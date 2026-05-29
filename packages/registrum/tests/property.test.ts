@@ -548,30 +548,131 @@ describe("property: lineage traces", () => {
     );
   });
 
-  it("child transitions extend lineage by 1", () => {
+  it("a same-id version transition appends to lineage (append-only)", () => {
     fc.assert(
       fc.property(
         arbStateId,
         (rootId) => {
           const registrar = createLegacyRegistrar();
 
-          // Register root
+          // Register root (version 1)
           registrar.register({
             from: null,
             to: arbRootState(rootId),
           });
 
-          // Child transition on root (same id)
+          // Same-id version transition (from: rootId, to.id: rootId) → version 2.
+          // Append-only: this MUST NOT overwrite v1; it records a new version
+          // whose parent is the prior version.
           registrar.register(arbChildTransition(rootId));
 
-          // Lineage: rootId → rootId (self-transition updates the entry)
+          // Lineage now contains BOTH versions of the same id, newest first.
           const lineage = registrar.getLineage(rootId);
-          expect(lineage.length).toBeGreaterThanOrEqual(1);
+          expect(lineage.length).toBe(2);
           expect(lineage[0]).toBe(rootId);
+          expect(lineage[1]).toBe(rootId);
         },
       ),
       { numRuns: 100 },
     );
+  });
+
+  it("v1 → v2 → v3 on one id yields a 3-entry lineage in newest-first order", () => {
+    const registrar = createLegacyRegistrar();
+    const id = "entity";
+
+    // v1: root
+    const r1 = registrar.register({ from: null, to: arbRootState(id) });
+    expect(r1.kind).toBe("accepted");
+
+    // v2: same-id transition
+    const r2 = registrar.register(arbChildTransition(id));
+    expect(r2.kind).toBe("accepted");
+
+    // v3: same-id transition
+    const r3 = registrar.register(arbChildTransition(id));
+    expect(r3.kind).toBe("accepted");
+
+    // Lineage walks the full version chain (3 entries), all the same id.
+    const lineage = registrar.getLineage(id);
+    expect(lineage.length).toBe(3);
+    expect(lineage).toEqual([id, id, id]);
+
+    // Order indices are strictly increasing across versions (append-only history).
+    if (r1.kind === "accepted" && r2.kind === "accepted" && r3.kind === "accepted") {
+      expect(r1.orderIndex).toBeLessThan(r2.orderIndex);
+      expect(r2.orderIndex).toBeLessThan(r3.orderIndex);
+    }
+  });
+
+  // V3-001: prove register() is NON-DESTRUCTIVE on the prior entry directly —
+  // i.e. the ORIGINAL v1 version's identity (orderIndex + parent link) is left
+  // UNCHANGED, not merely that a new entry was appended somewhere.
+  //
+  // To make this a direct (not transitive) proof, an UNRELATED root is
+  // registered between v1 and v2 so that v2.orderIndex is NOT v1.orderIndex + 1.
+  // A hypothetical destructive register() that rewrote the same-id slot in place
+  // would have to either reuse v1's index (collapsing the chain) or overwrite
+  // v1's index with v2's (orphaning the lineage). The lineage walk below is the
+  // public window into the version chain: it starts at the frontier (v2) and
+  // follows each entry's stored parentKey back to a null-parented root. It can
+  // only return [id, id] if BOTH versions still exist as distinct entries AND
+  // v1 still carries its ORIGINAL orderIndex (so v2's parentKey resolves to it)
+  // AND v1's parentKey is still null (so the walk terminates at a root rather
+  // than truncating or cycling).
+  it("register() leaves the prior version's orderIndex and parent link UNCHANGED (V3-001)", () => {
+    const registrar = createLegacyRegistrar();
+    const id = "doc";
+
+    // v1: root version of `id`. Capture its assigned orderIndex.
+    const v1 = registrar.register({ from: null, to: arbRootState(id) });
+    expect(v1.kind).toBe("accepted");
+    if (v1.kind !== "accepted") return;
+    const v1OrderIndex = v1.orderIndex;
+    expect(v1OrderIndex).toBe(0);
+
+    // v1 is a born-root: its lineage is exactly itself (parentKey === null).
+    expect(registrar.getLineage(id)).toEqual([id]);
+
+    // Register an UNRELATED root in between. This advances the global cursor so
+    // that v2 will NOT be assigned v1OrderIndex + 1 — defeating any "overwrite
+    // the same-id slot with the next index" shortcut.
+    const other = registrar.register({ from: null, to: arbRootState("other") });
+    expect(other.kind).toBe("accepted");
+
+    // v2: a SAME-id transition on `id`. Append-only — must record a new version
+    // and mutate NOTHING in v1's entry.
+    const v2 = registrar.register(arbChildTransition(id));
+    expect(v2.kind).toBe("accepted");
+    if (v2.kind !== "accepted") return;
+
+    // v2 got a fresh, strictly-greater, NON-adjacent index (proves the unrelated
+    // registration sat between the two versions of `id`).
+    expect(v2.orderIndex).toBeGreaterThan(v1OrderIndex);
+    expect(v2.orderIndex).not.toBe(v1OrderIndex + 1);
+
+    // Both versions of `id` are retained (append-only): 2 distinct id frontiers
+    // (`id`, `other`) but 3 total versions across history.
+    expect(registrar.getRegisteredCount()).toBe(2);
+    expect(registrar.getVersionCount()).toBe(3);
+
+    // The ORIGINAL v1 entry is still individually retrievable with its identity
+    // intact. The frontier (v2) → parentKey → v1 → null walk yields exactly
+    // [id, id]; this is only possible if v1 still has orderIndex v1OrderIndex
+    // (so v2's parentKey `id#${v1OrderIndex}` resolves to it) and v1's parentKey
+    // is still null (so the chain terminates at a root). A destructive register
+    // would have broken one of those, changing the walk.
+    expect(registrar.getLineage(id)).toEqual([id, id]);
+
+    // A snapshot taken now still projects v1's order index as the frontier's
+    // ancestor cursor base — the original index was never reused or rewritten.
+    const snap = registrar.snapshot();
+    // The frontier for `id` is v2; its cross-id parent is null (born-root chain).
+    expect(snap.lineage[id]).toBe(null);
+    // `other`'s index is strictly between v1's and v2's, confirming v1's index
+    // (0) was untouched while the cursor marched forward independently.
+    expect(snap.ordering.assigned["other"]).toBeGreaterThan(v1OrderIndex);
+    expect(snap.ordering.assigned["other"]).toBeLessThan(v2.orderIndex);
   });
 });
 

@@ -7,7 +7,7 @@
  * - Witness records (on-chain proof references)
  */
 
-import type { TxHash, ChainId } from "@attestia/types";
+import type { TxHash, ChainId, Telemetry } from "@attestia/types";
 
 // =============================================================================
 // Attestation Payload
@@ -192,6 +192,18 @@ export interface WitnessConfig {
 
   /** Optional: retry configuration for submit failures */
   readonly retry?: import("./retry.js").RetryConfig | undefined;
+
+  /**
+   * Optional telemetry sink for structured observability events.
+   *
+   * When omitted, the submitter emits nothing (default {@link NOOP_TELEMETRY}),
+   * keeping the package dependency-free and silent. When provided, the submitter
+   * emits `submit` (attempt + final outcome), `submit.retry`, and
+   * `submit.idempotent_hit` events under package `"@attestia/witness"`.
+   * Per the contract, txHash/ledgerIndex go in the event `message`, never in the
+   * low-cardinality `attributes`. `record` MUST NOT throw.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 // =============================================================================

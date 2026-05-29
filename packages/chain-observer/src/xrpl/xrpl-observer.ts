@@ -22,6 +22,7 @@
  */
 
 import { Client as XrplClient } from "xrpl";
+import { type Telemetry, NOOP_TELEMETRY } from "@attestia/types";
 import type {
   ChainObserver,
   ObserverConfig,
@@ -33,6 +34,7 @@ import type {
   TransferEvent,
   ConnectionStatus,
 } from "../observer.js";
+import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
 
 // =============================================================================
 // XRPL Observer
@@ -42,6 +44,7 @@ export class XrplObserver implements ChainObserver {
   readonly chainId: string;
   private client: XrplClient | null = null;
   private readonly config: ObserverConfig;
+  private readonly telemetry: Telemetry;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("xrpl:")) {
@@ -51,6 +54,7 @@ export class XrplObserver implements ChainObserver {
     }
     this.chainId = config.chain.chainId;
     this.config = config;
+    this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
   }
 
   async connect(): Promise<void> {
@@ -74,6 +78,8 @@ export class XrplObserver implements ChainObserver {
         chainId: this.chainId,
         connected: false,
         checkedAt: now,
+        error: "XrplObserver: not connected. Call connect() before querying.",
+        errorCode: "NOT_CONNECTED",
       };
     }
 
@@ -89,11 +95,15 @@ export class XrplObserver implements ChainObserver {
         latestBlock: response.result.ledger_index,
         checkedAt: now,
       };
-    } catch {
+    } catch (err) {
+      // Surface WHY the probe failed instead of an unexplained connected:false
+      // (D3-B-002). A health probe must not throw, so we return rather than rethrow.
       return {
         chainId: this.chainId,
         connected: false,
         checkedAt: now,
+        error: err instanceof Error ? err.message : String(err),
+        errorCode: classifyRpcError(err),
       };
     }
   }
@@ -101,11 +111,13 @@ export class XrplObserver implements ChainObserver {
   async getBalance(query: BalanceQuery): Promise<BalanceResult> {
     const client = this.requireClient();
 
-    const response = await client.request({
-      command: "account_info",
-      account: query.address,
-      ledger_index: query.atBlock !== undefined ? query.atBlock : "validated",
-    });
+    const response = await this.runRpc("getBalance", () =>
+      client.request({
+        command: "account_info",
+        account: query.address,
+        ledger_index: query.atBlock !== undefined ? query.atBlock : "validated",
+      }),
+    );
 
     const accountData = response.result.account_data;
     const balance = typeof accountData.Balance === "string"
@@ -127,16 +139,25 @@ export class XrplObserver implements ChainObserver {
     const client = this.requireClient();
 
     if (!query.issuer) {
-      throw new Error(
-        "XrplObserver.getTokenBalance: 'issuer' is required for XRPL token queries"
-      );
+      throw new ObserverError({
+        code: "INVALID_QUERY",
+        chainId: this.chainId,
+        message:
+          "XrplObserver.getTokenBalance: 'issuer' is required for XRPL token queries",
+        hint: "Provide the token issuer's r-address in query.issuer.",
+      });
     }
 
-    const response = await client.request({
-      command: "account_lines",
-      account: query.address,
-      peer: query.issuer,
-    });
+    // Capture the narrowed (non-undefined) issuer so the closure preserves the
+    // `peer: string` type (exactOptionalPropertyTypes) and account_lines typing.
+    const issuer: string = query.issuer;
+    const response = await this.runRpc("getTokenBalance", () =>
+      client.request({
+        command: "account_lines",
+        account: query.address,
+        peer: issuer,
+      }),
+    );
 
     const lines = response.result.lines;
     const line = lines.find(
@@ -169,13 +190,15 @@ export class XrplObserver implements ChainObserver {
   async getTransfers(query: TransferQuery): Promise<readonly TransferEvent[]> {
     const client = this.requireClient();
 
-    const response = await client.request({
-      command: "account_tx",
-      account: query.address,
-      ledger_index_min: query.fromBlock ?? -1,
-      ledger_index_max: query.toBlock ?? -1,
-      limit: query.limit ?? 100,
-    });
+    const response = await this.runRpc("getTransfers", () =>
+      client.request({
+        command: "account_tx",
+        account: query.address,
+        ledger_index_min: query.fromBlock ?? -1,
+        ledger_index_max: query.toBlock ?? -1,
+        limit: query.limit ?? 100,
+      }),
+    );
 
     const events: TransferEvent[] = [];
     const now = new Date().toISOString();
@@ -253,10 +276,50 @@ export class XrplObserver implements ChainObserver {
 
   private requireClient(): XrplClient {
     if (!this.client || !this.client.isConnected()) {
-      throw new Error(
-        "XrplObserver: not connected. Call connect() before querying."
-      );
+      const err = new ObserverError({
+        code: "NOT_CONNECTED",
+        chainId: this.chainId,
+        message: "XrplObserver: not connected. Call connect() before querying.",
+        hint: "Call connect() and await it before issuing queries.",
+      });
+      this.emitRpcFailure("NOT_CONNECTED");
+      throw err;
     }
     return this.client;
+  }
+
+  /**
+   * Emit a structured `rpc` failure telemetry event with low-cardinality
+   * attributes (`chainId`, `code`). Never throws.
+   */
+  private emitRpcFailure(code: string): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc",
+        level: "error",
+        outcome: "failed",
+        attributes: { chainId: this.chainId, code },
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run an XRPL request, classifying and re-throwing any failure as a structured
+   * {@link ObserverError} and emitting a `rpc` failure event (D3-B-003).
+   *
+   * @param context Operation name for the error message (e.g. "getBalance").
+   * @param fn The request to execute.
+   */
+  private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      const observerError = toObserverError(err, `XrplObserver.${context}`, this.chainId);
+      this.emitRpcFailure(observerError.code);
+      throw observerError;
+    }
   }
 }

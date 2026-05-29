@@ -33,6 +33,13 @@ export type ApiErrorCode =
 export interface ErrorDetail {
   readonly code: ApiErrorCode | string;
   readonly message: string;
+  /**
+   * Optional short, actionable next step for the caller (D6-B-001), e.g.
+   * "Approve the intent before executing it." Human-facing and safe to show in
+   * a UI — it must NEVER leak internal/sensitive detail (the same discipline as
+   * `message`). Distinct from `details`, which carries machine-readable data.
+   */
+  readonly hint?: string;
   readonly details?: Record<string, unknown>;
 }
 
@@ -44,14 +51,25 @@ export interface ErrorEnvelope {
 // Factory
 // =============================================================================
 
+/**
+ * Build an error envelope.
+ *
+ * @param code    Stable machine-readable error code.
+ * @param message Human-readable summary (safe to display; never sensitive).
+ * @param hint    Optional actionable next step (D6-B-001); omitted when absent.
+ * @param details Optional machine-readable structured data (e.g. validation
+ *                issues, current ETag). Kept distinct from `hint`.
+ */
 export function createErrorEnvelope(
   code: ApiErrorCode | string,
   message: string,
+  hint?: string,
   details?: Record<string, unknown>,
 ): ErrorEnvelope {
   const error: ErrorDetail = { code, message };
+  const withHint: ErrorDetail = hint !== undefined ? { ...error, hint } : error;
   if (details !== undefined) {
-    return { error: { ...error, details } };
+    return { error: { ...withHint, details } };
   }
-  return { error };
+  return { error: withHint };
 }

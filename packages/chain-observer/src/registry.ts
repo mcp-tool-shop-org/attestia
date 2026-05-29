@@ -83,14 +83,16 @@ export class ObserverRegistry {
    * Connect all registered observers.
    */
   async connectAll(): Promise<MultiChainResult<ConnectionStatus>> {
+    const chainIds = [...this.observers.keys()];
     const results = await Promise.allSettled(
-      [...this.observers.values()].map(async (observer) => {
+      chainIds.map(async (chainId) => {
+        const observer = this.observers.get(chainId)!;
         await observer.connect();
         return observer.getStatus();
       })
     );
 
-    return this.partitionResults(results);
+    return this.partitionResults(results, chainIds);
   }
 
   /**
@@ -106,10 +108,11 @@ export class ObserverRegistry {
    * Get status of all registered observers.
    */
   async getStatusAll(): Promise<MultiChainResult<ConnectionStatus>> {
+    const chainIds = [...this.observers.keys()];
     const results = await Promise.allSettled(
-      [...this.observers.values()].map((observer) => observer.getStatus())
+      chainIds.map((chainId) => this.observers.get(chainId)!.getStatus())
     );
-    return this.partitionResults(results);
+    return this.partitionResults(results, chainIds);
   }
 
   /**
@@ -132,19 +135,26 @@ export class ObserverRegistry {
         return observer.getBalance(query);
       })
     );
-    return this.partitionResults(results);
+    // D3-A-005: attribute results by the EXACT ordered target list used to build
+    // them, not by observers.keys() — `targets` may be a reordered subset.
+    return this.partitionResults(results, targets);
   }
 
   /**
    * Partition Promise.allSettled results into successes and errors.
+   *
+   * @param results The settled results, positionally aligned with `chainIds`.
+   * @param chainIds The chain IDs in the EXACT order the tasks were dispatched,
+   *   so a rejected result at index `i` is attributed to `chainIds[i]`. Callers
+   *   MUST pass the same ordered list they used to build `results` (which may be
+   *   a reordered subset of the registered observers).
    */
   private partitionResults<T extends { readonly chainId?: ChainId }>(
-    results: PromiseSettledResult<T>[]
+    results: PromiseSettledResult<T>[],
+    chainIds: readonly ChainId[]
   ): MultiChainResult<T> {
     const successes: T[] = [];
     const errors: { readonly chainId: ChainId; readonly error: string }[] = [];
-
-    const chainIds = [...this.observers.keys()];
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i]!;

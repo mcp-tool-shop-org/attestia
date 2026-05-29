@@ -10,10 +10,21 @@
  * - A single rejection kills the request
  * - Approval order doesn't matter
  * - Executed requests record in the ledger
+ *
+ * Separation of duties (D4-A-003):
+ * - The requester may NOT approve any gate on their own request, even if they
+ *   are also a configured gatekeeper. A gatekeeper who raised a request can
+ *   still approve OTHER requests; they are only barred from self-satisfying a
+ *   gate on the one they originated. Violations throw
+ *   FundingError("REQUESTER_CANNOT_APPROVE"). This preserves the two-distinct-
+ *   approver guarantee: a single person can never supply both the request and
+ *   one of its two approvals. (Submission by a gatekeeper is permitted; the
+ *   control is enforced at approval time.)
  */
 
 import { Ledger } from "@attestia/ledger";
-import type { Currency, LedgerEntry, Money } from "@attestia/types";
+import type { Currency, LedgerEntry, Money, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type { FundingRequest, FundingGate, FundingStatus } from "./types.js";
 
 // =============================================================================
@@ -35,7 +46,8 @@ export type FundingErrorCode =
   | "INVALID_TRANSITION"
   | "NOT_GATEKEEPER"
   | "ALREADY_APPROVED"
-  | "DUPLICATE_GATEKEEPER";
+  | "DUPLICATE_GATEKEEPER"
+  | "REQUESTER_CANNOT_APPROVE";
 
 // =============================================================================
 // Funding Gate
@@ -44,11 +56,19 @@ export type FundingErrorCode =
 export class FundingGateManager {
   private readonly requests: Map<string, FundingRequest> = new Map();
   private readonly gatekeepers: readonly [string, string];
+  private readonly telemetry: Telemetry;
 
+  /**
+   * @param telemetry Optional observability sink (D4-B-001). Defaults to
+   *   {@link NOOP_TELEMETRY}. Gate decisions emit `funding.gate` with
+   *   `{ gate, decision }` attributes (low-cardinality); execution emits
+   *   `funding.execute`. Raw request ids/amounts stay in `message`.
+   */
   constructor(
     gatekeepers: readonly [string, string],
     _currency: Currency,
     _decimals: number,
+    telemetry: Telemetry = NOOP_TELEMETRY,
   ) {
     if (gatekeepers[0] === gatekeepers[1]) {
       throw new FundingError(
@@ -57,6 +77,7 @@ export class FundingGateManager {
       );
     }
     this.gatekeepers = gatekeepers;
+    this.telemetry = telemetry;
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -123,6 +144,16 @@ export class FundingGateManager {
       );
     }
 
+    // Separation of duties: the requester cannot approve their own request,
+    // even if they are also a gatekeeper. Otherwise a single person could
+    // supply both the request and one of the two required approvals (D4-A-003).
+    if (approvedBy === request.requestedBy) {
+      throw new FundingError(
+        "REQUESTER_CANNOT_APPROVE",
+        `Requester cannot approve their own request '${id}' (separation of duties)`,
+      );
+    }
+
     // Check valid state
     if (request.status !== "pending" && request.status !== "gate1-approved") {
       throw new FundingError(
@@ -145,6 +176,13 @@ export class FundingGateManager {
         gate1: gate,
       };
       this.requests.set(id, updated);
+      this.telemetry.record({
+        package: "@attestia/treasury",
+        op: "funding.gate",
+        level: "info",
+        attributes: { gate: "gate1", decision: "approved" },
+        message: `funding request '${id}' gate1 approved`,
+      });
       return updated;
     }
 
@@ -162,6 +200,13 @@ export class FundingGateManager {
       gate2: gate,
     };
     this.requests.set(id, updated);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.gate",
+      level: "info",
+      attributes: { gate: "gate2", decision: "approved" },
+      message: `funding request '${id}' gate2 approved (fully approved)`,
+    });
     return updated;
   }
 
@@ -192,11 +237,19 @@ export class FundingGateManager {
     };
 
     // Determine which gate slot to use for the rejection record
+    const slot = request.gate1 ? "gate2" : "gate1";
     const updated: FundingRequest = request.gate1
       ? { ...request, status: "rejected", gate2: gate }
       : { ...request, status: "rejected", gate1: gate };
 
     this.requests.set(id, updated);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.gate",
+      level: "warn",
+      attributes: { gate: slot, decision: "rejected" },
+      message: `funding request '${id}' rejected at ${slot}`,
+    });
     return updated;
   }
 
@@ -263,6 +316,13 @@ export class FundingGateManager {
       executedAt: new Date().toISOString(),
     };
     this.requests.set(id, executed);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.execute",
+      level: "info",
+      outcome: "ok",
+      message: `funding request '${id}' executed for ${request.amount.amount} ${request.amount.currency}`,
+    });
     return executed;
   }
 

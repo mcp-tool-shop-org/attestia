@@ -26,16 +26,19 @@ import {
   isRetryableXrplError,
   type RetryConfig,
 } from "./retry.js";
+import { SubmitTelemetry } from "./telemetry.js";
 
 export class XrplSubmitter {
   private client: XrplClient | null = null;
   private wallet: Wallet | null = null;
   private readonly config: WitnessConfig;
   private readonly retryConfig: RetryConfig;
+  private readonly telemetry: SubmitTelemetry;
 
   constructor(config: WitnessConfig) {
     this.config = config;
     this.retryConfig = config.retry ?? DEFAULT_RETRY_CONFIG;
+    this.telemetry = new SubmitTelemetry(config.telemetry);
   }
 
   /**
@@ -88,13 +91,64 @@ export class XrplSubmitter {
     const client = this.client;
     const wallet = this.wallet;
 
+    // Idempotency-critical: autofill + sign EXACTLY ONCE, before the retry loop.
+    // This fixes Sequence + LastLedgerSequence (and therefore the transaction
+    // hash). Retries then resubmit the SAME signed blob and check the SAME fixed
+    // hash on-chain — so a lost-but-applied submission is recognized instead of
+    // re-submitted as a duplicate fund-affecting transaction (D3-A-001).
+    const memo: XrplMemo = encodeMemo(payload);
+    const tx: Payment = {
+      TransactionType: "Payment",
+      Account: this.config.account,
+      Destination: this.config.account, // Self-send
+      Amount: "1", // 1 drop
+      Memos: [
+        {
+          Memo: {
+            MemoType: memo.MemoType,
+            MemoData: memo.MemoData,
+            ...(memo.MemoFormat ? { MemoFormat: memo.MemoFormat } : {}),
+          },
+        },
+      ],
+      ...(this.config.feeDrops ? { Fee: this.config.feeDrops } : {}),
+    };
+
+    const prepared = await client.autofill(tx);
+    const signed = wallet.sign(prepared);
+
+    // D3-B-001: emit submission telemetry. attempt (info) once up-front; a
+    // submit.retry (warn) on each re-invocation of the retried callback; the
+    // final submit outcome (ok|failed) with durationMs. txHash/ledgerIndex go in
+    // the event message, never in low-cardinality attributes.
+    const startedAt = Date.now();
+    this.telemetry.attempt();
+
+    // The callback is invoked once per attempt by withRetry. The first invocation
+    // is the initial attempt; invocations 2..N are retries (emit submit.retry).
+    let invocation = 0;
+
     try {
-      return await withRetry(
-        async () => this._submitOnce(payload, client, wallet),
+      const record = await withRetry(
+        async () => {
+          invocation += 1;
+          if (invocation > 1) {
+            this.telemetry.retry(invocation - 1);
+          }
+          return this._submitSigned(payload, client, signed.tx_blob, signed.hash);
+        },
         this.retryConfig,
         isRetryableXrplError,
       );
+      this.telemetry.final(
+        "ok",
+        Date.now() - startedAt,
+        `witnessed txHash=${record.txHash} ledgerIndex=${record.ledgerIndex}`,
+      );
+      return record;
     } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.telemetry.final("failed", Date.now() - startedAt, `submission failed: ${detail}`);
       // Wrap RetryExhaustedError in WitnessSubmitError for domain-specific error type
       if (err instanceof WitnessSubmitError) {
         throw err;
@@ -155,48 +209,38 @@ export class XrplSubmitter {
   }
 
   /**
-   * Single submission attempt (no retry).
+   * Submit a single, already-signed transaction blob (one retry attempt).
+   *
+   * The blob and its hash are FIXED across retries (autofill + sign happen once
+   * in {@link submit}). Each attempt first checks whether the fixed-hash tx is
+   * already confirmed on-chain — if a previous attempt's response was lost but
+   * the tx applied, we recognize it here instead of submitting a duplicate.
+   *
+   * @param payload The attestation payload (for the returned record)
+   * @param client Connected XRPL client
+   * @param txBlob The signed transaction blob (constant across retries)
+   * @param txHash The signed transaction hash (constant across retries)
    */
-  private async _submitOnce(
+  private async _submitSigned(
     payload: AttestationPayload,
     client: XrplClient,
-    wallet: Wallet,
+    txBlob: string,
+    txHash: string,
   ): Promise<WitnessRecord> {
-    const memo: XrplMemo = encodeMemo(payload);
-
-    const tx: Payment = {
-      TransactionType: "Payment",
-      Account: this.config.account,
-      Destination: this.config.account, // Self-send
-      Amount: "1", // 1 drop
-      Memos: [
-        {
-          Memo: {
-            MemoType: memo.MemoType,
-            MemoData: memo.MemoData,
-            ...(memo.MemoFormat ? { MemoFormat: memo.MemoFormat } : {}),
-          },
-        },
-      ],
-      ...(this.config.feeDrops ? { Fee: this.config.feeDrops } : {}),
-    };
-
-    // Auto-fill sequence, fee (if not set), last ledger sequence
-    const prepared = await client.autofill(tx);
-
-    // Sign with witness wallet
-    const signed = wallet.sign(prepared);
-
     // Idempotency check: if the tx is already confirmed on-chain, return
     // the existing result instead of resubmitting (prevents duplicate
-    // attestations when a retry fires after a successful-but-lost response)
-    const existing = await this._checkExistingTx(client, signed.hash);
+    // attestations when a retry fires after a successful-but-lost response).
+    const existing = await this._checkExistingTx(client, txHash);
     if (existing) {
+      // D3-B-001: a lost-but-applied tx recovered via the fixed-hash check — a
+      // critical operational signal (the submission "succeeded" on a path that
+      // didn't return a response). Emit before returning the recovered record.
+      this.telemetry.idempotentHit(`txHash=${txHash} ledgerIndex=${existing.ledgerIndex}`);
       return {
         id: `witness:${payload.hash.slice(0, 16)}`,
         payload,
         chainId: this.config.chainId,
-        txHash: signed.hash,
+        txHash,
         ledgerIndex: existing.ledgerIndex,
         witnessedAt: new Date().toISOString(),
         witnessAccount: this.config.account,
@@ -204,7 +248,7 @@ export class XrplSubmitter {
     }
 
     // Submit and wait for validation
-    const result = await client.submitAndWait(signed.tx_blob);
+    const result = await client.submitAndWait(txBlob);
 
     const meta = result.result.meta;
     const ledgerIndex = typeof meta === "object" && meta !== null && "ledger_index" in meta
@@ -215,7 +259,7 @@ export class XrplSubmitter {
       id: `witness:${payload.hash.slice(0, 16)}`,
       payload,
       chainId: this.config.chainId,
-      txHash: signed.hash,
+      txHash,
       ledgerIndex,
       witnessedAt: new Date().toISOString(),
       witnessAccount: this.config.account,

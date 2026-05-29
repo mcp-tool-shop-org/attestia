@@ -17,7 +17,9 @@ import type {
   ChainId,
   TxHash,
   Money,
+  Telemetry,
 } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import { compareMoney } from "@attestia/ledger";
 import { BudgetEngine } from "./budget.js";
 import type {
@@ -70,9 +72,35 @@ const VALID_TRANSITIONS: Record<IntentStatus, readonly IntentStatus[]> = {
 export class IntentManager {
   private readonly intents: Map<string, VaultIntent> = new Map();
   private readonly budget: BudgetEngine;
+  private readonly telemetry: Telemetry;
 
-  constructor(budget: BudgetEngine) {
+  /**
+   * @param telemetry Optional observability sink (D4-B-001). Defaults to
+   *   {@link NOOP_TELEMETRY}. Lifecycle transitions emit `intent.transition`
+   *   with `{ from, to }` status attributes (both low-cardinality enums); the
+   *   raw intent id goes in `message`, never `attributes`.
+   */
+  constructor(budget: BudgetEngine, telemetry: Telemetry = NOOP_TELEMETRY) {
     this.budget = budget;
+    this.telemetry = telemetry;
+  }
+
+  /**
+   * Emit a lifecycle transition event. `from`/`to` are status enums (safe as
+   * metric labels); the high-cardinality intent id stays in `message`.
+   */
+  private emitTransition(
+    id: string,
+    from: IntentStatus,
+    to: IntentStatus,
+  ): void {
+    this.telemetry.record({
+      package: "@attestia/vault",
+      op: "intent.transition",
+      level: "info",
+      attributes: { from, to },
+      message: `intent '${id}' ${from} -> ${to}`,
+    });
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -159,6 +187,7 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    this.emitTransition(intentId, intent.status, "approved");
     return updated;
   }
 
@@ -187,6 +216,7 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    this.emitTransition(intentId, intent.status, "rejected");
     return updated;
   }
 
@@ -203,6 +233,7 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    this.emitTransition(intentId, intent.status, "executing");
     return updated;
   }
 
@@ -236,6 +267,7 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    this.emitTransition(intentId, intent.status, "executed");
     return updated;
   }
 
@@ -265,6 +297,16 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    // `matched` is low-cardinality (boolean) and meaningful for verification —
+    // surface it both as a transition attribute and a coarse outcome.
+    this.telemetry.record({
+      package: "@attestia/vault",
+      op: "intent.transition",
+      level: matched ? "info" : "warn",
+      outcome: matched ? "ok" : "degraded",
+      attributes: { from: intent.status, to: "verified", matched },
+      message: `intent '${intentId}' ${intent.status} -> verified (matched=${matched})`,
+    });
     return updated;
   }
 
@@ -294,6 +336,7 @@ export class IntentManager {
       discrepancies,
     };
 
+    const priorStatus = intent.status;
     const updated: VaultIntent = {
       ...intent,
       status: "failed",
@@ -301,6 +344,14 @@ export class IntentManager {
     };
 
     this.intents.set(intentId, updated);
+    this.telemetry.record({
+      package: "@attestia/vault",
+      op: "intent.transition",
+      level: "error",
+      outcome: "failed",
+      attributes: { from: priorStatus, to: "failed" },
+      message: `intent '${intentId}' ${priorStatus} -> failed`,
+    });
     return updated;
   }
 

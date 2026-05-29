@@ -3,11 +3,33 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { generateSeed, deriveKeypair, deriveAddress } from "ripple-keypairs";
 import { MultiSigWitness } from "../../src/governance/multisig-witness.js";
 import { GovernanceStore } from "../../src/governance/governance-store.js";
 import type { MultiSigWitnessConfig } from "../../src/governance/multisig-witness.js";
 import type { MultiSigConfig } from "../../src/governance/multisig-submitter.js";
 import type { WitnessConfig, AttestationPayload } from "../../src/types.js";
+
+// =============================================================================
+// Real signer keys (shared between wallet mock and governance policy).
+// =============================================================================
+
+interface TestKey {
+  readonly seed: string;
+  readonly address: string;
+  readonly publicKey: string;
+  readonly privateKey: string;
+}
+
+function genKey(): TestKey {
+  const seed = generateSeed();
+  const kp = deriveKeypair(seed);
+  return { seed, address: deriveAddress(kp.publicKey), publicKey: kp.publicKey, privateKey: kp.privateKey };
+}
+
+const KEYS: TestKey[] = [genKey(), genKey(), genKey()];
+const KEY_BY_SEED = new Map(KEYS.map((k) => [k.seed, k]));
+const MASTER_ACCOUNT = "rMultiSigAccount";
 
 // =============================================================================
 // Mocks
@@ -19,33 +41,51 @@ const mockIsConnected = vi.fn().mockReturnValue(true);
 const mockAutofill = vi.fn();
 const mockSubmitAndWait = vi.fn();
 
-vi.mock("xrpl", () => {
+vi.mock("xrpl", async () => {
+  const actual = await vi.importActual<typeof import("xrpl")>("xrpl");
   return {
+    ...actual,
     Client: vi.fn().mockImplementation(() => ({
       connect: mockConnect,
       disconnect: mockDisconnect,
       isConnected: mockIsConnected,
       autofill: mockAutofill,
       submitAndWait: mockSubmitAndWait,
-      request: vi.fn().mockResolvedValue({
-        result: {
-          transactions: [],
-        },
-      }),
+      // tx lookup: not found (pre-submit idempotency check misses by default).
+      request: vi.fn().mockRejectedValue(new Error("txnNotFound")),
     })),
     Wallet: {
-      fromSeed: vi.fn().mockImplementation((seed: string) => ({
-        address: `rAddr_${seed}`,
-        sign: vi.fn().mockImplementation((tx: Record<string, unknown>, multisign?: boolean) => ({
-          tx_blob: `blob_${seed}_${multisign ? "multi" : "single"}`,
-          hash: "consistent_tx_hash",
-        })),
-      })),
+      ...actual.Wallet,
+      fromSeed: vi.fn().mockImplementation((seed: string) => {
+        const key = KEY_BY_SEED.get(seed);
+        if (key) {
+          // Governance signer wallet — bound to a real keypair.
+          return {
+            classicAddress: key.address,
+            address: key.address,
+            publicKey: key.publicKey,
+            privateKey: key.privateKey,
+            sign: vi.fn().mockImplementation((tx: Record<string, unknown>, multisign?: boolean) => ({
+              tx_blob: `blob_${key.address}_${multisign ? "multi" : "single"}`,
+              hash: "consistent_tx_hash",
+            })),
+          };
+        }
+        // Single-signer wallet (single mode never verifies governance signatures).
+        return {
+          classicAddress: `rAddr_${seed}`,
+          address: `rAddr_${seed}`,
+          sign: vi.fn().mockImplementation((tx: Record<string, unknown>, multisign?: boolean) => ({
+            tx_blob: `blob_${seed}_${multisign ? "multi" : "single"}`,
+            hash: "consistent_tx_hash",
+          })),
+        };
+      }),
     },
     multisign: vi.fn().mockReturnValue("combined_multisign_blob"),
-    decode: vi.fn().mockImplementation((blob: string) => ({
-      Account: "rMultiSigAccount",
-      Destination: "rMultiSigAccount",
+    decode: vi.fn().mockImplementation(() => ({
+      Account: MASTER_ACCOUNT,
+      Destination: MASTER_ACCOUNT,
       TransactionType: "Payment",
     })),
   };
@@ -74,12 +114,8 @@ function makeMultiSigConfig(): MultiSigConfig {
   return {
     rpcUrl: "wss://test.xrpl.example.com",
     chainId: "xrpl:testnet",
-    account: "rMultiSigAccount",
-    signers: [
-      { address: "rSigner1", secret: "seed1" },
-      { address: "rSigner2", secret: "seed2" },
-      { address: "rSigner3", secret: "seed3" },
-    ],
+    account: MASTER_ACCOUNT,
+    signers: KEYS.map((k) => ({ address: k.address, secret: k.seed })),
     timeoutMs: 5000,
   };
 }
@@ -96,9 +132,9 @@ function makeSingleConfig(): WitnessConfig {
 
 function makeGovernanceStore(): GovernanceStore {
   const store = new GovernanceStore();
-  store.addSigner("rSigner1", "One");
-  store.addSigner("rSigner2", "Two");
-  store.addSigner("rSigner3", "Three");
+  store.addSigner(KEYS[0]!.address, "One", 1, KEYS[0]!.publicKey);
+  store.addSigner(KEYS[1]!.address, "Two", 1, KEYS[1]!.publicKey);
+  store.addSigner(KEYS[2]!.address, "Three", 1, KEYS[2]!.publicKey);
   store.changeQuorum(2);
   return store;
 }

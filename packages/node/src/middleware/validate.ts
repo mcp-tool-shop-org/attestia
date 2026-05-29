@@ -33,9 +33,12 @@ export function validateBody<T>(
     const result = schema.safeParse(body);
     if (!result.success) {
       return c.json(
-        createErrorEnvelope("VALIDATION_ERROR", "Request body validation failed", {
-          issues: formatZodErrors(result.error),
-        }),
+        createErrorEnvelope(
+          "VALIDATION_ERROR",
+          "Request body validation failed",
+          "Check the listed field issues and resubmit with a valid body.",
+          { issues: formatZodErrors(result.error) },
+        ),
         400,
       );
     }

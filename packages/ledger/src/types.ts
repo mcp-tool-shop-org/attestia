@@ -13,6 +13,7 @@
 import type {
   AccountRef,
   LedgerEntry,
+  Telemetry,
 } from "@attestia/types";
 
 // ─── Account Types ───────────────────────────────────────────────────────
@@ -131,6 +132,23 @@ export class LedgerError extends Error {
     this.name = "LedgerError";
     this.code = code;
   }
+}
+
+// ─── Ledger Options ──────────────────────────────────────────────────────
+
+/**
+ * Options for constructing a {@link Ledger}.
+ */
+export interface LedgerOptions {
+  /**
+   * Optional telemetry sink. When provided, the ledger emits structured
+   * {@link Telemetry} events (package `"@attestia/ledger"`) on append and on
+   * trial-balance failure. Emission is best-effort and never affects ledger
+   * behavior — `record` is contractually non-throwing.
+   *
+   * @default NOOP_TELEMETRY (no events emitted)
+   */
+  readonly telemetry?: Telemetry;
 }
 
 // ─── Append Options ──────────────────────────────────────────────────────

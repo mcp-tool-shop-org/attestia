@@ -57,6 +57,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@attestia/types": "workspace:*",
     "json-canonicalize": "^2.0.0"
   }
 }

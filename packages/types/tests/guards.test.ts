@@ -63,6 +63,86 @@ describe("isMoney", () => {
   it("rejects non-integer decimals", () => {
     expect(isMoney({ amount: "1", currency: "X", decimals: 6.5 })).toBe(false);
   });
+
+  // --- Numeric format validation of `amount` (D1-A-005) ---
+  // The amount is a string to avoid IEEE-754 error, but it must still be a
+  // canonical decimal numeral. Garbage strings that happen to be `typeof
+  // "string"` must be rejected fail-closed at the system boundary.
+
+  it("accepts canonical decimal amounts", () => {
+    expect(isMoney({ amount: "100.50", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "0", currency: "XRP", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "0.0", currency: "XRP", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "1000000", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "-5.25", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "-0", currency: "USDC", decimals: 6 })).toBe(true);
+  });
+
+  it("rejects empty amount string", () => {
+    expect(isMoney({ amount: "", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects whitespace in amount", () => {
+    expect(isMoney({ amount: " 100", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "100 ", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1 00", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "\t1", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects NaN / Infinity amounts", () => {
+    expect(isMoney({ amount: "NaN", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "Infinity", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "-Infinity", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects exponential notation", () => {
+    expect(isMoney({ amount: "1e6", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1E6", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1.5e-3", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects multi-dot / malformed numerals", () => {
+    expect(isMoney({ amount: "1.2.3", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: ".5", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "5.", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1,000", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "0x10", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "abc", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "+5", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "--5", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  // --- Precision coherence (D1-B-004) ---
+  // amount and decimals must be COHERENT: the fractional-part length must not
+  // exceed the declared precision. `{amount:"100.999", decimals:2}` is a
+  // well-formed decimal but declares 2 fractional digits while carrying 3 —
+  // consumers scaling by 10^decimals would silently misround it. Reject at the
+  // boundary so over-precise amounts never narrow to Money.
+
+  it("rejects amount with more fractional digits than decimals", () => {
+    expect(isMoney({ amount: "100.999", currency: "USDC", decimals: 2 })).toBe(false);
+    expect(isMoney({ amount: "0.1", currency: "BTC", decimals: 0 })).toBe(false);
+    expect(isMoney({ amount: "1.234567", currency: "XRP", decimals: 5 })).toBe(false);
+    expect(isMoney({ amount: "-0.001", currency: "USDC", decimals: 2 })).toBe(false);
+  });
+
+  it("accepts amount with fractional digits equal to decimals", () => {
+    expect(isMoney({ amount: "100.99", currency: "USDC", decimals: 2 })).toBe(true);
+    expect(isMoney({ amount: "1.234567", currency: "XRP", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "-0.01", currency: "USDC", decimals: 2 })).toBe(true);
+  });
+
+  it("accepts amount with fewer fractional digits than decimals", () => {
+    expect(isMoney({ amount: "100.5", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "1.0", currency: "XRP", decimals: 6 })).toBe(true);
+  });
+
+  it("accepts integer amounts even when decimals > 0", () => {
+    // No fractional part means zero fractional digits ≤ any decimals.
+    expect(isMoney({ amount: "100", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "1000000", currency: "USDC", decimals: 2 })).toBe(true);
+    expect(isMoney({ amount: "-5", currency: "USDC", decimals: 18 })).toBe(true);
+  });
 });
 
 describe("isAccountRef", () => {

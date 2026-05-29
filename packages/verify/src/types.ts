@@ -9,6 +9,7 @@
 
 import type { LedgerSnapshot } from "@attestia/ledger";
 import type { RegistrarSnapshotV1 } from "@attestia/registrum";
+import type { Telemetry } from "@attestia/types";
 
 // Re-export for convenience (used by state-bundle consumers)
 export type { LedgerSnapshot } from "@attestia/ledger";
@@ -197,6 +198,16 @@ export interface VerifierConfig {
 
   /** If true, missing optional fields (e.g., chainHashes) cause FAIL */
   readonly strictMode?: boolean;
+
+  /**
+   * Optional telemetry sink. When provided, {@link runVerification} emits a
+   * `"verify.phase"` event per verification phase (bundle integrity, replay,
+   * subsystem hashes, global hash, …) with low-cardinality
+   * `{ phase, passed }` attributes, making large-bundle verification
+   * observable. Telemetry is a side channel: it never changes the verdict, and
+   * omitting it emits nothing (the verifier defaults to a no-op sink).
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -263,6 +274,15 @@ export interface ConsensusResult {
 
   /** Whether minimum verifier threshold was met */
   readonly quorumReached: boolean;
+
+  /**
+   * True when the verdict is PASS but the quorum threshold that was applied
+   * was <= 1 — i.e. a single verifier was sufficient to approve. Such a PASS
+   * offers no protection against a compromised lone verifier; fail-closed
+   * callers should refuse it and require an explicit minimumVerifiers >= 2.
+   * Always false for a FAIL verdict.
+   */
+  readonly singleVerifierPass: boolean;
 
   /** Verifier IDs that dissented from the majority */
   readonly dissenters: readonly string[];

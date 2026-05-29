@@ -9,15 +9,27 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types/api-contract.js";
 import type { TenantRegistry } from "../services/tenant-registry.js";
 
-interface SubsystemStatus {
-  readonly status: "ok" | "degraded" | "down";
-  readonly detail?: string | undefined;
+export interface HealthRouteOptions {
+  /**
+   * Expose aggregate tenant counts (`tenants`/`ready`/`notReady`) on the
+   * unauthenticated `/ready` probe.
+   *
+   * Default: false (fail-closed). `/ready` is mounted BEFORE auth, so even an
+   * aggregate tenant count lets an unauthenticated caller probe how many
+   * tenants exist and watch that number change over time (enumeration,
+   * V2-002). By default the probe returns only boolean readiness
+   * (`status` + `timestamp`). Operators who need the counts can opt in here —
+   * or, better, expose them behind admin auth.
+   */
+  readonly exposeReadinessCounts?: boolean;
 }
 
 export function createHealthRoutes(
   tenantRegistry: TenantRegistry,
+  options: HealthRouteOptions = {},
 ): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
+  const exposeCounts = options.exposeReadinessCounts ?? false;
 
   routes.get("/health", (c) => {
     return c.json({
@@ -28,53 +40,55 @@ export function createHealthRoutes(
 
   routes.get("/ready", (c) => {
     const tenantIds = tenantRegistry.tenantIds();
-    const subsystems: Record<string, SubsystemStatus> = {};
-    let allReady = true;
+
+    // Deep health is computed PER tenant. This endpoint is mounted before auth,
+    // so the default response exposes ONLY boolean readiness — no per-tenant
+    // IDs (D6-A-003) and no aggregate counts (V2-002). Even a count is an
+    // enumeration signal on an unauthenticated probe; counts are opt-in via
+    // exposeReadinessCounts and otherwise belong behind admin auth.
+    let readyCount = 0;
+    let notReadyCount = 0;
 
     for (const tenantId of tenantIds) {
       const service = tenantRegistry.getOrCreate(tenantId);
 
       // Deep health: check event store integrity + writability
       const { writable, integrity } = service.checkEventStoreWritable();
+      const eventStoreOk = writable && integrity.valid;
+      const serviceReady = service.isReady() && eventStoreOk;
 
-      const eventStoreStatus: SubsystemStatus = writable && integrity.valid
-        ? { status: "ok" }
-        : {
-            status: "down",
-            detail: `writable=${writable}, chainValid=${integrity.valid}, errors=${integrity.errors.length}`,
-          };
-
-      const serviceReady = service.isReady() && eventStoreStatus.status === "ok";
-
-      subsystems[tenantId] = {
-        status: serviceReady ? "ok" : "down",
-        detail: serviceReady
-          ? undefined
-          : `eventStore=${eventStoreStatus.status}`,
-      };
-
-      if (!serviceReady) {
-        allReady = false;
+      if (serviceReady) {
+        readyCount++;
+      } else {
+        notReadyCount++;
       }
     }
 
     // If no tenants have been initialized yet, we're still ready
-    // (tenants are created on first request)
-    if (tenantIds.length === 0) {
-      allReady = true;
-    }
-
+    // (tenants are created on first request).
+    const allReady = notReadyCount === 0;
     const status = allReady ? 200 : 503;
 
-    return c.json(
-      {
-        status: allReady ? "ready" : "not_ready",
-        tenants: tenantIds.length,
-        subsystems,
-        timestamp: new Date().toISOString(),
-      },
-      status as 200,
-    );
+    const body: {
+      status: string;
+      timestamp: string;
+      tenants?: number;
+      ready?: number;
+      notReady?: number;
+    } = {
+      status: allReady ? "ready" : "not_ready",
+      timestamp: new Date().toISOString(),
+    };
+
+    // Counts are off by default (V2-002). When explicitly enabled, expose only
+    // aggregate counts — never per-tenant detail.
+    if (exposeCounts) {
+      body.tenants = tenantIds.length;
+      body.ready = readyCount;
+      body.notReady = notReadyCount;
+    }
+
+    return c.json(body, status as 200);
   });
 
   return routes;

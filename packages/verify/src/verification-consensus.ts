@@ -46,15 +46,25 @@ export function isConsensusReached(
  * - Verifiers who disagree with the majority are listed as dissenters
  * - If no reports are provided, verdict is FAIL with 0 agreement
  *
+ * The default `minimumVerifiers` of 1 is permissive: a caller that omits the
+ * threshold can obtain a PASS from a single verifier. The default is retained
+ * for backward compatibility, but any PASS reached with an applied quorum
+ * threshold of <= 1 is flagged via `singleVerifierPass` so fail-closed callers
+ * can refuse it and demand an explicit threshold of >= 2.
+ *
  * @param reports - All submitted verifier reports
- * @param minimumVerifiers - Minimum verifiers before consensus is valid (default: 1)
- * @returns ConsensusResult with verdict, counts, and dissenters
+ * @param minimumVerifiers - Minimum verifiers before consensus is valid (default: 1, permissive — see above)
+ * @returns ConsensusResult with verdict, counts, dissenters, and the weak-quorum flag
  */
 export function aggregateVerifierReports(
   reports: readonly VerifierReport[],
   minimumVerifiers: number = 1,
 ): ConsensusResult {
   const total = reports.length;
+
+  // A PASS is "single-verifier" (weak) when the applied quorum threshold is
+  // <= 1, i.e. one verifier would have sufficed. Computed per-verdict below.
+  const weakThreshold = minimumVerifiers <= 1;
 
   if (total === 0) {
     return {
@@ -64,6 +74,7 @@ export function aggregateVerifierReports(
       failCount: 0,
       agreementRatio: 0,
       quorumReached: false,
+      singleVerifierPass: false,
       dissenters: [],
       consensusAt: new Date().toISOString(),
     };
@@ -96,6 +107,8 @@ export function aggregateVerifierReports(
     failCount,
     agreementRatio,
     quorumReached,
+    // Flag a PASS that only required a lone verifier (weak quorum threshold).
+    singleVerifierPass: verdict === "PASS" && weakThreshold,
     dissenters,
     consensusAt: new Date().toISOString(),
   };

@@ -208,8 +208,14 @@ function tokenize(input: string): Token[] {
 
 /**
  * Parse error class.
+ *
+ * `code` is the stable identifier `"PREDICATE_PARSE"` from the registrum error
+ * vocabulary; callers may rely on it across patch/minor releases.
  */
 export class ParseError extends Error {
+  /** Stable error code: `"PREDICATE_PARSE"`. */
+  readonly code = "PREDICATE_PARSE" as const;
+
   constructor(message: string) {
     super(message);
     this.name = "ParseError";

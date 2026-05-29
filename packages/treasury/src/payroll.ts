@@ -20,7 +20,8 @@ import {
   zeroMoney,
   Ledger,
 } from "@attestia/ledger";
-import type { Money, Currency, LedgerEntry } from "@attestia/types";
+import type { Money, Currency, LedgerEntry, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type {
   Payee,
   PayComponent,
@@ -65,10 +66,21 @@ export class PayrollEngine {
   private readonly runs: Map<string, PayrollRun> = new Map();
   private readonly currency: Currency;
   private readonly decimals: number;
+  private readonly telemetry: Telemetry;
 
-  constructor(currency: Currency, decimals: number) {
+  /**
+   * @param telemetry Optional observability sink (D4-B-001). Defaults to
+   *   {@link NOOP_TELEMETRY}. Executing a run emits `payroll.run` with a
+   *   `{ recipientCount }` attribute; raw totals/ids stay in `message`.
+   */
+  constructor(
+    currency: Currency,
+    decimals: number,
+    telemetry: Telemetry = NOOP_TELEMETRY,
+  ) {
     this.currency = currency;
     this.decimals = decimals;
+    this.telemetry = telemetry;
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -300,6 +312,14 @@ export class PayrollEngine {
       executedAt: new Date().toISOString(),
     };
     this.runs.set(id, executed);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "payroll.run",
+      level: "info",
+      outcome: "ok",
+      attributes: { recipientCount: run.entries.length },
+      message: `payroll run '${run.id}' (${run.period.label}) executed: net ${run.totalNet.amount} ${run.totalNet.currency} to ${run.entries.length} payee(s)`,
+    });
     return executed;
   }
 

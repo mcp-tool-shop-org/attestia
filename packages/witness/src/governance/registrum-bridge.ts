@@ -22,7 +22,7 @@ import type {
   QuorumResult,
 } from "./types.js";
 import type { AttestationPayload } from "../types.js";
-import type { SignerSignature } from "./signing.js";
+import type { SignerSignature, SignatureVerifier } from "./signing.js";
 
 // =============================================================================
 // Types
@@ -60,6 +60,24 @@ export interface AuthorityValidation {
 
   /** Reasons for rejection (empty if valid) */
   readonly rejections: readonly string[];
+}
+
+/**
+ * Options for {@link validateHistoricalQuorum}.
+ */
+export interface HistoricalQuorumOptions {
+  /**
+   * Cryptographic signature verifier (verify-then-count). When supplied,
+   * each signature must verify over `payloadHash` against the signer's
+   * registered public key before its weight counts toward quorum.
+   */
+  readonly verify?: SignatureVerifier;
+
+  /**
+   * The canonical signing payload hash the signatures were produced over.
+   * Required when `verify` is supplied.
+   */
+  readonly payloadHash?: string;
 }
 
 /**
@@ -203,6 +221,10 @@ export function replayToVersion(
  * @param signatures The signatures that were collected at the time
  * @param events The full governance event history
  * @param policyVersion The policy version that was active when signed
+ * @param options Optional cryptographic verifier (see {@link HistoricalQuorumOptions}).
+ *   When supplied, each signature must verify over the canonical `payloadHash`
+ *   against the signer's registered public key before counting toward quorum
+ *   (verify-then-count); entries lacking a verifiable signature are rejected.
  * @returns HistoricalQuorumValidation result
  */
 export function validateHistoricalQuorum(
@@ -210,6 +232,7 @@ export function validateHistoricalQuorum(
   signatures: readonly SignerSignature[],
   events: readonly GovernanceChangeEvent[],
   policyVersion: number,
+  options: HistoricalQuorumOptions = {},
 ): HistoricalQuorumValidation {
   const rejections: string[] = [];
 
@@ -232,10 +255,11 @@ export function validateHistoricalQuorum(
     };
   }
 
+  const signerByAddress = new Map(policyAtTime.signers.map((s) => [s.address, s]));
+
   // Validate each signer was in the policy at that time
-  const policyAddresses = new Set(policyAtTime.signers.map((s) => s.address));
   for (const sig of signatures) {
-    if (!policyAddresses.has(sig.address)) {
+    if (!signerByAddress.has(sig.address)) {
       rejections.push(
         `Signer ${sig.address} was not in policy at version ${policyVersion}`,
       );
@@ -248,22 +272,55 @@ export function validateHistoricalQuorum(
     rejections.push("Duplicate signatures detected");
   }
 
-  // Calculate quorum
-  const totalWeight = signatures.reduce((sum, sig) => {
-    const signer = policyAtTime.signers.find((s) => s.address === sig.address);
-    return sum + (signer?.weight ?? 0);
-  }, 0);
+  // Fail-closed: a policy that registers public keys MUST be verified.
+  const { verify, payloadHash } = options;
+  const policyHasPublicKeys = policyAtTime.signers.some((s) => s.publicKey);
+  if (policyHasPublicKeys && !verify) {
+    rejections.push(
+      "Policy at version registers signer public keys but no signature verifier was supplied; " +
+      "refusing to count unverified signatures.",
+    );
+  }
+  if (verify && payloadHash === undefined) {
+    rejections.push(
+      "A signature verifier was supplied without a payloadHash; cannot verify signatures.",
+    );
+  }
+
+  // Verify-then-count: only signatures that verify over payloadHash against the
+  // signer's registered key contribute weight. Without a verifier this falls
+  // back to structural weight (legacy callers).
+  let totalWeight = 0;
+  const countedAddresses = new Set<string>();
+  const canVerify = Boolean(verify) && payloadHash !== undefined;
+  for (const sig of signatures) {
+    const signer = signerByAddress.get(sig.address);
+    if (!signer) continue; // already rejected above
+    if (canVerify) {
+      const ok = verify!(sig, payloadHash!, signer);
+      if (!ok) {
+        rejections.push(
+          `Signature from ${sig.address} failed cryptographic verification`,
+        );
+        continue;
+      }
+    }
+    if (!countedAddresses.has(sig.address)) {
+      totalWeight += signer.weight;
+      countedAddresses.add(sig.address);
+    }
+  }
 
   const allPolicyAddresses = policyAtTime.signers.map((s) => s.address);
   const missingAddresses = allPolicyAddresses.filter(
-    (addr) => !uniqueAddresses.has(addr),
+    (addr) => !countedAddresses.has(addr),
   );
 
   const quorum: QuorumResult = {
     met: totalWeight >= policyAtTime.quorum,
     totalWeight,
     requiredWeight: policyAtTime.quorum,
-    signerAddresses: [...uniqueAddresses],
+    signerAddresses: [...countedAddresses],
     missingAddresses,
   };
 

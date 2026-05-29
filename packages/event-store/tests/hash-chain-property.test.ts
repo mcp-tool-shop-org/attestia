@@ -82,6 +82,106 @@ describe("hash chain property tests", () => {
     );
   });
 
+  // D2-A-005: head-truncation must be detectable. A fully-hashed chain MUST
+  // begin at genesis; removing the first event (or any leading run) leaves a
+  // chain whose first event's previousHash is no longer GENESIS_HASH.
+  it("removing the FIRST event breaks the chain (head truncation)", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbDomainEvent, { minLength: 2, maxLength: 10 }),
+        (events) => {
+          const store = new InMemoryEventStore();
+          store.append("stream", events);
+
+          const allEvents = store.readAll() as StoredEvent[];
+          // Drop the head — the new first event's previousHash is the dropped
+          // event's hash, not GENESIS_HASH.
+          const tampered = allEvents.slice(1);
+
+          const result = verifyHashChain(tampered);
+          expect(result.valid).toBe(false);
+          expect(result.errors.length).toBeGreaterThan(0);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
+  it("removing a leading run of events breaks the chain", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbDomainEvent, { minLength: 4, maxLength: 12 }),
+        fc.nat(),
+        (events, dropCount) => {
+          const store = new InMemoryEventStore();
+          store.append("stream", events);
+
+          const allEvents = store.readAll() as StoredEvent[];
+          // Drop a leading run of 1..len-1 events.
+          const n = 1 + (dropCount % (allEvents.length - 1));
+          const tampered = allEvents.slice(n);
+
+          const result = verifyHashChain(tampered);
+          expect(result.valid).toBe(false);
+          expect(result.errors.length).toBeGreaterThan(0);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
+  it("removing a trailing run still validates the surviving prefix", () => {
+    // Removing the TAIL is legitimate append-truncation from the chain's POV:
+    // the surviving prefix still starts at genesis and links correctly, so the
+    // hash chain alone reports valid. (Detecting tail loss is the store's job
+    // via globalPosition/length, not verifyHashChain's.) This guards against an
+    // over-eager genesis check that would false-positive on a valid prefix.
+    fc.assert(
+      fc.property(
+        fc.array(arbDomainEvent, { minLength: 4, maxLength: 12 }),
+        fc.nat(),
+        (events, dropCount) => {
+          const store = new InMemoryEventStore();
+          store.append("stream", events);
+
+          const allEvents = store.readAll() as StoredEvent[];
+          const keep = allEvents.length - (1 + (dropCount % (allEvents.length - 1)));
+          const tampered = allEvents.slice(0, keep);
+
+          const result = verifyHashChain(tampered);
+          expect(result.valid).toBe(true);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
+  it("flipping the first event's previousHash away from genesis breaks the chain", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbDomainEvent, { minLength: 1, maxLength: 10 }),
+        (events) => {
+          const store = new InMemoryEventStore();
+          store.append("stream", events);
+
+          const allEvents = [...store.readAll()] as Array<
+            StoredEvent & { hash: string; previousHash: string }
+          >;
+          // Point the genesis event at a fabricated predecessor.
+          allEvents[0] = {
+            ...allEvents[0]!,
+            previousHash: "f".repeat(64),
+          };
+
+          const result = verifyHashChain(allEvents);
+          expect(result.valid).toBe(false);
+          expect(result.errors.some((e) => e.position === allEvents[0]!.globalPosition)).toBe(true);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
   it("modifying any event payload breaks the chain", () => {
     fc.assert(
       fc.property(

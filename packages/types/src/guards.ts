@@ -19,16 +19,61 @@ import type { SolanaOnChainEvent } from "./solana.js";
 const ACCOUNT_TYPES = new Set(["asset", "liability", "income", "expense", "equity"]);
 const ENTRY_TYPES = new Set<string>(["debit", "credit"]);
 
+/**
+ * Canonical decimal numeral.
+ *
+ * Money.amount is a string (to dodge IEEE-754 error), but it must still be a
+ * well-formed decimal. This anchored pattern accepts only:
+ *   - an optional leading minus
+ *   - one or more integer digits (no leading-dot, no separators)
+ *   - an optional fractional part with at least one digit
+ *
+ * It rejects empty strings, whitespace, "NaN"/"Infinity", exponential
+ * notation, multiple dots, thousands separators, hex, and signs other than a
+ * single leading "-". This is the fail-closed boundary check: a string that is
+ * not a real number must never narrow to Money.
+ *
+ * Capturing group 1 is the fractional part **including** its leading dot
+ * (e.g. ".999" for "100.999"), or `undefined` when the amount is an integer.
+ */
+const CANONICAL_AMOUNT = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Runtime guard for {@link Money}.
+ *
+ * Enforces the full Money contract, not just shape:
+ *  - `amount` is a string in canonical decimal form (see {@link CANONICAL_AMOUNT}).
+ *  - `decimals` is a non-negative integer.
+ *  - **Precision coherence:** the number of fractional digits in `amount` must
+ *    not exceed `decimals`. `amount` and `decimals` together declare the scale
+ *    of the value; an amount that carries more fractional digits than it
+ *    declares (e.g. `{ amount: "100.999", decimals: 2 }`) is internally
+ *    inconsistent. Downstream consumers scale by `10 ** decimals` to reach the
+ *    integer representation, so an over-precise amount would silently misround
+ *    (or throw deep in arithmetic). It is rejected fail-closed at this boundary.
+ *    An integer amount (no fractional part) is always coherent with any
+ *    non-negative `decimals`.
+ */
 export function isMoney(value: unknown): value is Money {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.amount === "string" &&
-    typeof v.currency === "string" &&
-    typeof v.decimals === "number" &&
-    Number.isInteger(v.decimals) &&
-    v.decimals >= 0
-  );
+  if (
+    typeof v.amount !== "string" ||
+    typeof v.currency !== "string" ||
+    typeof v.decimals !== "number" ||
+    !Number.isInteger(v.decimals) ||
+    v.decimals < 0
+  ) {
+    return false;
+  }
+
+  const match = CANONICAL_AMOUNT.exec(v.amount);
+  if (match === null) return false;
+
+  // Precision coherence: fractional digits (group 1 minus the leading dot)
+  // must not exceed the declared decimals. No fractional part ⇒ length 0.
+  const fractionalDigits = match[1] === undefined ? 0 : match[1].length - 1;
+  return fractionalDigits <= v.decimals;
 }
 
 export function isAccountRef(value: unknown): value is AccountRef {

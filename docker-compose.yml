@@ -1,5 +1,9 @@
 # Docker Compose — Attestia stack
 #
+# LOCAL DEVELOPMENT / INTEGRATION TESTING ONLY.
+# Not a production deployment manifest: attestia-node runs in unsecured mode
+# by default (see below) and rippled runs in standalone mode with no peers.
+#
 # Services:
 #   attestia-node  — REST API server (Phase 8)
 #   rippled        — Standalone XRPL node for integration testing
@@ -37,11 +41,12 @@ services:
       start_period: 5s
 
   rippled:
-    image: rippleci/rippled:latest
+    # Pinned to an immutable release (tag + digest) — never :latest.
+    image: rippleci/rippled:2.3.1@sha256:bb471c7f0bc7362f873cdb83f8be1409b42a1b4a8b7e9c36ea4d6d20b78d2de7
     command: standalone
     ports:
-      - "6006:6006"   # WebSocket (public)
-      - "5005:5005"   # JSON-RPC admin
+      - "6006:6006"             # WebSocket (used by integration tests)
+      - "127.0.0.1:5005:5005"   # JSON-RPC admin — localhost only, never all interfaces
     healthcheck:
       test: ["CMD", "rippled", "--silent", "server_info"]
       interval: 5s

@@ -26,6 +26,7 @@ export { AccountRegistry } from "./accounts.js";
 export {
   computeAccountBalance,
   computeTrialBalance,
+  assertTrialBalanced,
 } from "./balance-calculator.js";
 
 // Money arithmetic
@@ -55,6 +56,7 @@ export type {
   TrialBalanceLine,
   TrialBalance,
   LedgerErrorCode,
+  LedgerOptions,
   AppendOptions,
   AppendResult,
   LedgerSnapshot,

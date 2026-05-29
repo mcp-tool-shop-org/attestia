@@ -11,7 +11,7 @@
  * - Errors are thrown, not returned — fail-closed
  */
 
-import type { ChainId, ChainRef } from "@attestia/types";
+import type { ChainId, ChainRef, Telemetry } from "@attestia/types";
 import type { ChainProfile } from "./finality.js";
 
 // =============================================================================
@@ -37,6 +37,17 @@ export interface ObserverConfig {
    * (e.g., confirmation depth, safe/finalized block tags, commitment levels).
    */
   readonly profile?: ChainProfile;
+
+  /**
+   * Optional telemetry sink for structured observability events.
+   *
+   * When omitted, observers emit nothing (default {@link NOOP_TELEMETRY}),
+   * keeping the package dependency-free and silent. When provided, observers
+   * emit a `rpc` event (outcome `"failed"`, low-cardinality attributes
+   * `{ chainId, code }`) when a classified RPC failure occurs, so hosts can
+   * meter failure rates by chain and error class. `record` MUST NOT throw.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 // =============================================================================
@@ -63,6 +74,26 @@ export interface ConnectionStatus {
    * Only populated when the observer has a ChainProfile with finality config.
    */
   readonly safeBlock?: number;
+
+  /**
+   * Human-readable reason the probe failed, populated when `connected` is false.
+   *
+   * A health probe must never throw (callers poll it), but it must also never
+   * silently swallow *why* it failed — that violates the package's
+   * "errors are surfaced, never swallowed" rule. When the connection check
+   * errors, this carries the underlying error message so an operator can see
+   * the cause (e.g. "fetch failed", "WebSocket not connected") instead of an
+   * unexplained `connected: false`.
+   */
+  readonly error?: string;
+
+  /**
+   * Machine-readable classification of a failed probe, populated alongside
+   * {@link error} when `connected` is false. Mirrors {@link ObserverErrorCode}
+   * values (e.g. "NOT_CONNECTED", "RPC_TIMEOUT", "RPC_UNREACHABLE") so callers
+   * can branch on the code without string-matching `error`.
+   */
+  readonly errorCode?: string;
 }
 
 // =============================================================================

@@ -19,8 +19,14 @@
  * - ❌ No wall-clock timestamps (environment-dependent)
  */
 
+import { createHash } from "crypto";
+import { canonicalize } from "json-canonicalize";
 import type { StateID } from "../types.js";
 import type { RegistrarMode } from "../structural-registrar.js";
+import type {
+  CompiledInvariantRegistry,
+  CompiledInvariant,
+} from "../registry/loader.js";
 
 // =============================================================================
 // Snapshot Schema Version 1
@@ -35,9 +41,17 @@ export const SNAPSHOT_VERSION = "1.0" as const;
 /**
  * Registrar state snapshot.
  *
- * This is the complete, structural representation of a Registrar's state.
- * It contains everything needed to reconstruct the registrar exactly,
- * and nothing more.
+ * This is the structural projection of a Registrar's LIVE FRONTIER — the
+ * latest accepted version of each StateID — and the minimum needed to resume
+ * accepting transitions deterministically.
+ *
+ * Append-only note: Registrum never overwrites history; a same-id transition
+ * records a new version in the in-memory chain (see StructuralRegistrar). The
+ * snapshot deliberately captures only the frontier (one entry per StateID),
+ * because deep ancestry is reconstructed by REPLAY of the transition log, not
+ * by the snapshot. `getLineage` on a live registrar returns the full version
+ * chain; `getLineage` on a registrar rehydrated from a snapshot returns the
+ * restored frontier. This keeps the snapshot schema stable and bounded.
  */
 export interface RegistrarSnapshotV1 {
   /**
@@ -48,10 +62,13 @@ export interface RegistrarSnapshotV1 {
 
   /**
    * Invariant registry identity hash.
-   * Used to verify registry compatibility on rehydration.
+   * Used to verify registry compatibility on rehydration (fail-closed).
    *
-   * For legacy mode: hash of invariant IDs
-   * For registry mode: registry_id from the compiled registry
+   * For legacy mode: `legacy:<sorted invariant IDs>`
+   * For registry mode: hex SHA-256 content hash over the compiled registry's
+   *   normative content (registry_id, version, and each invariant's id, scope,
+   *   failure_mode, and canonicalized predicate AST). A constitutional change
+   *   therefore changes this hash even if registry_id is unchanged.
    */
   readonly registry_hash: string;
 
@@ -99,6 +116,9 @@ export interface RegistrarSnapshotV1 {
  * Thrown when snapshot validation fails.
  */
 export class SnapshotValidationError extends Error {
+  /** Stable error code: `"SNAPSHOT_INVALID"`. */
+  readonly code = "SNAPSHOT_INVALID" as const;
+
   constructor(
     message: string,
     public readonly field?: string
@@ -148,8 +168,15 @@ export function validateSnapshot(raw: unknown): asserts raw is RegistrarSnapshot
   }
 
   // mode
-  if (snapshot.mode !== "legacy" && snapshot.mode !== "registry") {
-    throw new SnapshotValidationError(`mode must be 'legacy' or 'registry', got '${snapshot.mode}'`, "mode");
+  if (
+    snapshot.mode !== "legacy" &&
+    snapshot.mode !== "registry" &&
+    snapshot.mode !== "dual"
+  ) {
+    throw new SnapshotValidationError(
+      `mode must be 'legacy', 'registry', or 'dual', got '${snapshot.mode}'`,
+      "mode"
+    );
   }
 
   // state_ids
@@ -252,6 +279,45 @@ function validateSnapshotConsistency(
     }
   }
 
+  // Root-reachability + acyclicity.
+  //
+  // Parent-existence is necessary but not sufficient: a lineage where every
+  // parent exists can still contain a cycle (e.g. A->B->A) and thus never
+  // terminate at a null-parent root. Such a snapshot describes an impossible
+  // append-only history and must be rejected fail-closed. Walk each state's
+  // parent chain; it must reach a null parent (a root) without revisiting any
+  // node. A repeated node on the walk proves a cycle.
+  for (const start of stateIds) {
+    const seen = new Set<string>();
+    let cursor: string | null = start;
+
+    while (cursor !== null) {
+      if (seen.has(cursor)) {
+        throw new SnapshotValidationError(
+          `Lineage cycle detected: state '${start}' does not reach a root ` +
+            `(revisited '${cursor}')`,
+          `lineage['${start}']`
+        );
+      }
+      seen.add(cursor);
+
+      // Parent presence and existence are already validated above, so a
+      // missing key here would be an internal inconsistency; treat it as a
+      // broken (rootless) chain rather than silently stopping.
+      const next: string | null | undefined = lineage[cursor];
+      if (next === undefined) {
+        throw new SnapshotValidationError(
+          `Lineage chain for state '${start}' references unknown node ` +
+            `'${cursor}' and does not reach a root`,
+          `lineage['${start}']`
+        );
+      }
+
+      cursor = next;
+    }
+    // Loop exited because cursor became null → reached a root. Good.
+  }
+
   // Every state_id must have an ordering entry
   for (const id of stateIds) {
     if (!(id in ordering.assigned)) {
@@ -332,10 +398,42 @@ export function computeLegacyRegistryHash(invariantIds: readonly string[]): stri
 }
 
 /**
- * Compute a registry hash for registry mode.
+ * Compute a content-addressed hash for a registry-mode invariant registry.
  *
- * Uses the registry_id from the compiled registry.
+ * The hash is a hex-encoded SHA-256 over the registry's NORMATIVE content —
+ * the parts that determine constitutional behavior:
+ *   - registry_id and version (identity)
+ *   - for each invariant, in declaration order:
+ *       id, scope, failure_mode, and the canonicalized predicate AST
+ *
+ * Why the AST and not the source expression: the AST is the compiled,
+ * normalized form actually evaluated at runtime, so two registries that parse
+ * to identical behavior hash identically, and any change to a predicate's
+ * meaning (operator, operand, function) changes the hash.
+ *
+ * This makes a registry hash mismatch detect CONSTITUTIONAL DRIFT: if a
+ * predicate changes while registry_id stays the same, rehydrating a snapshot
+ * under the new registry fails closed (RegistryMismatchError) instead of
+ * silently accepting a different constitution.
+ *
+ * Determinism: invariant order is preserved (it is part of the constitution),
+ * and applies_to / description are intentionally EXCLUDED — they are
+ * documentation, not normative behavior, so editing a description does not
+ * invalidate existing snapshots.
  */
-export function computeRegistryHash(registryId: string): string {
-  return `registry:${registryId}`;
+export function computeRegistryHash(
+  registry: CompiledInvariantRegistry
+): string {
+  const normative = {
+    registry_id: registry.registry_id,
+    version: registry.version,
+    invariants: registry.invariants.map((inv: CompiledInvariant) => ({
+      id: inv.id,
+      scope: inv.scope,
+      failure_mode: inv.failure_mode,
+      ast: inv.ast,
+    })),
+  };
+  const canonical = canonicalize(normative);
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
 }

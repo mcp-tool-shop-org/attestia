@@ -159,6 +159,29 @@ export interface Invariant {
 export type ViolationClassification = "REJECT" | "HALT";
 
 /**
+ * Structured, machine-readable detail about a specific invariant violation.
+ *
+ * This complements the human-readable `message` and the stable rule text
+ * (`InvariantViolation.message` historically carried only the static
+ * `Invariant.description`). `details` exposes the *offending operands* so a
+ * caller can react programmatically without parsing prose: which field was
+ * wrong, what was expected, and what was actually seen.
+ *
+ * All members are optional — different invariants know different operands. The
+ * values may be of any structural type (string id, number index, etc.); they
+ * are diagnostic data, not metric labels, so they are NOT subject to the
+ * low-cardinality rule that governs telemetry `attributes`.
+ */
+export interface InvariantViolationDetails {
+  /** The structural field that violated the rule (e.g. "to.id", "from", "orderIndex"). */
+  readonly field?: string;
+  /** The value the invariant required (e.g. the parent id an identity must equal). */
+  readonly expected?: unknown;
+  /** The value actually observed (e.g. the mismatched id). */
+  readonly actual?: unknown;
+}
+
+/**
  * Describes a specific invariant violation.
  *
  * This is a structured verdict, not an exception.
@@ -176,8 +199,25 @@ export interface InvariantViolation {
    */
   readonly classification: ViolationClassification;
 
-  /** Human-readable explanation of the violation */
+  /**
+   * Human-readable explanation of the violation.
+   *
+   * When the offending operands are known, the concrete values are interpolated
+   * into this string (e.g. `"identity.immutable: to.id 'X' must equal from
+   * 'Y'"`). The stable, value-free rule text remains available on the
+   * invariant's `description`.
+   */
   readonly message: string;
+
+  /**
+   * Optional structured detail naming the offending operands.
+   *
+   * Present when the registrar knows the concrete values that violated the rule
+   * (identity mismatch, missing lineage parent, ordering index, etc.). Absent
+   * for invariants whose violation has no single offending operand. See
+   * {@link InvariantViolationDetails}.
+   */
+  readonly details?: InvariantViolationDetails;
 }
 
 /**

@@ -93,6 +93,40 @@ describe("POST /api/v1/reconcile", () => {
 
     expect(res.status).toBe(200);
   });
+
+  it("surfaces machine-readable structured discrepancies on a mismatch (D4-B-002)", async () => {
+    const { app } = instance;
+    // An on-chain event whose txHash matches no declared intent/ledger entry,
+    // and a ledger entry whose chain leg is therefore missing → a clear,
+    // normalization-independent reconciliation mismatch.
+    const orphanChainEvent = {
+      chainId: "evm:1",
+      txHash: "0xdeadbeef",
+      from: "0xsender",
+      to: "0xreceiver",
+      amount: "100000000",
+      decimals: 6,
+      symbol: "USDC",
+      timestamp: "2025-01-01T00:00:02Z",
+    };
+    const res = await app.request(
+      jsonRequest("/api/v1/reconcile", "POST", {
+        ...validReconcileBody,
+        chainEvents: [orphanChainEvent],
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { summary: { allReconciled: boolean } };
+    };
+    expect(body.data.summary.allReconciled).toBe(false);
+    // The report carries machine-readable discrepancies (code + dimension),
+    // not just prose — surfaced verbatim in the API response.
+    const serialized = JSON.stringify(body.data);
+    expect(serialized).toContain("structuredDiscrepancies");
+    expect(serialized).toMatch(/MISSING_|AMOUNT_MISMATCH|CURRENCY_MISMATCH/);
+  });
 });
 
 describe("POST /api/v1/attest", () => {

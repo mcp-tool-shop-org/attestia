@@ -44,6 +44,8 @@ import type {
   ConnectionStatus,
 } from "../observer.js";
 import type { ChainProfile } from "../finality.js";
+import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
+import { type Telemetry, NOOP_TELEMETRY } from "@attestia/types";
 
 // =============================================================================
 // Chain ID to viem Chain mapping
@@ -113,6 +115,24 @@ export class EvmObserver implements ChainObserver {
   private readonly config: ObserverConfig;
   private readonly profile: ChainProfile | undefined;
   private readonly nativeToken: { symbol: string; decimals: number };
+  private readonly telemetry: Telemetry;
+
+  /**
+   * Maximum block span for a filterless (all-tokens) Transfer scan.
+   *
+   * Without a token (address) filter, getLogs scans EVERY contract over the
+   * range — expensive, and many RPCs reject address-less getLogs outright. Cap
+   * the span and fail closed (D3-A-006). 200k blocks accommodates realistic L2
+   * scan windows while still rejecting unbounded/whole-chain ranges.
+   */
+  private static readonly MAX_FILTERLESS_BLOCK_SPAN = 200_000;
+
+  /**
+   * Hard ceiling on the block span for any Transfer scan (even token-filtered).
+   * Most providers reject very large getLogs ranges; this fails closed with a
+   * structured error rather than emitting a guaranteed-to-be-rejected RPC call.
+   */
+  private static readonly MAX_BLOCK_SPAN = 1_000_000;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("eip155:")) {
@@ -123,6 +143,7 @@ export class EvmObserver implements ChainObserver {
     this.chainId = config.chain.chainId;
     this.config = config;
     this.profile = config.profile;
+    this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
 
     // Resolve native token metadata: profile > static map > default
     this.nativeToken =
@@ -134,10 +155,16 @@ export class EvmObserver implements ChainObserver {
   async connect(): Promise<void> {
     const viemChain = VIEM_CHAINS[this.chainId];
     if (!viemChain) {
-      throw new Error(
-        `EvmObserver: unsupported chain '${this.chainId}'. ` +
-          `Supported: ${Object.keys(VIEM_CHAINS).join(", ")}`
-      );
+      throw new ObserverError({
+        code: "UNSUPPORTED_CHAIN",
+        chainId: this.chainId,
+        message:
+          `EvmObserver: unsupported chain '${this.chainId}'. ` +
+          `Supported: ${Object.keys(VIEM_CHAINS).join(", ")}`,
+        hint:
+          `Use one of the supported EVM chain IDs (${Object.keys(VIEM_CHAINS).join(", ")}), ` +
+          `or register the chain before connecting.`,
+      });
     }
 
     this.client = createPublicClient({
@@ -159,23 +186,44 @@ export class EvmObserver implements ChainObserver {
         chainId: this.chainId,
         connected: false,
         checkedAt: now,
+        error: "EvmObserver: not connected. Call connect() before querying.",
+        errorCode: "NOT_CONNECTED",
       };
     }
 
+    let blockNumber: bigint;
     try {
-      const blockNumber = await this.client.getBlockNumber();
-
-      const status: ConnectionStatus = {
+      blockNumber = await this.client.getBlockNumber();
+    } catch (err) {
+      // The core liveness probe failed → genuinely disconnected. Surface the
+      // reason and a classified code instead of an unexplained connected:false
+      // (D3-B-002). A health probe must not throw, so we return rather than rethrow.
+      return {
         chainId: this.chainId,
-        connected: true,
-        latestBlock: Number(blockNumber),
+        connected: false,
         checkedAt: now,
+        error: err instanceof Error ? err.message : String(err),
+        errorCode: classifyRpcError(err),
       };
+    }
 
-      // When a profile with finality config is present, also fetch
-      // finalized and safe block numbers via EVM block tags.
-      if (this.profile?.finality) {
-        const { finalizedBlockTag, safeBlockTag } = this.profile.finality;
+    const status: ConnectionStatus = {
+      chainId: this.chainId,
+      connected: true,
+      latestBlock: Number(blockNumber),
+      checkedAt: now,
+    };
+
+    // When a profile with finality config is present, also fetch finalized and
+    // safe block numbers via EVM block tags. D3-B-009: a finality-tag failure
+    // (some RPCs/chains don't serve "finalized"/"safe") must degrade to
+    // "connected, finality unknown" — NOT "disconnected". We already proved
+    // liveness via getBlockNumber above, so we wrap this in its own try/catch
+    // and, on failure, return the connected status with the latest block plus a
+    // soft error note (without flipping connected to false).
+    if (this.profile?.finality) {
+      const { finalizedBlockTag, safeBlockTag } = this.profile.finality;
+      try {
         const blockPromises: [Promise<bigint> | undefined, Promise<bigint> | undefined] = [
           finalizedBlockTag
             ? this.client.getBlock({ blockTag: finalizedBlockTag as "finalized" }).then((b) => b.number ?? 0n)
@@ -194,30 +242,33 @@ export class EvmObserver implements ChainObserver {
           ...(finalizedBlock !== undefined && { finalizedBlock: Number(finalizedBlock) }),
           ...(safeBlock !== undefined && { safeBlock: Number(safeBlock) }),
         };
+      } catch (err) {
+        // Finality tags unavailable — stay connected, report finality unknown.
+        return {
+          ...status,
+          error: `finality unknown: ${err instanceof Error ? err.message : String(err)}`,
+          errorCode: classifyRpcError(err),
+        };
       }
-
-      return status;
-    } catch {
-      return {
-        chainId: this.chainId,
-        connected: false,
-        checkedAt: now,
-      };
     }
+
+    return status;
   }
 
   async getBalance(query: BalanceQuery): Promise<BalanceResult> {
     const client = this.requireClient();
     const address = query.address as `0x${string}`;
 
-    const [balance, blockNumber] = await Promise.all([
-      query.atBlock !== undefined
-        ? client.getBalance({ address, blockNumber: BigInt(query.atBlock) })
-        : client.getBalance({ address }),
-      query.atBlock !== undefined
-        ? Promise.resolve(BigInt(query.atBlock))
-        : client.getBlockNumber(),
-    ]);
+    const [balance, blockNumber] = await this.runRpc("getBalance", () =>
+      Promise.all([
+        query.atBlock !== undefined
+          ? client.getBalance({ address, blockNumber: BigInt(query.atBlock) })
+          : client.getBalance({ address }),
+        query.atBlock !== undefined
+          ? Promise.resolve(BigInt(query.atBlock))
+          : client.getBlockNumber(),
+      ]),
+    );
 
     return {
       chainId: this.chainId,
@@ -235,24 +286,26 @@ export class EvmObserver implements ChainObserver {
     const tokenAddress = query.token as `0x${string}`;
     const ownerAddress = query.address as `0x${string}`;
 
-    const [balance, symbol, decimals] = await Promise.all([
-      client.readContract({
-        address: tokenAddress,
-        abi: [ERC20_BALANCE_OF],
-        functionName: "balanceOf",
-        args: [ownerAddress],
-      }),
-      client.readContract({
-        address: tokenAddress,
-        abi: [ERC20_SYMBOL],
-        functionName: "symbol",
-      }),
-      client.readContract({
-        address: tokenAddress,
-        abi: [ERC20_DECIMALS],
-        functionName: "decimals",
-      }),
-    ]);
+    const [balance, symbol, decimals] = await this.runRpc("getTokenBalance", () =>
+      Promise.all([
+        client.readContract({
+          address: tokenAddress,
+          abi: [ERC20_BALANCE_OF],
+          functionName: "balanceOf",
+          args: [ownerAddress],
+        }),
+        client.readContract({
+          address: tokenAddress,
+          abi: [ERC20_SYMBOL],
+          functionName: "symbol",
+        }),
+        client.readContract({
+          address: tokenAddress,
+          abi: [ERC20_DECIMALS],
+          functionName: "decimals",
+        }),
+      ]),
+    );
 
     return {
       chainId: this.chainId,
@@ -268,7 +321,7 @@ export class EvmObserver implements ChainObserver {
   async getTransfers(query: TransferQuery): Promise<readonly TransferEvent[]> {
     const client = this.requireClient();
     const address = query.address as `0x${string}`;
-    const currentBlock = await client.getBlockNumber();
+    const currentBlock = await this.runRpc("getTransfers", () => client.getBlockNumber());
 
     const fromBlock = query.fromBlock !== undefined
       ? BigInt(query.fromBlock)
@@ -277,68 +330,81 @@ export class EvmObserver implements ChainObserver {
       ? BigInt(query.toBlock)
       : currentBlock;
 
+    // D3-A-006: bound the block span before issuing any getLogs. An unbounded
+    // (or very large) range is a DoS risk — and a filterless all-tokens scan is
+    // worse, since getLogs without an address scans every contract and many RPCs
+    // reject address-less getLogs entirely. Fail closed with a structured error.
+    // (This throws ObserverError BLOCK_RANGE_TOO_LARGE *before* any RPC, so it is
+    // intentionally outside runRpc — it is a guard, not a classified RPC failure.)
+    this.assertBlockSpan(fromBlock, toBlock, query.token === undefined);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allLogs: any[] = [];
     const now = new Date().toISOString();
 
-    if (query.token) {
-      // ERC-20 Transfer events for a specific token
-      const tokenAddress = query.token as `0x${string}`;
+    // All getLogs calls run under runRpc so a network/RPC failure surfaces as a
+    // classified ObserverError (RPC_TIMEOUT / RATE_LIMITED / ...) with telemetry,
+    // rather than a raw viem error (D3-B-003).
+    await this.runRpc("getTransfers", async () => {
+      if (query.token) {
+        // ERC-20 Transfer events for a specific token
+        const tokenAddress = query.token as `0x${string}`;
 
-      if (query.direction !== "outgoing") {
-        const incomingLogs = await client.getLogs({
-          address: tokenAddress,
-          event: ERC20_TRANSFER_EVENT,
-          args: { to: address },
-          fromBlock,
-          toBlock,
-        });
-        allLogs.push(...incomingLogs);
-      }
+        if (query.direction !== "outgoing") {
+          const incomingLogs = await client.getLogs({
+            address: tokenAddress,
+            event: ERC20_TRANSFER_EVENT,
+            args: { to: address },
+            fromBlock,
+            toBlock,
+          });
+          allLogs.push(...incomingLogs);
+        }
 
-      if (query.direction !== "incoming") {
-        const outgoingLogs = await client.getLogs({
-          address: tokenAddress,
-          event: ERC20_TRANSFER_EVENT,
-          args: { from: address },
-          fromBlock,
-          toBlock,
-        });
+        if (query.direction !== "incoming") {
+          const outgoingLogs = await client.getLogs({
+            address: tokenAddress,
+            event: ERC20_TRANSFER_EVENT,
+            args: { from: address },
+            fromBlock,
+            toBlock,
+          });
 
-        for (const log of outgoingLogs) {
-          // Avoid duplicates (self-transfers)
-          if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
-            allLogs.push(log);
+          for (const log of outgoingLogs) {
+            // Avoid duplicates (self-transfers)
+            if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
+              allLogs.push(log);
+            }
+          }
+        }
+      } else {
+        // ERC-20 Transfer events across all tokens (no specific token filter)
+        if (query.direction !== "outgoing") {
+          const incomingLogs = await client.getLogs({
+            event: ERC20_TRANSFER_EVENT,
+            args: { to: address },
+            fromBlock,
+            toBlock,
+          });
+          allLogs.push(...incomingLogs);
+        }
+
+        if (query.direction !== "incoming") {
+          const outgoingLogs = await client.getLogs({
+            event: ERC20_TRANSFER_EVENT,
+            args: { from: address },
+            fromBlock,
+            toBlock,
+          });
+
+          for (const log of outgoingLogs) {
+            if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
+              allLogs.push(log);
+            }
           }
         }
       }
-    } else {
-      // ERC-20 Transfer events across all tokens (no specific token filter)
-      if (query.direction !== "outgoing") {
-        const incomingLogs = await client.getLogs({
-          event: ERC20_TRANSFER_EVENT,
-          args: { to: address },
-          fromBlock,
-          toBlock,
-        });
-        allLogs.push(...incomingLogs);
-      }
-
-      if (query.direction !== "incoming") {
-        const outgoingLogs = await client.getLogs({
-          event: ERC20_TRANSFER_EVENT,
-          args: { from: address },
-          fromBlock,
-          toBlock,
-        });
-
-        for (const log of outgoingLogs) {
-          if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
-            allLogs.push(log);
-          }
-        }
-      }
-    }
+    });
 
     // Resolve token metadata for all unique token addresses in the logs.
     // Batch the unique addresses to minimize RPC calls.
@@ -384,11 +450,84 @@ export class EvmObserver implements ChainObserver {
 
   private requireClient(): PublicClient<HttpTransport, Chain> {
     if (!this.client) {
-      throw new Error(
-        "EvmObserver: not connected. Call connect() before querying."
-      );
+      const err = new ObserverError({
+        code: "NOT_CONNECTED",
+        chainId: this.chainId,
+        message: "EvmObserver: not connected. Call connect() before querying.",
+        hint: "Call connect() and await it before issuing queries.",
+      });
+      this.emitRpcFailure("NOT_CONNECTED");
+      throw err;
     }
     return this.client;
+  }
+
+  /**
+   * Emit a structured `rpc` failure telemetry event with low-cardinality
+   * attributes (`chainId`, `code`). Never throws — telemetry must not break the
+   * operation it observes (the sink contract guarantees `record` won't throw,
+   * but we guard defensively).
+   */
+  private emitRpcFailure(code: string): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc",
+        level: "error",
+        outcome: "failed",
+        attributes: { chainId: this.chainId, code },
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run an RPC operation, classifying and re-throwing any failure as a
+   * structured {@link ObserverError} and emitting a `rpc` failure event
+   * (D3-B-003). The original error is preserved as `cause`.
+   *
+   * @param context Operation name for the error message (e.g. "getBalance").
+   * @param fn The RPC call to execute.
+   */
+  private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      const observerError = toObserverError(err, `EvmObserver.${context}`, this.chainId);
+      this.emitRpcFailure(observerError.code);
+      throw observerError;
+    }
+  }
+
+  /**
+   * Enforce a bound on the Transfer-scan block span (D3-A-006).
+   *
+   * @param fromBlock Inclusive start block.
+   * @param toBlock Inclusive end block.
+   * @param filterless True when no token (address) filter is applied — the
+   *   dangerous all-contracts path, which gets a much tighter cap.
+   * @throws ObserverError (`BLOCK_RANGE_TOO_LARGE`) if the span exceeds the cap.
+   */
+  private assertBlockSpan(fromBlock: bigint, toBlock: bigint, filterless: boolean): void {
+    const span = toBlock - fromBlock;
+    const limit = filterless
+      ? BigInt(EvmObserver.MAX_FILTERLESS_BLOCK_SPAN)
+      : BigInt(EvmObserver.MAX_BLOCK_SPAN);
+
+    if (span > limit) {
+      const kind = filterless ? "all-tokens (filterless)" : "token-filtered";
+      throw new ObserverError({
+        code: "BLOCK_RANGE_TOO_LARGE",
+        chainId: this.chainId,
+        message:
+          `EvmObserver.getTransfers: block range ${span} exceeds the maximum ` +
+          `${kind} span of ${limit} (fromBlock=${fromBlock}, toBlock=${toBlock}).`,
+        hint: filterless
+          ? `Provide a 'token' to scan a single contract, or narrow the range to <= ${limit} blocks (chunk larger scans).`
+          : `Narrow the range to <= ${limit} blocks, or chunk the scan into smaller windows.`,
+      });
+    }
   }
 
   /**

@@ -29,6 +29,15 @@ export interface SignerEntry {
 
   /** ISO 8601 timestamp when this signer was added */
   readonly addedAt: string;
+
+  /**
+   * Signer's XRPL public key (hex), used to cryptographically verify the
+   * signer's signatures over the canonical payload hash before counting them
+   * toward quorum (verify-then-count). When present, signature verification is
+   * mandatory; when absent, the signer cannot be cryptographically verified at
+   * the aggregation layer.
+   */
+  readonly publicKey?: string;
 }
 
 /**
@@ -92,6 +101,8 @@ export interface SignerAddedEvent {
   readonly label: string;
   readonly weight: number;
   readonly timestamp: string;
+  /** Signer's XRPL public key (hex), if registered for signature verification. */
+  readonly publicKey?: string;
 }
 
 export interface SignerRemovedEvent {

@@ -42,8 +42,27 @@ export class MetricsCollector {
     Map<string, { labels: Record<string, string>; count: number }>
   >();
 
+  /** Custom HELP text per named counter, set via {@link registerCounter}. */
+  private readonly _counterHelp = new Map<string, string>();
+
   constructor(buckets: readonly number[] = DEFAULT_BUCKETS) {
     this._buckets = buckets;
+  }
+
+  /**
+   * Pre-declare a named counter with descriptive HELP text.
+   *
+   * Registration is optional — {@link incrementCounter} lazily creates a series
+   * on first use — but declaring up front lets a host document its business
+   * metrics (e.g. `attestia_witness_total`, `attestia_telemetry_total`) and
+   * surface the correct `# HELP` line in the exposition even before the first
+   * increment. Idempotent: re-registering the same name overwrites the help.
+   */
+  registerCounter(name: string, help: string): void {
+    this._counterHelp.set(name, help);
+    if (!this._namedCounters.has(name)) {
+      this._namedCounters.set(name, new Map());
+    }
   }
 
   /**
@@ -149,7 +168,7 @@ export class MetricsCollector {
 
     // Named counters (business metrics)
     for (const [name, entries] of this._namedCounters) {
-      lines.push(`# HELP ${name} Business metric counter`);
+      lines.push(`# HELP ${name} ${this._counterHelp.get(name) ?? "Business metric counter"}`);
       lines.push(`# TYPE ${name} counter`);
       for (const { labels, count } of entries.values()) {
         const labelStr = Object.entries(labels)
@@ -181,7 +200,16 @@ export class MetricsCollector {
 /**
  * Create metrics collection middleware.
  *
- * Records method, normalized path, status, and duration for every request.
+ * Records method, route-template path, status, and duration for every request.
+ *
+ * Path labelling (security-critical): the `path` label is the matched ROUTE
+ * TEMPLATE (`c.req.routePath`, e.g. `/api/v1/intents/:id`), NOT the concrete
+ * request path. Labelling by the concrete path leaked arbitrary resource IDs
+ * into the Prometheus `path` label whenever they were not UUID-shaped
+ * (attestation / intent / framework IDs), exposing them when `/metrics` is
+ * unauthenticated and unbounding label cardinality (V2-003). Using the template
+ * keeps IDs out of the label regardless of their format. Unmatched requests
+ * (no route) fall back to the concrete path so 404s are still observable.
  */
 export function metricsMiddleware(
   collector: MetricsCollector,
@@ -191,11 +219,14 @@ export function metricsMiddleware(
     await next();
     const durationMs = performance.now() - start;
 
-    // Normalize path: replace UUID/ID segments with :id
-    const path = c.req.path.replace(
-      /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-      "/:id",
-    );
+    // Prefer the matched route template; it never contains concrete IDs.
+    // routePath is "/*" (or empty) when nothing matched — fall back to the
+    // concrete path so unmatched routes remain visible in metrics.
+    const routePath = c.req.routePath;
+    const path =
+      routePath !== undefined && routePath !== "" && routePath !== "/*"
+        ? routePath
+        : c.req.path;
 
     collector.recordRequest(
       c.req.method,

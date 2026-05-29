@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
 import { MerkleTree } from "../src/merkle-tree.js";
 import {
+  hashAttestation as hashAttestationExported,
   packageAttestationProof,
   verifyAttestationProof,
 } from "../src/attestation-proof.js";
@@ -363,5 +364,49 @@ describe("edge cases", () => {
       const pkg = packageAttestationProof(attestations[i]!, eventHashes, tree, i)!;
       expect(verifyAttestationProof(pkg)).toBe(true);
     }
+  });
+});
+
+// =============================================================================
+// hashAttestation (exported single source of truth)
+// =============================================================================
+
+describe("hashAttestation", () => {
+  it("is deterministic for the same input", () => {
+    const att = makeAttestation("att-deterministic", 100);
+    expect(hashAttestationExported(att)).toBe(hashAttestationExported(att));
+  });
+
+  it("is invariant to key ordering (RFC 8785 canonical JSON)", () => {
+    const a = { id: "x", type: "payment", amount: "100.00" };
+    const b = { amount: "100.00", type: "payment", id: "x" };
+    expect(hashAttestationExported(a)).toBe(hashAttestationExported(b));
+  });
+
+  it("produces a 64-char lowercase SHA-256 hex digest", () => {
+    const hash = hashAttestationExported(makeAttestation("att-shape", 100));
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("differs for different attestations", () => {
+    const h0 = hashAttestationExported(makeAttestation("att-0", 100));
+    const h1 = hashAttestationExported(makeAttestation("att-1", 200));
+    expect(h0).not.toBe(h1);
+  });
+
+  it("equals the value the proof package binds to (round-trips at index 0)", () => {
+    const att = makeAttestation("att-bind", 100);
+    const leaf = hashAttestationExported(att);
+
+    // Build the tree over the attestation's own hash as the single leaf.
+    const tree = MerkleTree.build([leaf]);
+    const pkg = packageAttestationProof(att, [leaf], tree, 0)!;
+
+    // The package binds to exactly this hash...
+    expect(pkg).not.toBeNull();
+    expect(pkg.attestationHash).toBe(leaf);
+    expect(pkg.inclusionProof.leafHash).toBe(leaf);
+    // ...and the bound proof verifies.
+    expect(verifyAttestationProof(pkg)).toBe(true);
   });
 });

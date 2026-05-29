@@ -6,23 +6,23 @@ Last updated: February 11, 2026
 
 ## Where We Are
 
-**15 packages, 1,853 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
+**15 packages, 2,220 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
 
 | Package | Status | Tests | Purpose |
 |---------|--------|-------|---------|
-| `@attestia/types` | ✅ Complete | 62 | Shared domain types (zero deps) |
-| `@attestia/registrum` | ✅ Complete | 297 | Constitutional governance — 11 invariants, dual-witness |
-| `@attestia/ledger` | ✅ Complete | 144 | Append-only double-entry engine |
-| `@attestia/chain-observer` | ✅ Complete | 242 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
-| `@attestia/vault` | ✅ Complete | 67 | Personal vault — portfolios, budgets, intents |
-| `@attestia/treasury` | ✅ Complete | 63 | Org treasury — payroll, distributions, funding gates |
-| `@attestia/reconciler` | ✅ Complete | 56 | 3D cross-system matching + Registrum attestation |
-| `@attestia/witness` | ✅ Complete | 245 | XRPL on-chain attestation, multi-sig governance, retry |
-| `@attestia/verify` | ✅ Complete | 200 | Replay verification, state bundles, SLA, compliance evidence |
-| `@attestia/event-store` | ✅ Complete | 190 | Append-only event persistence, JSONL, hash chain, 34 event types |
-| `@attestia/node` | ✅ Complete | 184 | Hono REST API — 30+ endpoints, auth, public API, compliance |
-| `@attestia/proof` | ✅ Complete | 53 | Merkle trees, inclusion proofs, attestation proof packaging |
-| `@attestia/sdk` | ✅ Complete | 50 | Typed HTTP client SDK for external consumers |
+| `@attestia/types` | ✅ Complete | 72 | Shared domain types (zero deps) |
+| `@attestia/registrum` | ✅ Complete | 341 | Constitutional governance — 11 invariants, dual-witness |
+| `@attestia/ledger` | ✅ Complete | 154 | Append-only double-entry engine |
+| `@attestia/chain-observer` | ✅ Complete | 278 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
+| `@attestia/vault` | ✅ Complete | 75 | Personal vault — portfolios, budgets, intents |
+| `@attestia/treasury` | ✅ Complete | 92 | Org treasury — payroll, distributions, funding gates |
+| `@attestia/reconciler` | ✅ Complete | 81 | 3D cross-system matching + Registrum attestation |
+| `@attestia/witness` | ✅ Complete | 278 | XRPL on-chain attestation, multi-sig governance, retry |
+| `@attestia/verify` | ✅ Complete | 242 | Replay verification, state bundles, SLA, compliance evidence |
+| `@attestia/event-store` | ✅ Complete | 226 | Append-only event persistence, JSONL, hash chain, 34 event types |
+| `@attestia/node` | ✅ Complete | 227 | Hono REST API — 34 endpoints, auth, public API, compliance |
+| `@attestia/proof` | ✅ Complete | 75 | Merkle trees, inclusion proofs, attestation proof packaging |
+| `@attestia/sdk` | ✅ Complete | 79 | Typed HTTP client SDK for external consumers |
 
 **What we have:** All core domain logic, event sourcing, CI pipeline, deployable HTTP API with auth + multi-tenancy + observability. Tamper-evident hash chain, witness retry, startup integrity check, auditor export APIs, performance benchmarks. Docker Compose for full-stack deployment. External verification network, public verification API, Merkle inclusion proofs, SOC 2 + ISO 27001 compliance evidence, typed SDK, SLA enforcement, multi-tenant governance hardening.
 
@@ -442,7 +442,7 @@ Typed client SDK for API consumers.
 | **M5: Audit-Ready** | hash chain, witness retry, export, benchmarks, docs | Auditor can replay to same GlobalStateHash; 1,176 tests | ✅ Done |
 | **M5.5: Category Standard** | 5 RFCs, reference architecture, integration guide, RFC process, readiness checklist | Formal specification + institutional adoption path | ✅ Done |
 | **M6: Multi-Chain** | solana, L2s, XRPL EVM sidechain, multi-sig witness | 4 chain families, N-of-M governance; 1,551 tests | ✅ Done |
-| **M7: Trust Standard** | proof, sdk, public API, compliance, SLA, governance hardening | Externally verifiable, compliance-mappable, SDK-consumable; 1,853 tests | ✅ Done |
+| **M7: Trust Standard** | proof, sdk, public API, compliance, SLA, governance hardening | Externally verifiable, compliance-mappable, SDK-consumable; 1,928 tests | ✅ Done |
 | **M8: Integrated** | pipeline, e2e tests, XRPL testnet | Full intent→proof flow proven | Planned |
 | **M9: Intelligent** | anomaly detection, suggestions, NL queries | AI-assisted (never AI-decided) | Planned |
 | **M10: User-Facing** | vault UI, treasury dashboard, explorer | Non-developers can use Attestia | Planned |

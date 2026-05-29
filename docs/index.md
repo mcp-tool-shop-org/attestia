@@ -8,7 +8,7 @@ Financial truth infrastructure for the decentralized world — structural govern
 - **Org Treasury** — deterministic payroll, DAO distributions, dual-gate funding
 - **Registrum** — structural registrar with 11 invariants and dual-witness validation
 - **XRPL attestation** — on-chain proof of financial events
-- **1,853 tests** at 96.80% coverage across 14 packages
+- **2,220 tests** at 96.80% coverage across 14 packages
 - **Intent-Approve-Execute-Verify** pattern for every interaction
 
 ## Install / Quick Start

@@ -11,7 +11,8 @@
  */
 
 import { Ledger } from "@attestia/ledger";
-import type { Money } from "@attestia/types";
+import type { Money, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type {
   TreasuryConfig,
   TreasurySnapshot,
@@ -35,21 +36,30 @@ export class Treasury {
   private readonly distributions: DistributionEngine;
   private readonly funding: FundingGateManager;
 
-  constructor(config: TreasuryConfig) {
+  /**
+   * @param telemetry Optional observability sink (D4-B-001), threaded into the
+   *   payroll, distribution, and funding engines. Defaults to
+   *   {@link NOOP_TELEMETRY}. It is a runtime concern, not part of the
+   *   serializable {@link TreasuryConfig}, so it is passed separately.
+   */
+  constructor(config: TreasuryConfig, telemetry: Telemetry = NOOP_TELEMETRY) {
     this.config = config;
     this.ledger = new Ledger();
     this.payroll = new PayrollEngine(
       config.defaultCurrency,
       config.defaultDecimals,
+      telemetry,
     );
     this.distributions = new DistributionEngine(
       config.defaultCurrency,
       config.defaultDecimals,
+      telemetry,
     );
     this.funding = new FundingGateManager(
       config.gatekeepers,
       config.defaultCurrency,
       config.defaultDecimals,
+      telemetry,
     );
   }
 
@@ -168,8 +178,11 @@ export class Treasury {
     };
   }
 
-  static fromSnapshot(snap: TreasurySnapshot): Treasury {
-    const treasury = new Treasury(snap.config);
+  static fromSnapshot(
+    snap: TreasurySnapshot,
+    telemetry: Telemetry = NOOP_TELEMETRY,
+  ): Treasury {
+    const treasury = new Treasury(snap.config, telemetry);
     treasury.payroll.importPayees(snap.payees);
     treasury.payroll.importRuns(snap.payrollRuns);
     treasury.distributions.importPlans(snap.distributionPlans);

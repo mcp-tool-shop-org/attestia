@@ -8,6 +8,7 @@
 export type {
   ComplianceFramework,
   EvidenceType,
+  EvidenceClass,
   ControlStatus,
   ControlMapping,
   EvaluatedControl,

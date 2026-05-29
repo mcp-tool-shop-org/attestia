@@ -439,6 +439,85 @@ describe("GET /public/v1/verify/consensus", () => {
     const body = (await res.json()) as { data: { quorumReached: boolean } };
     expect(body.data.quorumReached).toBe(false);
   });
+
+  // ===========================================================================
+  // V1-003 [MEDIUM, fail-closed]: a lone (possibly operator-controlled)
+  // verifier must NOT yield an authoritative PASS over the PUBLIC, trust-free
+  // endpoint. The public consensus route defaults minimumVerifiers to 2.
+  // ===========================================================================
+
+  it("does NOT return an authoritative PASS for a single verifier by default (fail-closed)", async () => {
+    // No minimumVerifiers override → public default of 2 applies.
+    const instance = createTestAppWithPublicVerify();
+
+    await instance.app.request(
+      makeRequest("/public/v1/verify/submit-report", "POST", makeValidReport("solo", "PASS")),
+    );
+
+    const res = await instance.app.request(makeRequest("/public/v1/verify/consensus"));
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        verdict: string;
+        quorumReached: boolean;
+        totalVerifiers: number;
+        singleVerifierPass: boolean;
+      };
+    };
+
+    // Quorum of 2 is not met by a single verifier → verdict is NOT an
+    // authoritative PASS, and the weak-quorum flag is not raised.
+    expect(body.data.totalVerifiers).toBe(1);
+    expect(body.data.quorumReached).toBe(false);
+    expect(body.data.verdict).toBe("FAIL");
+    expect(body.data.singleVerifierPass).toBe(false);
+  });
+
+  it("returns an authoritative PASS once the public 2-verifier quorum is met", async () => {
+    const instance = createTestAppWithPublicVerify();
+
+    await instance.app.request(
+      makeRequest("/public/v1/verify/submit-report", "POST", makeValidReport("v1", "PASS")),
+    );
+    await instance.app.request(
+      makeRequest("/public/v1/verify/submit-report", "POST", makeValidReport("v2", "PASS")),
+    );
+
+    const res = await instance.app.request(makeRequest("/public/v1/verify/consensus"));
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { verdict: string; quorumReached: boolean; singleVerifierPass: boolean };
+    };
+    expect(body.data.verdict).toBe("PASS");
+    expect(body.data.quorumReached).toBe(true);
+    // Quorum threshold was 2 (>1), so this is not a weak single-verifier PASS.
+    expect(body.data.singleVerifierPass).toBe(false);
+  });
+
+  it("still honors an explicit higher quorum override", async () => {
+    const instance = createTestAppWithPublicVerify({ minimumVerifiers: 5 });
+
+    for (let i = 0; i < 3; i++) {
+      await instance.app.request(
+        makeRequest("/public/v1/verify/submit-report", "POST", makeValidReport(`v${i}`, "PASS")),
+      );
+    }
+
+    const res = await instance.app.request(makeRequest("/public/v1/verify/consensus"));
+    const body = (await res.json()) as { data: { verdict: string; quorumReached: boolean } };
+    expect(body.data.quorumReached).toBe(false);
+    expect(body.data.verdict).toBe("FAIL");
+  });
+
+  it("exposes singleVerifierPass in the consensus payload", async () => {
+    const instance = createTestAppWithPublicVerify();
+    const res = await instance.app.request(makeRequest("/public/v1/verify/consensus"));
+    const body = (await res.json()) as { data: Record<string, unknown> };
+    expect(body.data).toHaveProperty("singleVerifierPass");
+    expect(typeof body.data.singleVerifierPass).toBe("boolean");
+  });
 });
 
 // =============================================================================

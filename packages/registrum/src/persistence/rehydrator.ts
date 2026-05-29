@@ -27,8 +27,20 @@ import type { CompiledInvariantRegistry } from "../registry/loader.js";
 
 /**
  * Base error for rehydration failures.
+ *
+ * `code` is a stable, machine-readable identifier. The base value is
+ * `"REHYDRATION_FAILED"`; specialized subclasses (e.g.
+ * {@link RegistryMismatchError}) assign a more specific code in their
+ * constructor. The field is part of the public contract — callers may switch on
+ * it across patch/minor releases.
  */
 export class RehydrationError extends Error {
+  /**
+   * Stable error code. `"REHYDRATION_FAILED"` for the base class; subclasses
+   * may set a more specific code (e.g. `"REGISTRY_DRIFT"`).
+   */
+  readonly code: "REHYDRATION_FAILED" | "REGISTRY_DRIFT" = "REHYDRATION_FAILED";
+
   constructor(message: string) {
     super(`Rehydration failed: ${message}`);
     this.name = "RehydrationError";
@@ -36,9 +48,15 @@ export class RehydrationError extends Error {
 }
 
 /**
- * Error for registry hash mismatch.
+ * Error for registry hash mismatch — the snapshot was written under a different
+ * constitution than the one being rehydrated against (constitutional drift).
+ *
+ * `code` is the stable identifier `"REGISTRY_DRIFT"`.
  */
 export class RegistryMismatchError extends RehydrationError {
+  /** Stable error code: `"REGISTRY_DRIFT"`. */
+  override readonly code = "REGISTRY_DRIFT" as const;
+
   constructor(
     public readonly expectedHash: string,
     public readonly actualHash: string
@@ -52,6 +70,8 @@ export class RegistryMismatchError extends RehydrationError {
 
 /**
  * Error for mode mismatch.
+ *
+ * Inherits the base `code` `"REHYDRATION_FAILED"`.
  */
 export class ModeMismatchError extends RehydrationError {
   constructor(
@@ -76,16 +96,25 @@ export interface RehydrationOptions {
   /**
    * Mode to rehydrate into.
    * Must match the snapshot's mode.
+   *
+   * "dual" is the recommended production mode (see
+   * StructuralRegistrar.dualWitness). Because dual is registry-authoritative on
+   * agreement, a dual-mode snapshot is verified against the registry CONTENT
+   * hash — the same constitutional-drift guard as "registry" mode — so a dual
+   * snapshot requires a compiledRegistry to rehydrate, and a legacy invariant
+   * set is supplied so the restored registrar can keep running its second
+   * witness.
    */
-  readonly mode: "legacy" | "registry";
+  readonly mode: "legacy" | "registry" | "dual";
 
   /**
-   * Legacy invariants (required for legacy mode).
+   * Legacy invariants (required for legacy mode; also used as the secondary
+   * witness in dual mode).
    */
   readonly invariants?: readonly Invariant[];
 
   /**
-   * Compiled registry (required for registry mode).
+   * Compiled registry (required for registry mode and dual mode).
    */
   readonly compiledRegistry?: CompiledInvariantRegistry;
 }
@@ -164,13 +193,17 @@ export function rehydrate(
  * Compute the expected registry hash for the given options.
  */
 function computeExpectedHash(options: RehydrationOptions): string {
-  if (options.mode === "registry") {
+  // Registry and dual modes are both registry-authoritative, so both verify
+  // against the registry CONTENT hash. This keeps the constitutional-drift
+  // guard active for dual mode: a dual snapshot taken under one constitution
+  // fails closed (RegistryMismatchError) under a silently-mutated one.
+  if (options.mode === "registry" || options.mode === "dual") {
     if (!options.compiledRegistry) {
       throw new RehydrationError(
-        "Registry mode requires compiledRegistry option"
+        `${options.mode === "dual" ? "Dual" : "Registry"} mode requires compiledRegistry option`
       );
     }
-    return computeRegistryHash(options.compiledRegistry.registry_id);
+    return computeRegistryHash(options.compiledRegistry);
   }
 
   // Legacy mode

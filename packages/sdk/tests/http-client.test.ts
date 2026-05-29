@@ -273,6 +273,42 @@ describe("HttpClient error handling", () => {
     }
   });
 
+  it("surfaces the actionable hint and typed validation issues on 4xx (D6-B-014)", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "The request was invalid.",
+            hint: "Check the request body against the API schema, then retry.",
+            details: { issues: [{ path: "body.amount", message: "Required" }] },
+          },
+        },
+      },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 0,
+    });
+
+    try {
+      await client.post("/api/v1/items", {});
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AttestiaError);
+      const e = error as AttestiaError;
+      expect(e.hint).toBe(
+        "Check the request body against the API schema, then retry.",
+      );
+      // details.issues is now typed (ValidationIssue[]) — no cast required.
+      expect(e.details?.issues?.[0]?.path).toBe("body.amount");
+      expect(e.details?.issues?.[0]?.message).toBe("Required");
+    }
+  });
+
   it("does not retry on 4xx errors", async () => {
     const mockFetch = createMockFetch([
       { status: 404, body: { error: { code: "NOT_FOUND", message: "Not found" } } },
@@ -841,6 +877,113 @@ describe("HttpClient timeout (deterministic)", () => {
       // by the catch block in request(), becoming NETWORK_ERROR
       expect(attError.code).toBe("NETWORK_ERROR");
     }
+  });
+});
+
+// =============================================================================
+// D6-A-004 [MEDIUM, correctness]: POST retry safety + idempotency key
+// =============================================================================
+
+describe("HttpClient POST retry safety (D6-A-004)", () => {
+  it("does NOT retry a POST on a network error by default", async () => {
+    // A network error after a server-side mutation must not blindly replay
+    // the mutation. By default only idempotent methods (GET) retry.
+    const mockFetch = createMockFetch([
+      { status: 0, error: new Error("ECONNRESET") },
+      { status: 201, body: { data: { id: "should-not-reach" } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 3,
+    });
+
+    await expect(client.post("/api/v1/intents", { id: "x" })).rejects.toThrow(
+      AttestiaError,
+    );
+    // Only one attempt — the POST was not retried.
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT retry a POST on a 5xx response by default", async () => {
+    const mockFetch = createMockFetch([
+      { status: 503, body: { error: { code: "UNAVAILABLE", message: "Try again" } } },
+      { status: 201, body: { data: { id: "should-not-reach" } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 3,
+    });
+
+    await expect(client.post("/api/v1/intents", { id: "x" })).rejects.toThrow(
+      AttestiaError,
+    );
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it("still retries a GET on a network error by default", async () => {
+    const mockFetch = createMockFetch([
+      { status: 0, error: new Error("ECONNREFUSED") },
+      { status: 200, body: { data: { ok: true } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 2,
+    });
+
+    const result = await client.get<{ ok: boolean }>("/test");
+    expect(result.data).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("attaches a stable Idempotency-Key to every POST attempt when retries are enabled", async () => {
+    // When the caller opts into POST retries, each attempt must carry the SAME
+    // Idempotency-Key so the server dedupes the mutation (tenant/route-scoped).
+    const mockFetch = createMockFetch([
+      { status: 503, body: { error: { code: "UNAVAILABLE", message: "Try again" } } },
+      { status: 201, body: { data: { id: "ok" } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 2,
+      retryMutations: true,
+    });
+
+    const result = await client.post<{ id: string }>("/api/v1/intents", { id: "x" });
+    expect(result.data).toEqual({ id: "ok" });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    const calls = (mockFetch as ReturnType<typeof vi.fn>).mock.calls;
+    const key1 = (calls[0]![1] as RequestInit).headers as Record<string, string>;
+    const key2 = (calls[1]![1] as RequestInit).headers as Record<string, string>;
+
+    expect(key1["Idempotency-Key"]).toBeTruthy();
+    // Stable across retries.
+    expect(key2["Idempotency-Key"]).toBe(key1["Idempotency-Key"]);
+  });
+
+  it("does not send an Idempotency-Key on GET requests", async () => {
+    const mockFetch = createMockFetch([
+      { status: 200, body: { data: {} } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 0,
+    });
+
+    await client.get("/test");
+
+    const [, init] = (mockFetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect((init.headers as Record<string, string>)["Idempotency-Key"]).toBeUndefined();
   });
 });
 

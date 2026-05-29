@@ -38,6 +38,14 @@ export type {
   CrossChainLink,
 } from "./cross-chain-rules.js";
 
+// Structured discrepancies (D4-B-002)
+export { makeDiscrepancy, countByCode } from "./discrepancy.js";
+export type {
+  Discrepancy,
+  DiscrepancyCode,
+  DiscrepancyDimension,
+} from "./discrepancy.js";
+
 // Types
 export type {
   // Match results

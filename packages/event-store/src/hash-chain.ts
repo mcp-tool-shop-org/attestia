@@ -78,6 +78,11 @@ export function verifyHashChain(
   let lastVerifiedPosition = 0;
   let previousHash = GENESIS_HASH;
   let chainStarted = false;
+  // Track whether any pre-chain (unhashed) event preceded the first hashed
+  // event. A chain that starts fresh MUST anchor at genesis; a chain that
+  // follows legacy pre-chain events has no cryptographic predecessor to verify
+  // against, so the first hashed link is adopted as the anchor.
+  let sawPreChainEvent = false;
 
   for (const event of events) {
     const record = event as StoredEvent & {
@@ -89,6 +94,7 @@ export function verifyHashChain(
     if (record.hash === undefined || record.previousHash === undefined) {
       // If chain hasn't started yet, continue looking for first hashed event
       if (!chainStarted) {
+        sawPreChainEvent = true;
         continue;
       }
       // Chain was started but this event lacks hash — break
@@ -100,11 +106,26 @@ export function verifyHashChain(
     }
 
     if (!chainStarted) {
-      // First hashed event — verify its previousHash is genesis or the last pre-chain position
+      // First hashed event. A fully-hashed store MUST begin at genesis —
+      // otherwise head-truncation (dropping the leading events of the chain)
+      // is undetectable, because a truncated head's previousHash would simply
+      // be adopted as the anchor. Only when genuine legacy pre-chain events
+      // precede this event is a non-genesis anchor permitted (those events
+      // carry no hash, so the link cannot be verified cryptographically).
       chainStarted = true;
-      previousHash = record.previousHash === GENESIS_HASH
-        ? GENESIS_HASH
-        : record.previousHash;
+      if (record.previousHash !== GENESIS_HASH) {
+        if (!sawPreChainEvent) {
+          errors.push({
+            position: event.globalPosition,
+            reason: `chain does not start at genesis: first hashed event at position ${event.globalPosition} has previousHash "${record.previousHash}", expected GENESIS_HASH ("${GENESIS_HASH}") — possible head truncation`,
+          });
+        }
+        // Adopt the claimed predecessor as the anchor (legacy-compat path, or
+        // to avoid cascading false positives after the genesis error above).
+        previousHash = record.previousHash;
+      } else {
+        previousHash = GENESIS_HASH;
+      }
     }
 
     // Verify previousHash links to predecessor

@@ -557,6 +557,43 @@ describe("Ledger", () => {
       expect(revLine!.debitBalance).toBe("0.000000");
       expect(revLine!.creditBalance).toBe("100.000000");
     });
+
+    // D2-A-004: a self-consistent Ledger can never legitimately be unbalanced.
+    // getTrialBalance() must fail closed (throw) on imbalance — imbalance
+    // signals corruption, and silently returning balanced:false lets callers
+    // ignore a broken invariant.
+    it("getTrialBalance does NOT throw for a balanced ledger", () => {
+      ledger.append([
+        makeEntry("e1", "cash", "debit", usdc("100.000000"), "tx1"),
+        makeEntry("e2", "revenue", "credit", usdc("100.000000"), "tx1"),
+      ]);
+      expect(() => ledger.getTrialBalance(TS)).not.toThrow();
+    });
+
+    it("getTrialBalance throws UNBALANCED_TRANSACTION when internal state is corrupt", () => {
+      ledger.append([
+        makeEntry("e1", "cash", "debit", usdc("100.000000"), "tx1"),
+        makeEntry("e2", "revenue", "credit", usdc("100.000000"), "tx1"),
+      ]);
+
+      // Simulate state corruption: inject an unbalanced entry directly into the
+      // private entries array, bypassing append()'s balance validation. This is
+      // the only way a Ledger could become unbalanced — a bug or memory
+      // corruption. The reporting query must refuse to return such state.
+      const internal = ledger as unknown as { _entries: LedgerEntry[] };
+      internal._entries.push(
+        makeEntry("corrupt", "cash", "debit", usdc("0.000001"), "txX"),
+      );
+
+      let thrown: unknown;
+      try {
+        ledger.getTrialBalance(TS);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(LedgerError);
+      expect((thrown as LedgerError).code).toBe("UNBALANCED_TRANSACTION");
+    });
   });
 
   // ─── Snapshot & Restore ──────────────────────────────────────────────

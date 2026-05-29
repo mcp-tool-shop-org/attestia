@@ -14,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
+import { deriveAddress } from "xrpl";
 import type {
   SignerEntry,
   GovernancePolicy,
@@ -44,14 +45,39 @@ export class GovernanceStore {
    * @param address Signer's XRPL address
    * @param label Human-readable label
    * @param weight Voting weight (default: 1)
+   * @param publicKey Optional signer XRPL public key (hex). When provided,
+   *   signatures from this signer are cryptographically verified over the
+   *   canonical payload hash before counting toward quorum. The public key
+   *   must derive to `address`, or this throws (fail-closed).
    * @throws If signer already exists
+   * @throws If publicKey does not derive to address
    */
-  addSigner(address: string, label: string, weight = 1): GovernanceChangeEvent {
+  addSigner(
+    address: string,
+    label: string,
+    weight = 1,
+    publicKey?: string,
+  ): GovernanceChangeEvent {
     if (this.signers.has(address)) {
       throw new Error(`Signer already exists: ${address}`);
     }
     if (weight < 1) {
       throw new Error(`Weight must be >= 1, got ${weight}`);
+    }
+    if (publicKey !== undefined) {
+      let derived: string;
+      try {
+        derived = deriveAddress(publicKey);
+      } catch (err) {
+        throw new Error(
+          `Invalid signer public key for ${address}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      if (derived !== address) {
+        throw new Error(
+          `Signer public key does not match address: key derives to ${derived}, expected ${address}`,
+        );
+      }
     }
 
     const timestamp = new Date().toISOString();
@@ -61,6 +87,7 @@ export class GovernanceStore {
       label,
       weight,
       timestamp,
+      ...(publicKey !== undefined ? { publicKey } : {}),
     };
 
     this.applyEvent(event);
@@ -263,6 +290,7 @@ export class GovernanceStore {
           label: event.label,
           weight: event.weight,
           addedAt: event.timestamp,
+          ...(event.publicKey !== undefined ? { publicKey: event.publicKey } : {}),
         });
         break;
 

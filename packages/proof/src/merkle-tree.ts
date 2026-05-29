@@ -5,16 +5,34 @@
  *
  * Design:
  * - All hashing uses SHA-256 (caller provides pre-hashed leaves)
- * - Internal nodes: SHA-256(leftBytes || rightBytes) — binary concatenation of decoded hex
+ * - Domain separation (RFC 6962): leaves and internal nodes are hashed
+ *   with distinct one-byte tags so a leaf digest can NEVER equal an
+ *   internal-node digest. This defeats second-preimage attacks (an
+ *   internal node masquerading as a single leaf) and tree-shape collisions.
+ *     leaf   = SHA-256(0x00 || leafBytes)
+ *     parent = SHA-256(0x01 || leftBytes || rightBytes)
+ * - Caller-supplied leaves stay UNTAGGED in MerkleProof.leafHash; the tag
+ *   is applied internally at build + verify time. This keeps the proof
+ *   leafHash equal to the value the caller hashed (e.g. an attestation hash).
  * - Odd leaf count: duplicate the last leaf to make even
  * - Empty tree: null root
- * - Single leaf: leaf IS the root (no internal nodes)
+ * - Single leaf: root is H(0x00 || leaf) — NOT the raw leaf (so it cannot
+ *   be confused with an internal node)
  * - Deterministic: same leaves → same root
  * - Immutable: build once, query many times
  */
 
 import { createHash } from "node:crypto";
 import type { MerkleNode, MerkleProof, MerkleProofStep } from "./types.js";
+
+// =============================================================================
+// Domain Separation Tags (RFC 6962-style)
+// =============================================================================
+
+/** Prefix byte for leaf hashing. */
+const LEAF_TAG = 0x00;
+/** Prefix byte for internal-node hashing. */
+const NODE_TAG = 0x01;
 
 // =============================================================================
 // Validation
@@ -35,17 +53,32 @@ function assertValidSha256Hex(hash: string, context: string): void {
 // =============================================================================
 
 /**
+ * Hash a caller-supplied leaf into its tagged tree-leaf digest.
+ *
+ * leaf = SHA-256(0x00 || leafBytes). The 0x00 prefix domain-separates
+ * leaves from internal nodes (which use 0x01), so no internal-node digest
+ * can ever be presented as a single-leaf hash (second-preimage defense).
+ */
+function hashLeaf(leaf: string): string {
+  const buf = Buffer.allocUnsafe(33);
+  buf[0] = LEAF_TAG;
+  buf.set(Buffer.from(leaf, "hex"), 1);
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+/**
  * Hash two child hashes to produce a parent hash.
  *
- * Uses SHA-256(leftBytes || rightBytes) — binary concatenation of the
- * decoded hex digests. Because both inputs are fixed-length (32 bytes
- * each for SHA-256), the boundary is unambiguous and second-preimage
- * collisions via string concatenation are impossible.
+ * parent = SHA-256(0x01 || leftBytes || rightBytes) — the 0x01 prefix
+ * domain-separates internal nodes from leaves. Because both child inputs
+ * are fixed-length (32 bytes each for SHA-256), the boundary is
+ * unambiguous and string-concatenation collisions are impossible.
  */
 function hashPair(left: string, right: string): string {
-  const buf = Buffer.allocUnsafe(64);
-  buf.set(Buffer.from(left, "hex"), 0);
-  buf.set(Buffer.from(right, "hex"), 32);
+  const buf = Buffer.allocUnsafe(65);
+  buf[0] = NODE_TAG;
+  buf.set(Buffer.from(left, "hex"), 1);
+  buf.set(Buffer.from(right, "hex"), 33);
   return createHash("sha256").update(buf).digest("hex");
 }
 
@@ -58,8 +91,11 @@ function buildTree(leaves: readonly string[]): MerkleNode | null {
     return null;
   }
 
-  // Create leaf nodes
-  let currentLevel: MerkleNode[] = leaves.map((hash) => ({ hash }));
+  // Create leaf nodes — apply the leaf domain-separation tag so leaf
+  // digests can never collide with internal-node digests.
+  let currentLevel: MerkleNode[] = leaves.map((hash) => ({
+    hash: hashLeaf(hash),
+  }));
 
   // Build tree bottom-up
   while (currentLevel.length > 1) {
@@ -175,8 +211,11 @@ export class MerkleTree {
     const siblings: MerkleProofStep[] = [];
     let currentIndex = leafIndex;
 
-    // Reconstruct levels to find siblings at each level
-    let currentLevel = [...this.leaves];
+    // Reconstruct levels to find siblings at each level. The bottom level is
+    // the TAGGED leaf digests (matching buildTree); every sibling we emit is
+    // therefore a tagged-leaf or internal digest, exactly what verifyProof
+    // folds together.
+    let currentLevel = this.leaves.map(hashLeaf);
 
     while (currentLevel.length > 1) {
       const nextLevel: string[] = [];
@@ -232,7 +271,10 @@ export class MerkleTree {
       assertValidSha256Hex(proof.siblings[i]!.hash, `proof.siblings[${i}]`);
     }
 
-    let currentHash = proof.leafHash;
+    // Apply the leaf domain-separation tag before folding. The caller-supplied
+    // proof.leafHash is the UNTAGGED leaf; a single-leaf proof therefore folds
+    // to H(0x00 || leaf), which can never equal a (0x01-tagged) internal node.
+    let currentHash = hashLeaf(proof.leafHash);
 
     for (const step of proof.siblings) {
       if (step.direction === "left") {

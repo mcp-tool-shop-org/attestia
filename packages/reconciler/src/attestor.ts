@@ -118,10 +118,28 @@ export class Attestor {
 
   /**
    * Hash a reconciliation report for integrity verification.
-   * Uses SHA-256 over the deterministic JSON representation.
+   *
+   * Uses SHA-256 over a canonical JSON representation of ONLY the
+   * content-bearing fields. Volatile metadata (the report `id` and
+   * `timestamp`) is deliberately excluded: those are generated per-run from
+   * `Date.now()` / `new Date()`, so including them would make identical
+   * reconciliation inputs produce a different hash on every run — defeating
+   * deterministic-replay verification of immutable attestations (D4-A-001).
+   *
+   * The hash therefore covers: scope, the three match arrays, and the
+   * summary. The `id`/`timestamp` remain on the report as metadata outside
+   * the integrity envelope (they are still recorded in the attestation
+   * record and Registrum state structure).
    */
   private hashReport(report: ReconciliationReport): string {
-    const json = canonicalize(report);
+    const integrityContent = {
+      scope: report.scope,
+      intentLedgerMatches: report.intentLedgerMatches,
+      ledgerChainMatches: report.ledgerChainMatches,
+      intentChainMatches: report.intentChainMatches,
+      summary: report.summary,
+    };
+    const json = canonicalize(integrityContent);
     return createHash("sha256").update(json).digest("hex");
   }
 }

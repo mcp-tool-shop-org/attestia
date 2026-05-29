@@ -1,2 +1,11 @@
 packages:
   - "packages/*"
+
+# Security-advisory overrides (pnpm 10.x reads these from pnpm-workspace.yaml,
+# not package.json). bn.js/ws patch moderate advisories on the Solana read path;
+# minimatch/rollup patch dev-tooling advisories.
+overrides:
+  "minimatch@<3.1.4": "^3.1.4"
+  "rollup@<4.59.0": "^4.59.0"
+  "bn.js": "5.2.3"
+  "ws": "^8.21.0"

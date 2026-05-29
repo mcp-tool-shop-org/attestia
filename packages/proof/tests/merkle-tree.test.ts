@@ -26,13 +26,26 @@ function sha256(data: string): string {
 }
 
 /**
- * Hash pair using the same binary concatenation as production code.
- * SHA-256(leftBytes || rightBytes) where both are 32-byte buffers.
+ * Tag a leaf the same way production code does (RFC 6962 domain separation).
+ * leaf = SHA-256(0x00 || leafBytes).
+ */
+function hashLeaf(leaf: string): string {
+  const buf = Buffer.allocUnsafe(33);
+  buf[0] = 0x00;
+  buf.set(Buffer.from(leaf, "hex"), 1);
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+/**
+ * Hash pair using the same tagged construction as production code.
+ * parent = SHA-256(0x01 || leftBytes || rightBytes) — both children are
+ * 32-byte digests. The 0x01 tag domain-separates internal nodes from leaves.
  */
 function hashPair(left: string, right: string): string {
-  const buf = Buffer.allocUnsafe(64);
-  buf.set(Buffer.from(left, "hex"), 0);
-  buf.set(Buffer.from(right, "hex"), 32);
+  const buf = Buffer.allocUnsafe(65);
+  buf[0] = 0x01;
+  buf.set(Buffer.from(left, "hex"), 1);
+  buf.set(Buffer.from(right, "hex"), 33);
   return createHash("sha256").update(buf).digest("hex");
 }
 
@@ -52,19 +65,23 @@ describe("MerkleTree construction", () => {
     expect(tree.getLeafCount()).toBe(0);
   });
 
-  it("single leaf — leaf IS the root", () => {
+  it("single leaf — root is the TAGGED leaf (domain separation)", () => {
     const leaf = sha256("only-one");
     const tree = MerkleTree.build([leaf]);
 
-    expect(tree.getRoot()).toBe(leaf);
+    // With RFC 6962 domain separation the single-leaf root is H(0x00 || leaf),
+    // never the raw leaf — so it cannot be confused with an internal node.
+    expect(tree.getRoot()).toBe(hashLeaf(leaf));
+    expect(tree.getRoot()).not.toBe(leaf);
     expect(tree.getLeafCount()).toBe(1);
   });
 
-  it("two leaves — root is hash of pair", () => {
+  it("two leaves — root is hash of tagged pair", () => {
     const [a, b] = makeLeaves(2);
     const tree = MerkleTree.build([a!, b!]);
 
-    const expectedRoot = hashPair(a!, b!);
+    // Leaves are tagged before pairing: H(0x01 || H(0x00||a) || H(0x00||b)).
+    const expectedRoot = hashPair(hashLeaf(a!), hashLeaf(b!));
     expect(tree.getRoot()).toBe(expectedRoot);
     expect(tree.getLeafCount()).toBe(2);
   });
@@ -76,9 +93,12 @@ describe("MerkleTree construction", () => {
     expect(tree.getRoot()).toBeTruthy();
     expect(tree.getLeafCount()).toBe(3);
 
-    // Manually compute: H(H(L0,L1), H(L2,L2))
-    const h01 = hashPair(leaves[0]!, leaves[1]!);
-    const h22 = hashPair(leaves[2]!, leaves[2]!);
+    // Manually compute over TAGGED leaves: H(H(l0,l1), H(l2,l2))
+    const l0 = hashLeaf(leaves[0]!);
+    const l1 = hashLeaf(leaves[1]!);
+    const l2 = hashLeaf(leaves[2]!);
+    const h01 = hashPair(l0, l1);
+    const h22 = hashPair(l2, l2);
     const expectedRoot = hashPair(h01, h22);
     expect(tree.getRoot()).toBe(expectedRoot);
   });
@@ -87,8 +107,9 @@ describe("MerkleTree construction", () => {
     const leaves = makeLeaves(4);
     const tree = MerkleTree.build(leaves);
 
-    const h01 = hashPair(leaves[0]!, leaves[1]!);
-    const h23 = hashPair(leaves[2]!, leaves[3]!);
+    const l = leaves.map(hashLeaf);
+    const h01 = hashPair(l[0]!, l[1]!);
+    const h23 = hashPair(l[2]!, l[3]!);
     const expectedRoot = hashPair(h01, h23);
     expect(tree.getRoot()).toBe(expectedRoot);
   });
@@ -188,28 +209,31 @@ describe("MerkleTree proof generation", () => {
     const proof = tree.getProof(0);
 
     expect(proof).not.toBeNull();
+    // leafHash stays the UNTAGGED caller value...
     expect(proof!.leafHash).toBe(leaf);
     expect(proof!.leafIndex).toBe(0);
     expect(proof!.siblings).toEqual([]);
-    expect(proof!.root).toBe(leaf);
+    // ...but the root is the tagged leaf (domain separation).
+    expect(proof!.root).toBe(hashLeaf(leaf));
   });
 
-  it("two leaves — proof has one sibling", () => {
+  it("two leaves — proof has one sibling (tagged sibling digest)", () => {
     const [a, b] = makeLeaves(2);
     const tree = MerkleTree.build([a!, b!]);
 
     const proof0 = tree.getProof(0);
     expect(proof0).not.toBeNull();
+    // leafHash is the untagged caller value; the sibling is the tagged leaf.
     expect(proof0!.leafHash).toBe(a!);
     expect(proof0!.siblings.length).toBe(1);
-    expect(proof0!.siblings[0]!.hash).toBe(b!);
+    expect(proof0!.siblings[0]!.hash).toBe(hashLeaf(b!));
     expect(proof0!.siblings[0]!.direction).toBe("right");
 
     const proof1 = tree.getProof(1);
     expect(proof1).not.toBeNull();
     expect(proof1!.leafHash).toBe(b!);
     expect(proof1!.siblings.length).toBe(1);
-    expect(proof1!.siblings[0]!.hash).toBe(a!);
+    expect(proof1!.siblings[0]!.hash).toBe(hashLeaf(a!));
     expect(proof1!.siblings[0]!.direction).toBe("left");
   });
 

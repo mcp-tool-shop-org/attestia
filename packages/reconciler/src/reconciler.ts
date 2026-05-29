@@ -11,10 +11,14 @@
  */
 
 import type { Registrar } from "@attestia/registrum";
+import type { Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import { IntentLedgerMatcher } from "./intent-ledger-matcher.js";
 import { LedgerChainMatcher } from "./ledger-chain-matcher.js";
 import { IntentChainMatcher } from "./intent-chain-matcher.js";
 import { Attestor } from "./attestor.js";
+import { countByCode } from "./discrepancy.js";
+import type { Discrepancy } from "./discrepancy.js";
 import type {
   ReconciliationReport,
   ReconciliationScope,
@@ -26,6 +30,21 @@ import type {
 } from "./types.js";
 
 // =============================================================================
+// Internal
+// =============================================================================
+
+/**
+ * The shape `computeSummary` needs from each match type. All three concrete
+ * match interfaces (intent↔ledger, ledger↔chain, intent↔chain) satisfy it, so
+ * the summary can treat them uniformly without depending on their full shapes.
+ */
+interface MatchLike {
+  readonly status: string;
+  readonly discrepancies: readonly string[];
+  readonly structuredDiscrepancies: readonly Discrepancy[];
+}
+
+// =============================================================================
 // Configuration
 // =============================================================================
 
@@ -34,6 +53,12 @@ export interface ReconcilerConfig {
   readonly registrar?: Registrar;
   /** Identity of the attestor (e.g. "reconciler-service-1"). Required if registrar is provided. */
   readonly attestorId?: string;
+  /**
+   * Optional observability sink (D4-B-001). Defaults to {@link NOOP_TELEMETRY}.
+   * Each `reconcile()` emits one `reconcile` event carrying `{ matched,
+   * mismatched, missing }` counts, an `ok | degraded` outcome, and `durationMs`.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 // =============================================================================
@@ -56,6 +81,7 @@ export class Reconciler {
   private readonly ledgerChainMatcher = new LedgerChainMatcher();
   private readonly intentChainMatcher = new IntentChainMatcher();
   private readonly attestor: Attestor | null;
+  private readonly telemetry: Telemetry;
   private reportCounter = 0;
 
   constructor(config: ReconcilerConfig = {}) {
@@ -67,6 +93,7 @@ export class Reconciler {
     } else {
       this.attestor = null;
     }
+    this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
   }
 
   /**
@@ -74,6 +101,7 @@ export class Reconciler {
    */
   reconcile(input: ReconciliationInput): ReconciliationReport {
     const { intents, ledgerEntries, chainEvents, scope } = input;
+    const startedAt = Date.now();
 
     // Filter inputs by scope
     const scopedIntents = this.filterIntents(intents, scope);
@@ -106,6 +134,25 @@ export class Reconciler {
 
     this.reportCounter += 1;
     const id = `recon:${Date.now()}:${this.reportCounter}`;
+
+    // Emit one structured event per reconciliation. Counts are low-cardinality
+    // and safe as metric labels; the report id (high-cardinality) goes in
+    // `message`. Outcome degrades when anything failed to reconcile.
+    this.telemetry.record({
+      package: "@attestia/reconciler",
+      op: "reconcile",
+      level: summary.allReconciled ? "info" : "warn",
+      outcome: summary.allReconciled ? "ok" : "degraded",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        matched: summary.matchedCount,
+        mismatched: summary.mismatchCount,
+        missing: summary.missingCount,
+      },
+      message:
+        `reconciliation '${id}' ${summary.allReconciled ? "clean" : "found discrepancies"}: ` +
+        `${summary.matchedCount} matched, ${summary.mismatchCount} mismatched, ${summary.missingCount} missing`,
+    });
 
     return {
       id,
@@ -193,9 +240,9 @@ export class Reconciler {
     intents: readonly ReconcilableIntent[],
     ledgerEntries: readonly ReconcilableLedgerEntry[],
     chainEvents: readonly ReconcilableChainEvent[],
-    intentLedger: readonly { status: string; discrepancies: readonly string[] }[],
-    ledgerChain: readonly { status: string; discrepancies: readonly string[] }[],
-    intentChain: readonly { status: string; discrepancies: readonly string[] }[],
+    intentLedger: readonly MatchLike[],
+    ledgerChain: readonly MatchLike[],
+    intentChain: readonly MatchLike[],
   ): ReconciliationSummary {
     const allMatches = [...intentLedger, ...ledgerChain, ...intentChain];
 
@@ -210,6 +257,7 @@ export class Reconciler {
     ).length;
 
     const allDiscrepancies = allMatches.flatMap((m) => m.discrepancies);
+    const allStructured = allMatches.flatMap((m) => m.structuredDiscrepancies);
 
     return {
       totalIntents: intents.length,
@@ -220,6 +268,8 @@ export class Reconciler {
       missingCount,
       allReconciled: mismatchCount === 0 && missingCount === 0,
       discrepancies: allDiscrepancies,
+      structuredDiscrepancies: allStructured,
+      discrepancyCountsByCode: countByCode(allStructured),
     };
   }
 }

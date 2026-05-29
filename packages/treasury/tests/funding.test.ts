@@ -104,6 +104,48 @@ describe("FundingGateManager", () => {
     });
   });
 
+  // ─── Separation of duties (D4-A-003) ──────────────────────────────
+
+  describe("separation of duties", () => {
+    it("rejects when the requester (also a gatekeeper) approves their own gate", () => {
+      // cfo is a gatekeeper. If cfo also raised the request, cfo approving a
+      // gate would self-satisfy one of the two required approvals.
+      funding.submitRequest("f-sod", "Self-funded", usdc("1000"), "cfo");
+
+      expect(() => funding.approveGate("f-sod", "cfo")).toThrow(
+        /requester cannot approve|cannot approve.*own/i,
+      );
+    });
+
+    it("exposes a REQUESTER_CANNOT_APPROVE error code", () => {
+      funding.submitRequest("f-sod2", "Self-funded", usdc("1000"), "cfo");
+      try {
+        funding.approveGate("f-sod2", "cfo");
+        throw new Error("expected approveGate to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(FundingError);
+        expect((err as FundingError).code).toBe("REQUESTER_CANNOT_APPROVE");
+      }
+    });
+
+    it("still allows the OTHER gatekeeper to approve a gatekeeper-raised request", () => {
+      // cfo raises; ceo (the other gatekeeper) may approve gate 1.
+      funding.submitRequest("f-sod3", "Cross-approved", usdc("1000"), "cfo");
+      const updated = funding.approveGate("f-sod3", "ceo");
+      expect(updated.status).toBe("gate1-approved");
+      expect(updated.gate1?.approvedBy).toBe("ceo");
+    });
+
+    it("does not affect requests raised by a non-gatekeeper", () => {
+      // Regression guard for the common path: alice (non-gatekeeper) requests,
+      // both gatekeepers approve normally.
+      funding.submitRequest("f-sod4", "Normal", usdc("1000"), "alice");
+      funding.approveGate("f-sod4", "cfo");
+      const approved = funding.approveGate("f-sod4", "ceo");
+      expect(approved.status).toBe("approved");
+    });
+  });
+
   // ─── Rejection ────────────────────────────────────────────────────
 
   describe("rejectRequest", () => {

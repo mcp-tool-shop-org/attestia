@@ -302,7 +302,8 @@ export type EventStoreErrorCode =
   | "EMPTY_APPEND"
   | "INVALID_VERSION"
   | "STORE_CLOSED"
-  | "LOCK_TIMEOUT";
+  | "LOCK_TIMEOUT"
+  | "INTEGRITY_VIOLATION";
 
 /**
  * Error thrown by EventStore operations.

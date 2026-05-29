@@ -105,6 +105,139 @@ describe("DistributionEngine", () => {
     });
   });
 
+  // ─── Share validation (D4-B-003) ──────────────────────────────────
+  // Individual recipient.share values flow into BigInt(share) and bigint
+  // arithmetic during resolution. A fractional share throws an opaque
+  // RangeError, a negative mints a negative payout, and NaN/Infinity corrupt
+  // the math. createPlan must validate every share is a non-negative integer
+  // (and ≤ 10000 for proportional/milestone) and reject with INVALID_SHARES.
+
+  describe("share validation", () => {
+    function expectInvalidShares(
+      strategy: "proportional" | "fixed" | "milestone",
+      recipients: DistributionRecipient[],
+    ): void {
+      let err: unknown;
+      try {
+        engine.createPlan("d-1", "Bad shares", strategy, usdc("10000"), recipients);
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(DistributionError);
+      expect((err as DistributionError).code).toBe("INVALID_SHARES");
+    }
+
+    for (const strategy of ["proportional", "fixed", "milestone"] as const) {
+      it(`rejects a negative share (${strategy})`, () => {
+        expectInvalidShares(strategy, [
+          { payeeId: "p-1", share: -100, milestoneMet: true },
+        ]);
+      });
+
+      it(`rejects a fractional share (${strategy})`, () => {
+        expectInvalidShares(strategy, [
+          { payeeId: "p-1", share: 33.33, milestoneMet: true },
+        ]);
+      });
+
+      it(`rejects a NaN share (${strategy})`, () => {
+        expectInvalidShares(strategy, [
+          { payeeId: "p-1", share: NaN, milestoneMet: true },
+        ]);
+      });
+
+      it(`rejects an Infinity share (${strategy})`, () => {
+        expectInvalidShares(strategy, [
+          { payeeId: "p-1", share: Infinity, milestoneMet: true },
+        ]);
+      });
+    }
+
+    it("names the offending payeeId and value in the message", () => {
+      let err: DistributionError | undefined;
+      try {
+        engine.createPlan("d-1", "Bad", "proportional", usdc("100"), [
+          { payeeId: "p-good", share: 5000 },
+          { payeeId: "p-bad", share: -7 },
+        ]);
+      } catch (e) {
+        err = e as DistributionError;
+      }
+      expect(err).toBeInstanceOf(DistributionError);
+      expect(err!.message).toContain("p-bad");
+      expect(err!.message).toContain("-7");
+    });
+
+    it("rejects an individual proportional share above 10000", () => {
+      // Single recipient whose share alone exceeds the basis-point ceiling.
+      expectInvalidShares("proportional", [
+        { payeeId: "p-1", share: 10001 },
+      ]);
+    });
+
+    it("rejects an individual milestone share above 10000", () => {
+      expectInvalidShares("milestone", [
+        { payeeId: "p-1", share: 20000, milestoneMet: true },
+      ]);
+    });
+
+    it("does NOT bound fixed shares at 10000 (they are amounts, not basis points)", () => {
+      // A fixed share of 50000 against a 100000 pool is a legitimate amount.
+      const plan = engine.createPlan("d-1", "Big stipend", "fixed", usdc("100000"), [
+        { payeeId: "p-1", share: 50000 },
+      ]);
+      expect(plan.recipients[0]!.share).toBe(50000);
+    });
+
+    it("accepts a zero share", () => {
+      const plan = engine.createPlan("d-1", "Zero", "proportional", usdc("100"), [
+        { payeeId: "p-1", share: 0 },
+        { payeeId: "p-2", share: 5000 },
+      ]);
+      expect(plan.recipients.length).toBe(2);
+    });
+  });
+
+  // ─── Duplicate recipient validation (D4-B-004) ────────────────────
+  // Recipients with duplicate payeeIds collide on correlationId during
+  // execute and silently double-credit. createPlan must reject duplicates.
+
+  describe("duplicate recipient validation", () => {
+    it("rejects duplicate payeeIds with DUPLICATE_RECIPIENT", () => {
+      let err: DistributionError | undefined;
+      try {
+        engine.createPlan("d-1", "Dupes", "proportional", usdc("10000"), [
+          { payeeId: "p-1", share: 3000 },
+          { payeeId: "p-1", share: 2000 },
+        ]);
+      } catch (e) {
+        err = e as DistributionError;
+      }
+      expect(err).toBeInstanceOf(DistributionError);
+      expect(err!.code).toBe("DUPLICATE_RECIPIENT");
+      expect(err!.message).toContain("p-1");
+    });
+
+    it("rejects duplicates across all strategies", () => {
+      for (const strategy of ["proportional", "fixed", "milestone"] as const) {
+        expect(() =>
+          engine.createPlan(`d-${strategy}`, "Dupes", strategy, usdc("100"), [
+            { payeeId: "dup", share: 10, milestoneMet: true },
+            { payeeId: "dup", share: 10, milestoneMet: true },
+          ]),
+        ).toThrow(DistributionError);
+      }
+    });
+
+    it("accepts distinct payeeIds", () => {
+      const plan = engine.createPlan("d-1", "Distinct", "proportional", usdc("10000"), [
+        { payeeId: "p-1", share: 3000 },
+        { payeeId: "p-2", share: 2000 },
+      ]);
+      expect(plan.recipients.length).toBe(2);
+    });
+  });
+
   // ─── Proportional distribution ────────────────────────────────────
 
   describe("proportional distribution", () => {

@@ -3,7 +3,23 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { createApp } from "../src/app.js";
 import { createTestApp, jsonRequest } from "./setup.js";
+
+/**
+ * App with the opt-in readiness counts enabled (V2-002). The default app
+ * exposes only boolean readiness on the unauthenticated probe.
+ */
+function createCountsApp() {
+  return createApp({
+    serviceConfig: {
+      ownerId: "test-tenant",
+      defaultCurrency: "USDC",
+      defaultDecimals: 6,
+    },
+    exposeReadinessCounts: true,
+  });
+}
 
 describe("deep health check", () => {
   it("GET /health returns 200 always", async () => {
@@ -23,11 +39,13 @@ describe("deep health check", () => {
 
     const body = await res.json();
     expect(body.status).toBe("ready");
-    expect(body.tenants).toBe(0);
+    // Default probe is boolean-only — no counts (V2-002).
+    expect(body.tenants).toBeUndefined();
   });
 
   it("GET /ready returns 200 after tenant is used", async () => {
-    const { app } = createTestApp();
+    // Counts enabled so we can observe the aggregate readiness numbers.
+    const { app } = createCountsApp();
 
     // Trigger tenant creation by making an API request
     await app.request(jsonRequest("/api/v1/intents"));
@@ -39,12 +57,11 @@ describe("deep health check", () => {
     expect(body.status).toBe("ready");
     expect(body.tenants).toBeGreaterThan(0);
 
-    // Subsystem should report "ok"
-    const subsystemKeys = Object.keys(body.subsystems);
-    expect(subsystemKeys.length).toBeGreaterThan(0);
-    for (const key of subsystemKeys) {
-      expect(body.subsystems[key].status).toBe("ok");
-    }
+    // Aggregate readiness counts are reported (opt-in); no per-tenant
+    // breakdown is exposed on this endpoint (D6-A-003).
+    expect(body.ready).toBeGreaterThan(0);
+    expect(body.notReady).toBe(0);
+    expect(body.subsystems).toBeUndefined();
   });
 
   it("GET /ready returns 503 when service is stopped", async () => {
@@ -61,8 +78,9 @@ describe("deep health check", () => {
     expect(body.status).toBe("not_ready");
   });
 
-  it("GET /ready includes subsystem detail when down", async () => {
-    const { app, tenantRegistry } = createTestApp();
+  it("GET /ready reports an aggregate not-ready count when a tenant is down", async () => {
+    // Counts enabled so the aggregate not-ready number is present to assert on.
+    const { app, tenantRegistry } = createCountsApp();
 
     const service = tenantRegistry.getOrCreate("test-tenant");
     await service.stop();
@@ -70,8 +88,11 @@ describe("deep health check", () => {
     const res = await app.request(jsonRequest("/ready"));
     const body = await res.json();
 
-    expect(body.subsystems["test-tenant"]).toBeDefined();
-    expect(body.subsystems["test-tenant"].status).toBe("down");
+    // Aggregate-only: the down tenant is counted but never named (D6-A-003).
+    expect(body.status).toBe("not_ready");
+    expect(body.notReady).toBeGreaterThan(0);
+    expect(body.subsystems).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("test-tenant");
   });
 
   it("GET /ready reports timestamp", async () => {

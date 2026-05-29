@@ -165,6 +165,69 @@ describe("IntentLedgerMatcher", () => {
     });
   });
 
+  describe("amount-bearing intent with no debit (D4-A-004)", () => {
+    // An outflow intent that carries an amount but is linked only to credit
+    // entries has NOT been debited. Reporting it as a clean "matched" hides a
+    // real discrepancy (intent amount vs 0 debited). It must be flagged.
+    it("flags an amount-bearing intent linked only to credit entries", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-credit-only",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"), // outflow of 100 expected
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "entry-credit",
+          accountId: "acct-1",
+          type: "credit", // ONLY a credit — no debit recorded the outflow
+          money: usdc("100.000000"),
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-credit-only",
+          correlationId: "corr-co",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.status).not.toBe("matched");
+      expect(["amount-mismatch", "missing-ledger"]).toContain(results[0]!.status);
+      expect(results[0]!.discrepancies.length).toBeGreaterThan(0);
+      // Discrepancy should make clear the debited amount is zero.
+      expect(results[0]!.discrepancies.join(" ")).toMatch(/0(\.0+)?/);
+    });
+
+    it("still treats amount-less intent with only credit entries as matched", () => {
+      // No amount on the intent → debit-absent is legitimately clean.
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-no-amount",
+          status: "executed",
+          kind: "allocate",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "entry-credit-2",
+          accountId: "acct-1",
+          type: "credit",
+          money: usdc("50.000000"),
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-no-amount",
+          correlationId: "corr-na",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.status).toBe("matched");
+    });
+  });
+
   describe("multiple intents", () => {
     it("matches multiple intents to their respective ledger entries", () => {
       const intents: ReconcilableIntent[] = [

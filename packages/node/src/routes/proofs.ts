@@ -18,10 +18,12 @@ import { validateBody } from "../middleware/validate.js";
 import { requirePermission } from "../middleware/auth.js";
 import {
   MerkleTree,
+  hashAttestation,
   packageAttestationProof,
   verifyAttestationProof,
 } from "@attestia/proof";
 import type { AttestationProofPackage } from "@attestia/proof";
+import type { AttestationRecord } from "@attestia/reconciler";
 
 // =============================================================================
 // Zod Schemas
@@ -55,15 +57,23 @@ const ProofPackageSchema = z.object({
 
 /**
  * Build a Merkle tree from the attestation records in a service.
- * Uses reportHash from each attestation as leaves (ordered by attestedAt).
+ *
+ * Each leaf is the attestation's OWN canonical hash (`hashAttestation` over the
+ * full record), NOT `reportHash`. This is the same hash `packageAttestationProof`
+ * binds the inclusion proof to, so a proof minted from this tree satisfies the
+ * proof package's leaf↔attestation binding. `reportHash` is a hash of the
+ * reconciliation report, not of the attestation record, and would not bind.
+ *
+ * `/merkle-root` and `/attestation/:id` both route through this helper so they
+ * share one leaf basis and therefore one root.
  */
 function buildAttestationTree(service: {
-  listAttestations(): readonly { reportHash: string }[];
-}): { tree: MerkleTree; hashes: string[] } {
+  listAttestations(): readonly AttestationRecord[];
+}): { tree: MerkleTree; attestations: readonly AttestationRecord[]; hashes: string[] } {
   const attestations = service.listAttestations();
-  const hashes = attestations.map((a) => a.reportHash);
+  const hashes = attestations.map((a) => hashAttestation(a));
   const tree = MerkleTree.build(hashes);
-  return { tree, hashes };
+  return { tree, attestations, hashes };
 }
 
 // =============================================================================
@@ -93,7 +103,10 @@ export function createProofRoutes(): Hono<AppEnv> {
     const attestationId = c.req.param("id");
     const service = c.get("service");
 
-    const attestations = service.listAttestations();
+    // Build the tree over the SAME leaf basis as /merkle-root (each leaf is the
+    // attestation's own canonical hash) so the roots stay consistent and the
+    // packaged proof's leaf binds to the attestation.
+    const { tree, attestations, hashes } = buildAttestationTree(service);
     const index = attestations.findIndex((a) => a.id === attestationId);
 
     if (index === -1) {
@@ -107,8 +120,6 @@ export function createProofRoutes(): Hono<AppEnv> {
     }
 
     const attestation = attestations[index]!;
-    const hashes = attestations.map((a) => a.reportHash);
-    const tree = MerkleTree.build(hashes);
 
     const pkg = packageAttestationProof(attestation, hashes, tree, index);
 

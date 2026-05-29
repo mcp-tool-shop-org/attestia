@@ -288,10 +288,15 @@ const OPENAPI_SCHEMA = {
           failCount: { type: "integer" },
           agreementRatio: { type: "number", minimum: 0, maximum: 1 },
           quorumReached: { type: "boolean" },
+          singleVerifierPass: {
+            type: "boolean",
+            description:
+              "True when the PASS was reached with a weak quorum threshold (<= 1 verifier would have sufficed). Fail-closed callers should refuse an authoritative PASS when this is true.",
+          },
           dissenters: { type: "array", items: { type: "string" } },
           consensusAt: { type: "string", format: "date-time" },
         },
-        required: ["verdict", "totalVerifiers", "passCount", "failCount", "agreementRatio", "quorumReached", "dissenters", "consensusAt"],
+        required: ["verdict", "totalVerifiers", "passCount", "failCount", "agreementRatio", "quorumReached", "singleVerifierPass", "dissenters", "consensusAt"],
       },
       Pagination: {
         type: "object",

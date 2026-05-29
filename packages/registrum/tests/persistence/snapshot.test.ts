@@ -17,6 +17,31 @@ import {
   computeRegistryHash,
   type RegistrarSnapshotV1,
 } from "../../src/persistence/snapshot";
+import { loadInvariantRegistry } from "../../src/registry/loader";
+import type { RawInvariantRegistry } from "../../src/registry/loader";
+
+// A minimal, well-formed raw registry used for content-hash tests.
+function rawRegistry(
+  registryId: string,
+  expression: string
+): RawInvariantRegistry {
+  return {
+    version: "1.0",
+    registry_id: registryId,
+    status: "experimental",
+    invariants: [
+      {
+        id: "state.identity.explicit",
+        group: "identity",
+        scope: "state",
+        description: "Every State must declare an explicit identity.",
+        applies_to: ["state.id"],
+        condition: { type: "predicate", expression },
+        failure_mode: "reject",
+      },
+    ],
+  };
+}
 
 // =============================================================================
 // Test Helpers
@@ -296,6 +321,71 @@ describe("Snapshot Schema Validation (E.1)", () => {
       expect(() => validateSnapshot(snapshot)).toThrow(/parent 'NonExistent'.*does not exist/);
     });
 
+    // --- Root-reachability and cycle detection (D1-A-004) ---
+    // Parent-existence alone is not enough: a lineage where every parent
+    // exists can still be unreachable from any root (a cycle). Such a snapshot
+    // describes an impossible append-only history and must be rejected.
+
+    it("rejects a 2-node lineage cycle with no root (A->B->A)", () => {
+      const snapshot = createValidSnapshot({
+        state_ids: ["A", "B"],
+        lineage: { A: "B", B: "A" }, // every parent exists, but no root
+        ordering: {
+          max_index: 1,
+          assigned: { A: 0, B: 1 },
+        },
+      });
+      expect(() => validateSnapshot(snapshot)).toThrow(SnapshotValidationError);
+      expect(() => validateSnapshot(snapshot)).toThrow(/cycle|root/i);
+    });
+
+    it("rejects a self-parent cycle (A->A)", () => {
+      const snapshot = createValidSnapshot({
+        state_ids: ["A"],
+        lineage: { A: "A" }, // A is its own parent — never terminates at root
+        ordering: { max_index: 0, assigned: { A: 0 } },
+      });
+      expect(() => validateSnapshot(snapshot)).toThrow(SnapshotValidationError);
+      expect(() => validateSnapshot(snapshot)).toThrow(/cycle|root/i);
+    });
+
+    it("rejects a longer cycle embedded among valid roots (A->B->C->A)", () => {
+      const snapshot = createValidSnapshot({
+        state_ids: ["Root", "A", "B", "C"],
+        lineage: { Root: null, A: "B", B: "C", C: "A" },
+        ordering: {
+          max_index: 3,
+          assigned: { Root: 0, A: 1, B: 2, C: 3 },
+        },
+      });
+      expect(() => validateSnapshot(snapshot)).toThrow(SnapshotValidationError);
+      expect(() => validateSnapshot(snapshot)).toThrow(/cycle|root/i);
+    });
+
+    it("accepts a valid chain that terminates at a null-parent root", () => {
+      const snapshot = createValidSnapshot({
+        state_ids: ["A", "B", "C"],
+        lineage: { A: null, B: "A", C: "B" }, // A is root; B, C reachable
+        ordering: {
+          max_index: 2,
+          assigned: { A: 0, B: 1, C: 2 },
+        },
+      });
+      expect(() => validateSnapshot(snapshot)).not.toThrow();
+    });
+
+    it("accepts a forest of independent roots", () => {
+      const snapshot = createValidSnapshot({
+        state_ids: ["R1", "R2", "C1"],
+        lineage: { R1: null, R2: null, C1: "R1" },
+        ordering: {
+          max_index: 2,
+          assigned: { R1: 0, R2: 1, C1: 2 },
+        },
+      });
+      expect(() => validateSnapshot(snapshot)).not.toThrow();
+    });
+
     it("rejects state_id without ordering entry", () => {
       const snapshot = createValidSnapshot({
         state_ids: ["A", "B", "C"],
@@ -345,8 +435,9 @@ describe("Snapshot Schema Validation (E.1)", () => {
     });
 
     it("accepts non-contiguous order indices", () => {
-      // This is valid: states can have non-contiguous indices
-      // (e.g., when the same ID is re-registered, overwriting previous entry)
+      // This is valid: the snapshot projects the live frontier (latest version
+      // per StateID). When an id gains a new append-only version, its frontier
+      // order index advances, leaving gaps relative to other ids' indices.
       const snapshot = createValidSnapshot({
         state_ids: ["A", "B"],
         lineage: { A: null, B: "A" },
@@ -390,21 +481,55 @@ describe("Registry Hash Computation", () => {
     });
   });
 
-  describe("Registry mode hash", () => {
-    it("uses registry_id directly", () => {
-      const hash = computeRegistryHash("registrum.invariants.v1");
-      expect(hash).toBe("registry:registrum.invariants.v1");
+  describe("Registry mode hash (content-addressed, D1-A-003)", () => {
+    it("is a hex-encoded SHA-256 of the compiled registry content", () => {
+      const reg = loadInvariantRegistry(
+        rawRegistry("registrum.invariants.v1", "exists(state.id)")
+      );
+      const hash = computeRegistryHash(reg);
+      // 64 lowercase hex chars — a real content digest, not a static id echo.
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(hash).not.toContain("registrum.invariants.v1");
     });
 
-    it("includes registry prefix", () => {
-      const hash = computeRegistryHash("test");
-      expect(hash).toMatch(/^registry:/);
+    it("is deterministic for identical registry content", () => {
+      const a = loadInvariantRegistry(rawRegistry("same", "exists(state.id)"));
+      const b = loadInvariantRegistry(rawRegistry("same", "exists(state.id)"));
+      expect(computeRegistryHash(a)).toBe(computeRegistryHash(b));
     });
 
-    it("produces different hashes for different registries", () => {
-      const hash1 = computeRegistryHash("v1");
-      const hash2 = computeRegistryHash("v2");
-      expect(hash1).not.toBe(hash2);
+    it("CHANGES when a predicate expression changes (constitutional drift)", () => {
+      // Same registry_id, same invariant id — only the predicate differs.
+      // A static-id hash would collide here; a content hash must not.
+      const original = loadInvariantRegistry(
+        rawRegistry("registrum.core", "exists(state.id)")
+      );
+      const tampered = loadInvariantRegistry(
+        rawRegistry("registrum.core", "exists(state.id) && state.id != \"\"")
+      );
+      expect(computeRegistryHash(original)).not.toBe(
+        computeRegistryHash(tampered)
+      );
+    });
+
+    it("changes when failure_mode changes", () => {
+      const reject = loadInvariantRegistry(rawRegistry("r", "exists(state.id)"));
+      const rawHalt = rawRegistry("r", "exists(state.id)");
+      const haltRegistry = loadInvariantRegistry({
+        ...rawHalt,
+        invariants: [{ ...rawHalt.invariants[0], failure_mode: "halt" }],
+      });
+      expect(computeRegistryHash(reject)).not.toBe(
+        computeRegistryHash(haltRegistry)
+      );
+    });
+
+    it("produces different hashes for genuinely different registries", () => {
+      const v1 = loadInvariantRegistry(rawRegistry("v1", "exists(state.id)"));
+      const v2 = loadInvariantRegistry(
+        rawRegistry("v2", "exists(transition.to.id)")
+      );
+      expect(computeRegistryHash(v1)).not.toBe(computeRegistryHash(v2));
     });
   });
 });

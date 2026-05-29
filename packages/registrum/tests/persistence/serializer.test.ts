@@ -312,7 +312,9 @@ describe("Deterministic Serialization (E.2)", () => {
       const parsed = JSON.parse(json);
 
       expect(parsed.mode).toBe("registry");
-      expect(parsed.registry_hash).toMatch(/^registry:/);
+      // Registry mode now uses a content-addressed SHA-256 (D1-A-003), not a
+      // static "registry:<id>" echo.
+      expect(parsed.registry_hash).toMatch(/^[0-9a-f]{64}$/);
     });
 
     it("legacy and registry mode produce different hashes", () => {
@@ -332,7 +334,8 @@ describe("Deterministic Serialization (E.2)", () => {
       // Different modes have different registry hashes
       expect(legacyHash).not.toBe(registryHash);
       expect(legacyHash).toMatch(/^legacy:/);
-      expect(registryHash).toMatch(/^registry:/);
+      // Registry-mode hash is a content-addressed SHA-256 (D1-A-003).
+      expect(registryHash).toMatch(/^[0-9a-f]{64}$/);
     });
 
     it("deterministic for registry mode", () => {

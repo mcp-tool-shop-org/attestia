@@ -29,6 +29,7 @@
     "@attestia/registrum": "workspace:*",
     "@attestia/types": "workspace:*",
     "json-canonicalize": "^2.0.0",
+    "ripple-keypairs": "^2.0.0",
     "xrpl": "^4.2.0"
   },
   "devDependencies": {

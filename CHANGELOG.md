@@ -4,6 +4,47 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [1.0.1] - 2026-05-29
+
+A full health-and-hardening pass plus a new observability and error-UX feature layer. No public API was removed; existing behavior is preserved and now better instrumented and explained.
+
+### Security & correctness hardening
+
+Resolved 6 CRITICAL, 14 HIGH, and 19 MEDIUM findings across 14 packages. Highlights:
+
+- **Append-only lineage re-architecture** — lineage tracking reworked so that history is structurally unbroken and tamper-evident, not merely conventionally append-only.
+- **Runtime dual-witness enforcement** — dual-witness validation is now enforced at runtime on critical operations, not only asserted at the type level.
+- **Attestation-proof leaf binding** — Merkle inclusion proofs are bound to their attestation leaf, closing a proof-substitution gap.
+- **Hash-chain genesis anchor** — the event hash chain is anchored to an explicit genesis marker so the first event cannot be silently replaced.
+- **Tenant-scoped idempotency** — `Idempotency-Key` handling is scoped per tenant, preventing cross-tenant key collisions.
+- **Verify-then-count multi-sig** — multi-sig quorum counts signatures only after verifying each one, preventing inflated quorum via unverified signatures.
+
+### Added — Observability layer
+
+- **Injectable telemetry** — domain packages accept an optional `Telemetry` sink (defaulting to a silent no-op), so verification and accounting run unobserved and free unless a host opts in. Telemetry is defensively guarded: a throwing sink can never break the operation it observes.
+- **pino + Prometheus bridge** — the node service wires the telemetry contract to structured `pino` logging and Prometheus counters/histograms, including `attestia_witness_total{status}`.
+
+### Added — Error-UX layer
+
+- **`{ code, message, hint }` error envelope** — API errors carry a stable machine code, a safe human-readable message, and an actionable hint. Internal details never leak in 4xx responses.
+- **Structured reconciliation discrepancies** — reconciliation responses now return discrepancies in a structured, machine-readable shape rather than free text.
+- **Auditor report formatters** — verifier reports gain human-readable formatters for auditor consumption.
+- **SDK typed errors** — the SDK surfaces typed errors with `hint` and `ValidationIssue` details for consumers.
+
+### Fixed — Documentation accuracy
+
+- Test counts updated from 1,928 to **2,220** across README, HANDBOOK, INDEX, the landing-page config, and the docs handbook.
+- `VERIFICATION_GUIDE.md`: corrected the Step 4 replay example (auditors are pointed at `runVerification()`, which recomputes the global hash from replayed snapshots plus the bundle's own chain hashes; the prior snippet passed the global hash as `expectedHash` to `verifyByReplay()`, producing a spurious FAIL on any chain-observing node). Stale "1,107 tests" corrected to 2,220.
+- Documented Node floor reconciled to **Node 20+** (CI tests Node 20 and 22) across VERIFICATION_GUIDE and HANDBOOK.
+- HANDBOOK version corrected to 1.0.1; REST endpoint count stated as 34; event-type count reconciled to 34 (verified against the event-store catalog).
+- INDEX workflow inventory corrected (3 workflows: ci, docker, pages).
+
+### Security
+
+- All dependency advisories cleared — **0 high/critical** advisories.
+
+---
+
 ## [1.0.0] - 2026-02-27
 
 ### Added
@@ -76,7 +117,7 @@ All notable changes to Attestia, organized by development phase.
 - RFC-008: Compliance Evidence Generation Protocol
 - RFC-009: External Verification Protocol
 
-**Tests added in Phase 12:** ~302 new tests (1,853 total across 15 packages)
+**Tests added in Phase 12:** ~302 new tests (1,928 total across 15 packages)
 
 ---
 

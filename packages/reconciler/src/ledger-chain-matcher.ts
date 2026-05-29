@@ -11,6 +11,8 @@
 
 import { parseAmount, formatAmount } from "@attestia/ledger";
 import { preventDoubleCounting } from "./cross-chain-rules.js";
+import { makeDiscrepancy } from "./discrepancy.js";
+import type { Discrepancy } from "./discrepancy.js";
 import type { CrossChainEvent } from "./cross-chain-rules.js";
 import type {
   LedgerChainMatch,
@@ -51,13 +53,16 @@ export class LedgerChainMatcher {
       const events = byTxHash.get(entry.txHash);
 
       if (!events || events.length === 0) {
+        const msg =
+          `Ledger entry ${entry.id} references txHash ${entry.txHash} but no on-chain event found`;
         results.push({
           correlationId: entry.correlationId,
           txHash: entry.txHash,
           status: "missing-chain",
           ledgerAmount: entry.money,
-          discrepancies: [
-            `Ledger entry ${entry.id} references txHash ${entry.txHash} but no on-chain event found`,
+          discrepancies: [msg],
+          structuredDiscrepancies: [
+            makeDiscrepancy("MISSING_CHAIN", "presence", msg),
           ],
         });
         continue;
@@ -71,6 +76,9 @@ export class LedgerChainMatcher {
       );
 
       if (!matchingEvent) {
+        const expected = entry.money.currency;
+        const actual = events[0]!.symbol;
+        const msg = `Currency mismatch: ledger=${expected} chain=${actual}`;
         results.push({
           correlationId: entry.correlationId,
           txHash: entry.txHash,
@@ -79,8 +87,9 @@ export class LedgerChainMatcher {
           ledgerAmount: entry.money,
           chainAmount: events[0]!.amount,
           chainDecimals: events[0]!.decimals,
-          discrepancies: [
-            `Currency mismatch: ledger=${entry.money.currency} chain=${events[0]!.symbol}`,
+          discrepancies: [msg],
+          structuredDiscrepancies: [
+            makeDiscrepancy("CURRENCY_MISMATCH", "currency", msg, { expected, actual }),
           ],
         });
         continue;
@@ -92,15 +101,19 @@ export class LedgerChainMatcher {
       const chainRaw = BigInt(matchingEvent.amount);
 
       const discrepancies: string[] = [];
+      const structuredDiscrepancies: Discrepancy[] = [];
       const sameDecimals = entry.money.decimals === matchingEvent.decimals;
 
       let amountMatches: boolean;
       if (sameDecimals) {
         amountMatches = ledgerRaw === chainRaw;
         if (!amountMatches) {
-          discrepancies.push(
-            `Amount mismatch: ledger=${formatAmount(ledgerRaw, entry.money.decimals)} ` +
-            `chain=${formatAmount(chainRaw, matchingEvent.decimals)}`,
+          const expected = formatAmount(ledgerRaw, entry.money.decimals);
+          const actual = formatAmount(chainRaw, matchingEvent.decimals);
+          const msg = `Amount mismatch: ledger=${expected} chain=${actual}`;
+          discrepancies.push(msg);
+          structuredDiscrepancies.push(
+            makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
           );
         }
       } else {
@@ -110,10 +123,17 @@ export class LedgerChainMatcher {
         const cNorm = chainRaw * 10n ** BigInt(maxDec - matchingEvent.decimals);
         amountMatches = lNorm === cNorm;
         if (!amountMatches) {
-          discrepancies.push(
-            `Amount mismatch (cross-decimal): ledger=${formatAmount(ledgerRaw, entry.money.decimals)} ` +
-            `(${entry.money.decimals} dec) chain=${formatAmount(chainRaw, matchingEvent.decimals)} ` +
-            `(${matchingEvent.decimals} dec)`,
+          const expected = formatAmount(ledgerRaw, entry.money.decimals);
+          const actual = formatAmount(chainRaw, matchingEvent.decimals);
+          const msg =
+            `Amount mismatch (cross-decimal): ledger=${expected} ` +
+            `(${entry.money.decimals} dec) chain=${actual} ` +
+            `(${matchingEvent.decimals} dec)`;
+          discrepancies.push(msg);
+          // Values disagree after decimal normalization → a true amount mismatch.
+          // The differing bases are surfaced in the message for context.
+          structuredDiscrepancies.push(
+            makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
           );
         }
       }
@@ -127,12 +147,14 @@ export class LedgerChainMatcher {
         chainAmount: matchingEvent.amount,
         chainDecimals: matchingEvent.decimals,
         discrepancies,
+        structuredDiscrepancies,
       });
     }
 
     // Find unmatched chain events (no ledger entry references them)
     for (const event of chainEvents) {
       if (!matchedTxHashes.has(event.txHash)) {
+        const msg = `On-chain event ${event.txHash} has no matching ledger entry`;
         results.push({
           correlationId: `unmatched:${event.txHash}`,
           txHash: event.txHash,
@@ -140,8 +162,9 @@ export class LedgerChainMatcher {
           status: "missing-ledger",
           chainAmount: event.amount,
           chainDecimals: event.decimals,
-          discrepancies: [
-            `On-chain event ${event.txHash} has no matching ledger entry`,
+          discrepancies: [msg],
+          structuredDiscrepancies: [
+            makeDiscrepancy("MISSING_LEDGER", "presence", msg),
           ],
         });
       }

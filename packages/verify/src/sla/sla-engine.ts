@@ -32,6 +32,12 @@ function compareThreshold(
   operator: ThresholdOperator,
   threshold: number,
 ): boolean {
+  // Fail-closed: a non-finite actual (NaN / ±Infinity) or threshold can never
+  // satisfy a comparison. Guarding here closes the fail-OPEN path where
+  // `Infinity >= threshold` / `Infinity > threshold` returned true.
+  if (!Number.isFinite(actual) || !Number.isFinite(threshold)) {
+    return false;
+  }
   switch (operator) {
     case "lte":
       return actual <= threshold;
@@ -88,6 +94,28 @@ function evaluateTarget(target: SlaTarget, metrics: SlaMetrics): SlaTargetResult
       actualValue: undefined,
       passed: false,
       detail: `[FAIL] ${target.metric}: metric not available (fail-closed)`,
+    };
+  }
+
+  // Non-finite metric (NaN / ±Infinity) → fail-closed. This catches values
+  // that `=== undefined` does not, and prevents an Infinity from satisfying
+  // a gte/gt threshold.
+  if (!Number.isFinite(actualValue)) {
+    return {
+      target,
+      actualValue,
+      passed: false,
+      detail: `[FAIL] ${target.metric}: non-finite value (fail-closed)`,
+    };
+  }
+
+  // A non-finite threshold cannot be satisfied either → fail-closed.
+  if (!Number.isFinite(target.threshold)) {
+    return {
+      target,
+      actualValue,
+      passed: false,
+      detail: `[FAIL] ${target.metric}: non-finite threshold (fail-closed)`,
     };
   }
 

@@ -45,8 +45,8 @@
 
 - [x] `[all]` `verify` script exists (test + build + smoke in one command) (2026-02-27) — pnpm verify
 - [x] `[all]` Version in manifest matches git tag (2026-02-27)
-- [x] `[all]` Dependency scanning runs in CI (ecosystem-appropriate) (2026-02-27)
-- [x] `[all]` Automated dependency update mechanism exists (2026-02-27)
+- [x] `[all]` Dependency scanning runs in CI (ecosystem-appropriate) (2026-05-28) — `pnpm audit --audit-level=high` step in ci.yml (Node 22 job); fails CI on high/critical advisories, non-blocking on registry outage
+- [ ] `[all]` SKIP: automated dependency-update mechanism — dependabot.yml prohibited by org CI rules unless explicitly requested
 - [ ] `[npm]` SKIP: private monorepo, not published to npm
 - [x] `[npm]` `engines.node` set · `[pypi]` `python_requires` set (2026-02-27) — >=18
 - [x] `[npm]` Lockfile committed · `[pypi]` Clean wheel + sdist build (2026-02-27)

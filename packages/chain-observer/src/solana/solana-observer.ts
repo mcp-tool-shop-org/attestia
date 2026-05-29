@@ -29,7 +29,8 @@ import {
   type Finality,
   type ParsedTransactionWithMeta,
 } from "@solana/web3.js";
-import type { SolanaCommitment } from "@attestia/types";
+import type { SolanaCommitment, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type {
   ChainObserver,
   ObserverConfig,
@@ -42,6 +43,7 @@ import type {
   ConnectionStatus,
 } from "../observer.js";
 import type { ChainProfile } from "../finality.js";
+import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
 import {
   DEFAULT_SOLANA_RPC_CONFIG,
   type SolanaRpcConfig,
@@ -58,6 +60,7 @@ export class SolanaObserver implements ChainObserver {
   private readonly config: ObserverConfig;
   private readonly profile: ChainProfile | undefined;
   private readonly rpcConfig: SolanaRpcConfig;
+  private readonly telemetry: Telemetry;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("solana:")) {
@@ -68,6 +71,7 @@ export class SolanaObserver implements ChainObserver {
     this.chainId = config.chain.chainId;
     this.config = config;
     this.profile = config.profile;
+    this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
 
     // Build RPC config from profile commitment level or defaults
     const commitment: SolanaCommitment =
@@ -97,43 +101,56 @@ export class SolanaObserver implements ChainObserver {
         chainId: this.chainId,
         connected: false,
         checkedAt: now,
+        error: "SolanaObserver: not connected. Call connect() before querying.",
+        errorCode: "NOT_CONNECTED",
       };
     }
 
+    let slot: number;
     try {
-      const slot = await this.connection.getSlot(
+      slot = await this.connection.getSlot(
         this.rpcConfig.commitment as Commitment,
       );
-
-      const status: ConnectionStatus = {
-        chainId: this.chainId,
-        connected: true,
-        latestBlock: slot,
-        checkedAt: now,
-      };
-
-      // If profile has finality config, also fetch finalized slot
-      if (this.profile?.finality) {
-        try {
-          const finalizedSlot = await this.connection.getSlot("finalized");
-          return {
-            ...status,
-            finalizedBlock: finalizedSlot,
-          };
-        } catch {
-          // If finalized query fails, return status without it
-          return status;
-        }
-      }
-
-      return status;
-    } catch {
+    } catch (err) {
+      // Core liveness probe failed → genuinely disconnected. Surface the reason
+      // and a classified code (D3-B-002). A health probe must not throw.
       return {
         chainId: this.chainId,
         connected: false,
         checkedAt: now,
+        error: err instanceof Error ? err.message : String(err),
+        errorCode: classifyRpcError(err),
       };
     }
+
+    const status: ConnectionStatus = {
+      chainId: this.chainId,
+      connected: true,
+      latestBlock: slot,
+      checkedAt: now,
+    };
+
+    // If profile has finality config, also fetch finalized slot. D3-B-009: a
+    // finalized-slot failure degrades to "connected, finality unknown" — never
+    // "disconnected" (liveness was already proven via getSlot above).
+    if (this.profile?.finality) {
+      try {
+        const finalizedSlot = await this.connection.getSlot("finalized");
+        return {
+          ...status,
+          finalizedBlock: finalizedSlot,
+        };
+      } catch (err) {
+        // Finalized slot unavailable — stay connected, report finality unknown.
+        return {
+          ...status,
+          error: `finality unknown: ${err instanceof Error ? err.message : String(err)}`,
+          errorCode: classifyRpcError(err),
+        };
+      }
+    }
+
+    return status;
   }
 
   async getBalance(query: BalanceQuery): Promise<BalanceResult> {
@@ -144,10 +161,12 @@ export class SolanaObserver implements ChainObserver {
     const commitment: Commitment =
       (query.finality ?? this.rpcConfig.commitment) as Commitment;
 
-    const [balance, slot] = await Promise.all([
-      withRetry(() => connection.getBalance(pubkey, commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
-      withRetry(() => connection.getSlot(commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
-    ]);
+    const [balance, slot] = await this.runRpc("getBalance", () =>
+      Promise.all([
+        withRetry(() => connection.getBalance(pubkey, commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
+        withRetry(() => connection.getSlot(commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
+      ]),
+    );
 
     return {
       chainId: this.chainId,
@@ -166,10 +185,12 @@ export class SolanaObserver implements ChainObserver {
     const mintPubkey = new PublicKey(query.token);
 
     // Find token accounts for this owner + mint combination
-    const response = await withRetry(
-      () => connection.getParsedTokenAccountsByOwner(ownerPubkey, { mint: mintPubkey }),
-      this.rpcConfig.maxRetries,
-      this.rpcConfig.retryDelayMs,
+    const response = await this.runRpc("getTokenBalance", () =>
+      withRetry(
+        () => connection.getParsedTokenAccountsByOwner(ownerPubkey, { mint: mintPubkey }),
+        this.rpcConfig.maxRetries,
+        this.rpcConfig.retryDelayMs,
+      ),
     );
 
     if (response.value.length === 0) {
@@ -217,10 +238,12 @@ export class SolanaObserver implements ChainObserver {
       rawCommitment === "processed" ? "confirmed" : rawCommitment as Finality;
 
     // Get recent transaction signatures for this address
-    const signatures = await withRetry(
-      () => connection.getSignaturesForAddress(pubkey, { limit: query.limit ?? 100 }, finality),
-      this.rpcConfig.maxRetries,
-      this.rpcConfig.retryDelayMs,
+    const signatures = await this.runRpc("getTransfers", () =>
+      withRetry(
+        () => connection.getSignaturesForAddress(pubkey, { limit: query.limit ?? 100 }, finality),
+        this.rpcConfig.maxRetries,
+        this.rpcConfig.retryDelayMs,
+      ),
     );
 
     if (signatures.length === 0) {
@@ -229,10 +252,12 @@ export class SolanaObserver implements ChainObserver {
 
     // Fetch full parsed transactions
     const txHashes = signatures.map((s) => s.signature);
-    const transactions = await withRetry(
-      () => connection.getParsedTransactions(txHashes, { commitment: finality, maxSupportedTransactionVersion: 0 }),
-      this.rpcConfig.maxRetries,
-      this.rpcConfig.retryDelayMs,
+    const transactions = await this.runRpc("getTransfers", () =>
+      withRetry(
+        () => connection.getParsedTransactions(txHashes, { commitment: finality, maxSupportedTransactionVersion: 0 }),
+        this.rpcConfig.maxRetries,
+        this.rpcConfig.retryDelayMs,
+      ),
     );
 
     const events: TransferEvent[] = [];
@@ -264,11 +289,53 @@ export class SolanaObserver implements ChainObserver {
 
   private requireConnection(): Connection {
     if (!this.connection) {
-      throw new Error(
-        "SolanaObserver: not connected. Call connect() before querying.",
-      );
+      const err = new ObserverError({
+        code: "NOT_CONNECTED",
+        chainId: this.chainId,
+        message: "SolanaObserver: not connected. Call connect() before querying.",
+        hint: "Call connect() and await it before issuing queries.",
+      });
+      this.emitRpcFailure("NOT_CONNECTED");
+      throw err;
     }
     return this.connection;
+  }
+
+  /**
+   * Emit a structured `rpc` failure telemetry event with low-cardinality
+   * attributes (`chainId`, `code`). Never throws.
+   */
+  private emitRpcFailure(code: string): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc",
+        level: "error",
+        outcome: "failed",
+        attributes: { chainId: this.chainId, code },
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run a Solana RPC operation, classifying and re-throwing any failure as a
+   * structured {@link ObserverError} and emitting a `rpc` failure event
+   * (D3-B-003). Wraps the already-retried RPC call so the *final* failure (after
+   * retries are exhausted) surfaces classified rather than as a raw web3.js error.
+   *
+   * @param context Operation name for the error message (e.g. "getBalance").
+   * @param fn The RPC call (typically a withRetry(...) invocation) to execute.
+   */
+  private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      const observerError = toObserverError(err, `SolanaObserver.${context}`, this.chainId);
+      this.emitRpcFailure(observerError.code);
+      throw observerError;
+    }
   }
 
   /**

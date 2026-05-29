@@ -24,7 +24,8 @@
     "@attestia/verify": "workspace:*",
     "@attestia/proof": "workspace:*",
     "@attestia/chain-observer": "workspace:*",
-    "chalk": "^5.4.1"
+    "chalk": "^5.4.1",
+    "json-canonicalize": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

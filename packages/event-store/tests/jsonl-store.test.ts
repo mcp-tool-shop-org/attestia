@@ -515,3 +515,217 @@ describe("file locking", () => {
     expect(new Set(positions).size).toBe(2);
   });
 });
+
+// =============================================================================
+// Verify-on-load — fail closed against tampered files (D2-A-003)
+// =============================================================================
+
+describe("verify on load", () => {
+  /**
+   * Write a valid store, then corrupt the payload of the SECOND line in place
+   * (preserving line count and JSON validity, so the corrupt-line skipper does
+   * not silently drop it). The hash chain must catch this on load.
+   */
+  function tamperSecondLine(path: string): void {
+    const lines = readFileSync(path, "utf-8").trim().split("\n");
+    const rec = JSON.parse(lines[1]!) as {
+      event: { payload: Record<string, unknown> };
+    };
+    rec.event.payload = { ...rec.event.payload, tampered: true };
+    lines[1] = JSON.stringify(rec);
+    writeFileSync(path, lines.join("\n") + "\n", "utf-8");
+  }
+
+  it("throws EventStoreError when loading a tampered file (default)", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+
+    tamperSecondLine(path);
+
+    // Default verifyOnLoad: true — construction must fail closed.
+    let thrown: unknown;
+    try {
+      new JsonlEventStore({ filePath: path });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(EventStoreError);
+    expect((thrown as EventStoreError).code).toBe("INTEGRITY_VIOLATION");
+  });
+
+  it("loads a tampered file when verifyOnLoad is explicitly false", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+    store.append("s", [makeEvent("a"), makeEvent("b")]);
+
+    tamperSecondLine(path);
+
+    // Opt out — load succeeds, but integrity reports invalid.
+    const reloaded = new JsonlEventStore({ filePath: path, verifyOnLoad: false });
+    expect(reloaded.readAll()).toHaveLength(2);
+    expect(reloaded.verifyIntegrity().valid).toBe(false);
+  });
+
+  it("loads a clean file when verifyOnLoad is on", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+
+    // Untampered — default verifyOnLoad must succeed.
+    const reloaded = new JsonlEventStore({ filePath: path });
+    expect(reloaded.readAll()).toHaveLength(3);
+    expect(reloaded.verifyIntegrity().valid).toBe(true);
+  });
+
+  it("detects head truncation on load (fail closed)", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+
+    // Drop the first (genesis) line — head truncation.
+    const lines = readFileSync(path, "utf-8").trim().split("\n");
+    writeFileSync(path, lines.slice(1).join("\n") + "\n", "utf-8");
+
+    expect(() => new JsonlEventStore({ filePath: path })).toThrow(EventStoreError);
+  });
+
+  it("does not leak the absolute file path in the thrown message (V2-004)", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+
+    tamperSecondLine(path);
+
+    let thrown: unknown;
+    try {
+      new JsonlEventStore({ filePath: path });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(EventStoreError);
+    const err = thrown as EventStoreError;
+    expect(err.code).toBe("INTEGRITY_VIOLATION");
+
+    // The absolute server-side path must NOT appear in the client-facing message.
+    expect(err.message).not.toContain(path);
+    expect(err.message).not.toContain(testDir);
+
+    // The integrity signal is preserved: basename + violation reason + position.
+    const base = path.split(/[\\/]/).pop()!;
+    expect(base).toMatch(/\.jsonl$/); // sanity: we derived a real basename
+    expect(err.message).toContain(base);
+    expect(err.message).toMatch(/First violation at position \d+:/);
+    // The tampered second line yields a hash-mismatch reason — confirm the
+    // human-readable reason rides along in the message.
+    expect(err.message).toMatch(/[Hh]ash mismatch at position 2/);
+
+    // The full absolute path is still available to operators on a
+    // non-enumerable field (so it is not serialized to clients).
+    expect((err as unknown as { filePath?: string }).filePath).toBe(path);
+    expect(Object.keys(err)).not.toContain("filePath");
+    expect(JSON.stringify(err)).not.toContain(path);
+  });
+});
+
+// =============================================================================
+// Write failure recovery (D2-A-002)
+// =============================================================================
+
+describe("write failure recovery", () => {
+  /**
+   * Replace _writeAndSync with a spy that throws the first time it is called
+   * (simulating ENOSPC/EIO) and then delegates to the real implementation.
+   * Returns a restore function.
+   */
+  function failFirstWrite(store: JsonlEventStore): () => void {
+    const internal = store as unknown as {
+      _writeAndSync: (data: string) => void;
+    };
+    const real = internal._writeAndSync.bind(store);
+    let failed = false;
+    internal._writeAndSync = (data: string): void => {
+      if (!failed) {
+        failed = true;
+        const err = new Error("simulated disk failure") as NodeJS.ErrnoException;
+        err.code = "ENOSPC";
+        throw err;
+      }
+      real(data);
+    };
+    return () => {
+      internal._writeAndSync = real;
+    };
+  }
+
+  it("a failed write does not desync in-memory state from disk", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+
+    store.append("stream-1", [makeEvent("ok-1")]);
+    expect(store.globalPosition()).toBe(1);
+
+    // Next append's write fails.
+    const restore = failFirstWrite(store);
+    expect(() => store.append("stream-1", [makeEvent("doomed")])).toThrow();
+    restore();
+
+    // The failed append must NOT have advanced the global position or the
+    // chain head: nothing reached disk, so in-memory state must roll back.
+    expect(store.globalPosition()).toBe(1);
+
+    // The next successful append must be contiguous (position 2, not 3) and
+    // chain-valid against the survivor at position 1.
+    store.append("stream-1", [makeEvent("ok-2")]);
+    expect(store.globalPosition()).toBe(2);
+
+    const all = store.readAll();
+    expect(all.map((e) => e.globalPosition)).toEqual([1, 2]);
+    expect(store.verifyIntegrity().valid).toBe(true);
+  });
+
+  it("survives a failed multi-event append without gaps", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+
+    store.append("s", [makeEvent("a"), makeEvent("b")]); // positions 1,2
+
+    const restore = failFirstWrite(store);
+    expect(() =>
+      store.append("s", [makeEvent("c"), makeEvent("d"), makeEvent("e")]),
+    ).toThrow();
+    restore();
+
+    expect(store.globalPosition()).toBe(2);
+
+    store.append("s", [makeEvent("c2"), makeEvent("d2")]); // positions 3,4
+    expect(store.readAll().map((e) => e.globalPosition)).toEqual([1, 2, 3, 4]);
+    expect(store.verifyIntegrity().valid).toBe(true);
+
+    // And the on-disk file must match: a fresh load reproduces the same chain.
+    const reloaded = new JsonlEventStore({ filePath: path });
+    expect(reloaded.readAll().map((e) => e.globalPosition)).toEqual([1, 2, 3, 4]);
+    expect(reloaded.verifyIntegrity().valid).toBe(true);
+  });
+
+  it("stream version does not advance on a failed append", () => {
+    const path = freshPath();
+    const store = new JsonlEventStore({ filePath: path });
+
+    store.append("s", [makeEvent("a")]);
+    expect(store.streamVersion("s")).toBe(1);
+
+    const restore = failFirstWrite(store);
+    expect(() => store.append("s", [makeEvent("doomed")])).toThrow();
+    restore();
+
+    expect(store.streamVersion("s")).toBe(1);
+
+    // A retry must be accepted at the correct expected version (1), proving the
+    // in-memory stream array was not left with a phantom entry.
+    store.append("s", [makeEvent("b")], { expectedVersion: 1 });
+    expect(store.streamVersion("s")).toBe(2);
+    expect(store.verifyIntegrity().valid).toBe(true);
+  });
+});

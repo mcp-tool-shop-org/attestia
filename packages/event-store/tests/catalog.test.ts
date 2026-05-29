@@ -792,3 +792,63 @@ describe("migration atomicity (M6)", () => {
     expect(result).toEqual({ base: 1, v2: true, v3: true });
   });
 });
+
+// =============================================================================
+// D2-B-008: stable CatalogError codes
+// =============================================================================
+
+describe("CatalogError codes (D2-B-008)", () => {
+  it("UNKNOWN_EVENT_TYPE when registering a migration for an unregistered type", () => {
+    const catalog = new EventCatalog();
+
+    let caught: CatalogError | undefined;
+    try {
+      catalog.registerMigration("never.registered", 1, (p) => p);
+    } catch (err) {
+      caught = err as CatalogError;
+    }
+
+    expect(caught).toBeInstanceOf(CatalogError);
+    expect(caught!.code).toBe("UNKNOWN_EVENT_TYPE");
+  });
+
+  it("MISSING_MIGRATION when a version hop has no registered migration", () => {
+    const catalog = new EventCatalog();
+    catalog.register(makeSchema("test.gap.event", 3));
+    // Register v1→v2 but deliberately omit v2→v3.
+    catalog.registerMigration("test.gap.event", 1, (p) => ({ ...p, v2: true }));
+
+    let caught: CatalogError | undefined;
+    try {
+      catalog.migrate("test.gap.event", { id: "x" }, 1);
+    } catch (err) {
+      caught = err as CatalogError;
+    }
+
+    expect(caught).toBeInstanceOf(CatalogError);
+    expect(caught!.code).toBe("MISSING_MIGRATION");
+    // Message includes the target version and an actionable hint.
+    expect(caught!.message).toContain("target version 3");
+    expect(caught!.message).toContain("registerMigration");
+  });
+
+  it("MIGRATION_FAILED when a registered migration throws", () => {
+    const catalog = new EventCatalog();
+    catalog.register(makeSchema("test.throwing.event", 2));
+    catalog.registerMigration("test.throwing.event", 1, () => {
+      throw new Error("boom");
+    });
+
+    let caught: CatalogError | undefined;
+    try {
+      catalog.migrate("test.throwing.event", { id: "x" }, 1);
+    } catch (err) {
+      caught = err as CatalogError;
+    }
+
+    expect(caught).toBeInstanceOf(CatalogError);
+    expect(caught!.code).toBe("MIGRATION_FAILED");
+    // Underlying cause message is preserved for diagnosis.
+    expect(caught!.message).toContain("boom");
+  });
+});
