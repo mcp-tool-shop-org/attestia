@@ -4,7 +4,7 @@ import starlight from '@astrojs/starlight';
 import tailwindcss from '@tailwindcss/vite';
 
 const SITE = 'https://mcp-tool-shop-org.github.io';
-const BASE = '/Attestia';
+const BASE = '/attestia';
 const OG_IMAGE = `${SITE}${BASE}/og-image.png`;
 const OG_DESCRIPTION =
   'Financial truth infrastructure for the decentralized world — structural governance, deterministic accounting, and human-approved intent.';
