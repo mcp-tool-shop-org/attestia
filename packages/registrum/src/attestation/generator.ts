@@ -19,6 +19,7 @@ import type {
   XrplAttestationMemos,
 } from "./types.js";
 import { REGISTRUM_VERSION } from "../version.js";
+import { StructuralRegistrar } from "../structural-registrar.js";
 
 /** Current attestation specification version */
 export const ATTESTATION_VERSION = "1.0";
@@ -57,6 +58,63 @@ export function generateAttestationPayload(
     state_count: snapshot.state_ids.length,
     ordering_max: snapshot.ordering.max_index,
   };
+}
+
+/**
+ * Options for deriving an attestation directly from a dual-witness registrar.
+ */
+export interface RegistrarAttestationOptions {
+  /** Content-addressed registry hash (64 hex chars). */
+  readonly registryHash: string;
+  /** First transition index covered (inclusive). */
+  readonly transitionFrom: number;
+  /** Last transition index covered (inclusive). */
+  readonly transitionTo: number;
+  /** Override the Registrum version string (defaults to REGISTRUM_VERSION). */
+  readonly registrumVersion?: string;
+}
+
+/**
+ * Generate an attestation payload from a registrar, deriving `parity_status`
+ * and `mode` from the registrar's ACTUAL dual-witness comparison rather than
+ * accepting them as caller input.
+ *
+ * Fail-closed: if no dual-witness comparison has run yet (parity status is
+ * null), this throws — an attestation must witness a real comparison, not a
+ * fabricated one. This is the runtime counterpart to dual-witness governance:
+ * the attestation cannot claim AGREED unless the comparator actually agreed.
+ *
+ * @param registrar - A dual-witness StructuralRegistrar that has executed at
+ *   least one register()/validate().
+ * @param options - Registry hash + transition range.
+ * @returns Attestation payload with parity_status taken from the comparator.
+ */
+export function generateAttestationFromRegistrar(
+  registrar: StructuralRegistrar,
+  options: RegistrarAttestationOptions
+): AttestationPayload {
+  const parityStatus = registrar.getLastParityStatus();
+  if (parityStatus === null) {
+    throw new Error(
+      "Cannot attest: no dual-witness parity comparison has been performed. " +
+        "Run register()/validate() on a dual-witness registrar first."
+    );
+  }
+
+  const mode = toAttestationMode(
+    // In dual mode the underlying engine is registry-authoritative; map to the
+    // attestation mode via the real parity outcome.
+    registrar.getMode() === "legacy" ? "legacy" : "registry",
+    parityStatus
+  );
+
+  return generateAttestationPayload(registrar.snapshot(), options.registryHash, {
+    registrumVersion: options.registrumVersion ?? REGISTRUM_VERSION,
+    mode,
+    parityStatus,
+    transitionFrom: options.transitionFrom,
+    transitionTo: options.transitionTo,
+  });
 }
 
 /**

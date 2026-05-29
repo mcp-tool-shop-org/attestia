@@ -26,6 +26,7 @@ export { AccountRegistry } from "./accounts.js";
 export {
   computeAccountBalance,
   computeTrialBalance,
+  assertTrialBalanced,
 } from "./balance-calculator.js";
 
 // Money arithmetic

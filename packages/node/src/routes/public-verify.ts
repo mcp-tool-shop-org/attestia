@@ -59,7 +59,14 @@ export interface PublicVerifyDeps {
   /** Callback to generate a state bundle on demand */
   readonly getBundleFn?: () => unknown;
 
-  /** Minimum verifiers required for consensus. Default: 1 */
+  /**
+   * Minimum verifiers required for an authoritative public consensus.
+   *
+   * Default: 2 (fail-closed). This is the PUBLIC, trust-free endpoint, so a
+   * lone — possibly operator-controlled — verifier must not be able to produce
+   * an authoritative PASS (V1-003). Callers may pass a higher quorum, but not
+   * lower the public floor below 1 verifier's worth of trust.
+   */
   readonly minimumVerifiers?: number;
 
   /**
@@ -190,8 +197,17 @@ export function createPublicVerifyRoutes(
   });
 
   // ─── GET /consensus ───────────────────────────────────────────
+  // Fail-closed on the public endpoint: a single (possibly operator-controlled)
+  // verifier must NOT yield an authoritative PASS. Default the quorum to 2 so a
+  // lone verifier reports quorumReached=false / verdict=FAIL (V1-003). Callers
+  // may raise the threshold but the public floor stays at 2. The
+  // `singleVerifierPass` weak-quorum flag is still surfaced in the response.
+  const PUBLIC_MIN_VERIFIERS = 2;
   routes.get("/consensus", (c) => {
-    const minVerifiers = deps?.minimumVerifiers ?? 1;
+    const minVerifiers = Math.max(
+      deps?.minimumVerifiers ?? PUBLIC_MIN_VERIFIERS,
+      PUBLIC_MIN_VERIFIERS,
+    );
     const result = aggregateVerifierReports(reports, minVerifiers);
 
     return c.json({ data: result });

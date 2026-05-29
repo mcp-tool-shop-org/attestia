@@ -19,7 +19,11 @@
 
 import type { AccountRef, LedgerEntry } from "@attestia/types";
 import { AccountRegistry } from "./accounts.js";
-import { computeAccountBalance, computeTrialBalance } from "./balance-calculator.js";
+import {
+  assertTrialBalanced,
+  computeAccountBalance,
+  computeTrialBalance,
+} from "./balance-calculator.js";
 import { validateMoney } from "./money-math.js";
 import type {
   AccountBalance,
@@ -223,10 +227,19 @@ export class Ledger {
 
   /**
    * Compute the full trial balance.
+   *
+   * Fails closed: because every appended transaction is balance-validated, a
+   * self-consistent ledger can never produce an unbalanced trial balance. If it
+   * does, that signals corruption, so this method throws
+   * `LedgerError("UNBALANCED_TRANSACTION")` rather than returning a
+   * `balanced: false` report that a caller might ignore. Use the standalone
+   * `computeTrialBalance` if you need the boolean flag for reporting.
    */
   getTrialBalance(timestamp?: string): TrialBalance {
     const ts = timestamp ?? new Date().toISOString();
-    return computeTrialBalance(this._entries, this._accounts, ts);
+    return assertTrialBalanced(
+      computeTrialBalance(this._entries, this._accounts, ts),
+    );
   }
 
   /**

@@ -76,16 +76,25 @@ export interface RehydrationOptions {
   /**
    * Mode to rehydrate into.
    * Must match the snapshot's mode.
+   *
+   * "dual" is the recommended production mode (see
+   * StructuralRegistrar.dualWitness). Because dual is registry-authoritative on
+   * agreement, a dual-mode snapshot is verified against the registry CONTENT
+   * hash — the same constitutional-drift guard as "registry" mode — so a dual
+   * snapshot requires a compiledRegistry to rehydrate, and a legacy invariant
+   * set is supplied so the restored registrar can keep running its second
+   * witness.
    */
-  readonly mode: "legacy" | "registry";
+  readonly mode: "legacy" | "registry" | "dual";
 
   /**
-   * Legacy invariants (required for legacy mode).
+   * Legacy invariants (required for legacy mode; also used as the secondary
+   * witness in dual mode).
    */
   readonly invariants?: readonly Invariant[];
 
   /**
-   * Compiled registry (required for registry mode).
+   * Compiled registry (required for registry mode and dual mode).
    */
   readonly compiledRegistry?: CompiledInvariantRegistry;
 }
@@ -164,13 +173,17 @@ export function rehydrate(
  * Compute the expected registry hash for the given options.
  */
 function computeExpectedHash(options: RehydrationOptions): string {
-  if (options.mode === "registry") {
+  // Registry and dual modes are both registry-authoritative, so both verify
+  // against the registry CONTENT hash. This keeps the constitutional-drift
+  // guard active for dual mode: a dual snapshot taken under one constitution
+  // fails closed (RegistryMismatchError) under a silently-mutated one.
+  if (options.mode === "registry" || options.mode === "dual") {
     if (!options.compiledRegistry) {
       throw new RehydrationError(
-        "Registry mode requires compiledRegistry option"
+        `${options.mode === "dual" ? "Dual" : "Registry"} mode requires compiledRegistry option`
       );
     }
-    return computeRegistryHash(options.compiledRegistry.registry_id);
+    return computeRegistryHash(options.compiledRegistry);
   }
 
   // Legacy mode

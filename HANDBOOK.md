@@ -18,7 +18,7 @@ Attestia does not move money. It proves what happened, enforces structural rules
 |--------|-------|
 | Packages | 14 |
 | Source lines (TypeScript) | ~19,000 |
-| Tests | 1,853 |
+| Tests | 1,928 |
 | Test coverage | 96.80% |
 | Runtime dependencies (core) | 0 |
 | REST API endpoints | 30+ |
@@ -135,7 +135,7 @@ Defines the canonical shapes for `Identity`, `Money`, `Intent`, `ChainRef`, `Eve
 ### @attestia/registrum
 **Purpose:** Constitutional governance — the structural registrar.
 **Runtime deps:** json-canonicalize.
-**Tests:** 297.
+**Tests:** 298.
 **Source:** ~5,600 lines (largest package).
 
 The heart of Attestia. Registrum enforces 11 structural invariants that hold unconditionally. It manages identities, organizations, roles, and governance transitions through a deterministic state machine. Features include:
@@ -168,7 +168,7 @@ Ported from the Python-based Payroll Engine. Zero runtime dependencies — pure 
 ### @attestia/chain-observer
 **Purpose:** Multi-chain read-only observation layer.
 **Runtime deps:** viem, xrpl.js, @solana/web3.js.
-**Tests:** 242.
+**Tests:** 251.
 
 Observes blockchain state without modifying it. Supports:
 
@@ -218,7 +218,7 @@ Evolved from the Python-based Payroll Engine.
 ### @attestia/reconciler
 **Purpose:** Cross-system reconciliation — match intents to reality.
 **Runtime deps:** Internal packages + json-canonicalize.
-**Tests:** 56.
+**Tests:** 57.
 
 The truth engine. Reconciler performs 3D matching across three dimensions:
 
@@ -233,7 +233,7 @@ When all three agree, the record is clean. When they disagree, the system halts 
 ### @attestia/witness
 **Purpose:** XRPL on-chain attestation — write proofs to the ledger.
 **Runtime deps:** xrpl.js, json-canonicalize.
-**Tests:** 245.
+**Tests:** 258.
 
 Takes reconciliation reports and attestation payloads and writes them to the XRP Ledger as payment memos. Features include:
 
@@ -251,7 +251,7 @@ The witness is the bridge between Attestia's internal truth and public, verifiab
 ### @attestia/verify
 **Purpose:** Deterministic replay verification, compliance evidence, SLA enforcement.
 **Runtime deps:** Internal packages + json-canonicalize.
-**Tests:** 200.
+**Tests:** 203.
 
 Answers one question: given the same sequence of events, do we arrive at the same state? Features include:
 
@@ -270,7 +270,7 @@ If replay produces a different result, something is wrong. Fail-closed.
 ### @attestia/event-store
 **Purpose:** Append-only event persistence with hash chaining.
 **Runtime deps:** json-canonicalize.
-**Tests:** 190.
+**Tests:** 197.
 
 The durable backbone. All domain events flow through the event store. Features include:
 
@@ -286,7 +286,7 @@ The durable backbone. All domain events flow through the event store. Features i
 ### @attestia/proof
 **Purpose:** Merkle trees, inclusion proofs, attestation proof packaging.
 **Runtime deps:** json-canonicalize.
-**Tests:** 53.
+**Tests:** 57.
 
 Cryptographic proof infrastructure. Features include:
 
@@ -299,7 +299,7 @@ Cryptographic proof infrastructure. Features include:
 ### @attestia/sdk
 **Purpose:** Typed HTTP client SDK for external consumers.
 **Runtime deps:** @attestia/types (type-only).
-**Tests:** 50.
+**Tests:** 73.
 
 The integration layer for third-party systems. Features include:
 
@@ -313,7 +313,7 @@ The integration layer for third-party systems. Features include:
 ### @attestia/node
 **Purpose:** HTTP service — the deployable API surface.
 **Runtime deps:** Hono, pino, Zod.
-**Tests:** 184.
+**Tests:** 198.
 
 The operational interface to the entire Attestia stack. Built on Hono with a full middleware stack:
 
@@ -412,7 +412,7 @@ Phases 1 through 12 are complete. All 14 packages are built, tested, and operati
 | **M5: Audit-Ready** | Hash chain, witness retry, export, benchmarks, auditor docs; 1,176 tests | Done |
 | **M5.5: Category Standard** | 5 RFCs, reference architecture, integration guide, RFC process | Done |
 | **M6: Multi-Chain** | Solana, L2s, XRPL EVM sidechain, multi-sig witness; 1,551 tests | Done |
-| **M7: Trust Standard** | Proof, SDK, public API, compliance, SLA, governance hardening; 1,853 tests | Done |
+| **M7: Trust Standard** | Proof, SDK, public API, compliance, SLA, governance hardening; 1,928 tests | Done |
 | **M8: Integrated** | Full intent-to-proof pipeline, E2E tests | Planned |
 | **M9: Intelligent** | Anomaly detection, intent suggestions, NL queries | Planned |
 | **M10: User-Facing** | Vault UI, Treasury dashboard, Attestation explorer | Planned |
@@ -441,7 +441,7 @@ Phases 1 through 12 are complete. All 14 packages are built, tested, and operati
 ```bash
 pnpm install                # Install all dependencies
 pnpm build                  # Build all packages
-pnpm test                   # Run all tests (1,853)
+pnpm test                   # Run all tests (1,928)
 pnpm test:coverage          # Run with coverage reporting
 pnpm typecheck              # Type-check all packages
 pnpm bench                  # Run benchmarks

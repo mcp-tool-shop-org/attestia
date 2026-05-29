@@ -219,3 +219,156 @@ describe("idempotency body hash (M1)", () => {
     expect(errBody.error.code).toBe("IDEMPOTENCY_MISMATCH");
   });
 });
+
+// =============================================================================
+// D6-A-001 [CRITICAL, authz]: Idempotency cache must be tenant-scoped
+// =============================================================================
+
+describe("idempotency tenant isolation (D6-A-001)", () => {
+  it("tenant B cannot read tenant A's cached idempotent response", async () => {
+    const { app } = createTestApp();
+
+    // Same idempotency key AND same body bytes used by both tenants.
+    const key = "shared-key-cross-tenant";
+    const body = {
+      id: "cross-tenant-intent",
+      kind: "transfer",
+      description: "Cross-tenant idempotency probe",
+      params: {},
+    };
+
+    // Tenant A declares the intent (gets cached under A).
+    const resA = await app.request(
+      jsonRequest("/api/v1/intents", "POST", body, {
+        "Idempotency-Key": key,
+        "X-Tenant-Id": "tenant-a",
+      }),
+    );
+    expect(resA.status).toBe(201);
+    const bodyA = (await resA.json()) as { data: { id: string; declaredBy: string } };
+    expect(bodyA.data.declaredBy).toBe("tenant-a");
+
+    // Tenant B sends the SAME key + SAME body. It must NOT receive A's cached
+    // response; B must get its own freshly created intent (declaredBy=tenant-b).
+    const resB = await app.request(
+      jsonRequest("/api/v1/intents", "POST", body, {
+        "Idempotency-Key": key,
+        "X-Tenant-Id": "tenant-b",
+      }),
+    );
+
+    // Cross-tenant replay must not happen.
+    expect(resB.headers.get("X-Idempotent-Replay")).toBeNull();
+    expect(resB.status).toBe(201);
+    const bodyB = (await resB.json()) as { data: { id: string; declaredBy: string } };
+    expect(bodyB.data.declaredBy).toBe("tenant-b");
+  });
+
+  it("a tenant still gets its own cached response within its own scope", async () => {
+    const { app } = createTestApp();
+
+    const key = "scoped-key-same-tenant";
+    const body = {
+      id: "same-tenant-intent",
+      kind: "transfer",
+      description: "Same-tenant replay",
+      params: {},
+    };
+
+    const res1 = await app.request(
+      jsonRequest("/api/v1/intents", "POST", body, {
+        "Idempotency-Key": key,
+        "X-Tenant-Id": "tenant-x",
+      }),
+    );
+    expect(res1.status).toBe(201);
+    expect(res1.headers.get("X-Idempotent-Replay")).toBeNull();
+
+    const res2 = await app.request(
+      jsonRequest("/api/v1/intents", "POST", body, {
+        "Idempotency-Key": key,
+        "X-Tenant-Id": "tenant-x",
+      }),
+    );
+    expect(res2.status).toBe(201);
+    expect(res2.headers.get("X-Idempotent-Replay")).toBe("true");
+  });
+});
+
+// =============================================================================
+// D6-A-002 [HIGH, correctness]: Idempotency cache must be route-scoped
+// =============================================================================
+
+describe("idempotency route scoping (D6-A-002)", () => {
+  it("same key on a different path/param does not replay the first response", async () => {
+    const { app } = createTestApp();
+
+    // Two distinct intents the same tenant can approve.
+    for (const id of ["route-intent-a", "route-intent-b"]) {
+      const decl = await app.request(
+        jsonRequest("/api/v1/intents", "POST", {
+          id,
+          kind: "transfer",
+          description: `Intent ${id}`,
+          params: {},
+        }),
+      );
+      expect(decl.status).toBe(201);
+    }
+
+    const key = "shared-key-cross-route";
+
+    // Approve intent A with an empty body + the shared key.
+    const approveA = await app.request(
+      jsonRequest("/api/v1/intents/route-intent-a/approve", "POST", {}, {
+        "Idempotency-Key": key,
+      }),
+    );
+    expect(approveA.status).toBe(200);
+    const bodyA = (await approveA.json()) as { data: { id: string } };
+    expect(bodyA.data.id).toBe("route-intent-a");
+
+    // Approve intent B with the SAME key + SAME (empty) body, but a DIFFERENT path.
+    // Must NOT replay A's result — it must approve B and return B's id.
+    const approveB = await app.request(
+      jsonRequest("/api/v1/intents/route-intent-b/approve", "POST", {}, {
+        "Idempotency-Key": key,
+      }),
+    );
+
+    expect(approveB.headers.get("X-Idempotent-Replay")).toBeNull();
+    expect(approveB.status).toBe(200);
+    const bodyB = (await approveB.json()) as { data: { id: string } };
+    expect(bodyB.data.id).toBe("route-intent-b");
+  });
+
+  it("same key + same path still replays (per-route idempotency preserved)", async () => {
+    const { app } = createTestApp();
+
+    const decl = await app.request(
+      jsonRequest("/api/v1/intents", "POST", {
+        id: "route-replay-intent",
+        kind: "transfer",
+        description: "Route replay",
+        params: {},
+      }),
+    );
+    expect(decl.status).toBe(201);
+
+    const key = "same-route-key";
+    const approve1 = await app.request(
+      jsonRequest("/api/v1/intents/route-replay-intent/approve", "POST", {}, {
+        "Idempotency-Key": key,
+      }),
+    );
+    expect(approve1.status).toBe(200);
+
+    const approve2 = await app.request(
+      jsonRequest("/api/v1/intents/route-replay-intent/approve", "POST", {}, {
+        "Idempotency-Key": key,
+      }),
+    );
+    expect(approve2.status).toBe(200);
+    expect(approve2.headers.get("X-Idempotent-Replay")).toBe("true");
+  });
+});

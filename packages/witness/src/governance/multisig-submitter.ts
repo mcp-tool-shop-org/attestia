@@ -26,6 +26,8 @@ import {
 import {
   buildCanonicalSigningPayload,
   aggregateSignatures,
+  signPayloadHash,
+  xrplSignatureVerifier,
   type SignerSignature,
 } from "./signing.js";
 import type { GovernancePolicy } from "./types.js";
@@ -87,6 +89,13 @@ export interface MultiSignResult {
 
   /** The combined multi-signed transaction blob */
   readonly combinedBlob: string;
+
+  /**
+   * The expected on-chain transaction hash for the combined multi-signed tx.
+   * Fixed once the prepared transaction is autofilled+signed; used for the
+   * idempotency / replay existence check across retries (D3-A-002).
+   */
+  readonly txHash: string;
 }
 
 // =============================================================================
@@ -117,7 +126,21 @@ export class MultiSigSubmitter {
     for (const signer of this.config.signers) {
       const secret = await resolveSecret(signer.secret, signer.address);
       const wallet = Wallet.fromSeed(secret);
-      this.wallets.set(signer.address, wallet);
+
+      // D3-A-004: bind the secret to the configured signer identity. A secret
+      // that derives to a DIFFERENT address must not be silently counted as
+      // this policy signer. Fail closed on mismatch.
+      if (wallet.classicAddress !== signer.address) {
+        throw new Error(
+          `MultiSigSubmitter: signer secret/address mismatch — secret for configured ` +
+          `address ${signer.address} derives to ${wallet.classicAddress}. ` +
+          `Refusing to connect (a key for a different address cannot act as this signer).`,
+        );
+      }
+
+      // Key wallets by the wallet's own derived address (the verified identity),
+      // not the config-supplied string.
+      this.wallets.set(wallet.classicAddress, wallet);
     }
   }
 
@@ -163,9 +186,36 @@ export class MultiSigSubmitter {
 
     const client = this.client;
 
+    // Idempotency-critical (D3-A-002): autofill, collect signatures, verify
+    // quorum, and combine the multi-signed blob EXACTLY ONCE — before the retry
+    // loop. This fixes Sequence + LastLedgerSequence and therefore the on-chain
+    // transaction hash. Retries then resubmit the SAME combined blob and check
+    // the SAME fixed hash (and payload.hash memo) on-chain, so a lost-but-applied
+    // submission is recognized instead of double-submitted.
+    const memo: XrplMemo = encodeMemo(payload);
+    const tx: Payment = {
+      TransactionType: "Payment",
+      Account: this.config.account,
+      Destination: this.config.account, // Self-send
+      Amount: "1", // 1 drop
+      Memos: [
+        {
+          Memo: {
+            MemoType: memo.MemoType,
+            MemoData: memo.MemoData,
+            ...(memo.MemoFormat ? { MemoFormat: memo.MemoFormat } : {}),
+          },
+        },
+      ],
+      ...(this.config.feeDrops ? { Fee: this.config.feeDrops } : {}),
+    };
+
+    const prepared = await client.autofill(tx);
+    const multiSignResult = this.buildMultiSign(payload, policy, prepared);
+
     try {
       return await withRetry(
-        async () => this._submitOnce(payload, policy, client),
+        async () => this._submitSigned(payload, client, multiSignResult),
         this.retryConfig,
         isRetryableXrplError,
       );
@@ -190,10 +240,13 @@ export class MultiSigSubmitter {
     const signerSignatures: SignerSignature[] = [];
     const now = normalizeTimestamp(new Date());
 
+    // The canonical payload hash each signer cryptographically attests to.
+    const payloadHash = buildCanonicalSigningPayload(payload, policy);
+
     let expectedHash: string | null = null;
 
     for (const [address, wallet] of this.wallets) {
-      // Each signer independently signs the prepared transaction
+      // Each signer independently signs the prepared transaction (XRPL multisign).
       const signed = wallet.sign(prepared, /* multisign */ true);
 
       // Verify all signers produce the same transaction hash.
@@ -223,16 +276,24 @@ export class MultiSigSubmitter {
 
       signedBlobs.push(signed.tx_blob);
 
+      // D3-A-003: contribute a REAL cryptographic signature over the canonical
+      // payload hash (not the XRPL tx hash). This is what aggregateSignatures
+      // verifies against the signer's registered public key before counting it
+      // toward quorum. D3-A-004: the recorded address is the wallet's own
+      // verified identity, never a config-supplied string.
       signerSignatures.push({
-        address,
-        signature: signed.hash,
+        address: wallet.classicAddress,
+        signature: signPayloadHash(payloadHash, wallet.privateKey),
         signedAt: now,
       });
     }
 
-    // Verify quorum via governance signing module
-    const payloadHash = buildCanonicalSigningPayload(payload, policy);
-    aggregateSignatures(signerSignatures, policy, payloadHash);
+    // Verify quorum via governance signing module — verify-then-count: each
+    // signature must cryptographically verify over payloadHash against the
+    // signer's registered public key before its weight counts (fail-closed).
+    aggregateSignatures(signerSignatures, policy, payloadHash, {
+      verify: xrplSignatureVerifier,
+    });
 
     // Combine all signed blobs into a single multi-signed transaction
     const combinedBlob = multisign([...signedBlobs]);
@@ -241,6 +302,9 @@ export class MultiSigSubmitter {
       signedBlobs,
       signerSignatures,
       combinedBlob,
+      // expectedHash is the prepared-tx hash, identical across signers (asserted
+      // above) and stable for the fixed autofilled transaction.
+      txHash: expectedHash ?? "",
     };
   }
 
@@ -266,35 +330,59 @@ export class MultiSigSubmitter {
   // Private
   // ===========================================================================
 
-  private async _submitOnce(
-    payload: AttestationPayload,
-    policy: GovernancePolicy,
+  /**
+   * Check whether a transaction is already validated on-chain by its hash.
+   * Returns the ledger index if validated, otherwise null.
+   */
+  private async _checkExistingTx(
     client: XrplClient,
+    txHash: string,
+  ): Promise<{ ledgerIndex: number } | null> {
+    if (!txHash) return null;
+    try {
+      const response = await client.request({
+        command: "tx",
+        transaction: txHash,
+      });
+      const result = response.result as unknown as Record<string, unknown>;
+      if (result.validated === true) {
+        const ledgerIndex = typeof result.ledger_index === "number" ? result.ledger_index : 0;
+        return { ledgerIndex };
+      }
+      return null;
+    } catch {
+      // tx not found — proceed with submission
+      return null;
+    }
+  }
+
+  /**
+   * Submit the pre-built, combined multi-signed transaction (one retry attempt).
+   *
+   * The combined blob and its expected hash are FIXED across retries (autofill +
+   * multi-sign happen once in {@link submit}). Each attempt first checks whether
+   * the fixed-hash tx is already validated on-chain — if a previous attempt's
+   * response was lost but the tx applied, we recognize it here instead of
+   * submitting a duplicate fund-affecting transaction (D3-A-002).
+   */
+  private async _submitSigned(
+    payload: AttestationPayload,
+    client: XrplClient,
+    multiSignResult: MultiSignResult,
   ): Promise<WitnessRecord> {
-    const memo: XrplMemo = encodeMemo(payload);
-
-    const tx: Payment = {
-      TransactionType: "Payment",
-      Account: this.config.account,
-      Destination: this.config.account, // Self-send
-      Amount: "1", // 1 drop
-      Memos: [
-        {
-          Memo: {
-            MemoType: memo.MemoType,
-            MemoData: memo.MemoData,
-            ...(memo.MemoFormat ? { MemoFormat: memo.MemoFormat } : {}),
-          },
-        },
-      ],
-      ...(this.config.feeDrops ? { Fee: this.config.feeDrops } : {}),
-    };
-
-    // Auto-fill sequence, fee, last ledger sequence
-    const prepared = await client.autofill(tx);
-
-    // Build multi-sign result (each signer signs, quorum verified, combined)
-    const multiSignResult = this.buildMultiSign(payload, policy, prepared);
+    // Pre-submit replay/idempotency guard: is this exact tx already on-chain?
+    const existing = await this._checkExistingTx(client, multiSignResult.txHash);
+    if (existing) {
+      return {
+        id: `witness:multisig:${payload.hash.slice(0, 16)}`,
+        payload,
+        chainId: this.config.chainId,
+        txHash: multiSignResult.txHash,
+        ledgerIndex: existing.ledgerIndex,
+        witnessedAt: normalizeTimestamp(new Date()),
+        witnessAccount: this.config.account,
+      };
+    }
 
     // Submit the combined multi-signed transaction
     const result = await client.submitAndWait(multiSignResult.combinedBlob);
@@ -309,7 +397,7 @@ export class MultiSigSubmitter {
       id: `witness:multisig:${payload.hash.slice(0, 16)}`,
       payload,
       chainId: this.config.chainId,
-      txHash: result.result.hash ?? "",
+      txHash: result.result.hash ?? multiSignResult.txHash,
       ledgerIndex,
       witnessedAt: normalizeTimestamp(new Date()),
       witnessAccount: this.config.account,

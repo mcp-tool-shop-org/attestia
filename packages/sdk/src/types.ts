@@ -21,6 +21,19 @@ export interface AttestiaClientConfig {
   readonly timeout?: number | undefined;
   /** Maximum retry attempts for 5xx errors (default: 3) */
   readonly retries?: number | undefined;
+  /**
+   * Retry non-idempotent methods (POST) on 5xx / network errors.
+   *
+   * Default: false. By default only idempotent methods (GET) are retried,
+   * because blindly replaying a POST can duplicate a server-side mutation
+   * (e.g. a financial state transition) when the original request actually
+   * succeeded but the response was lost.
+   *
+   * When enabled, the client attaches a stable `Idempotency-Key` to each POST
+   * and reuses it across retries, so the server (with a tenant/route-scoped
+   * idempotency store) deduplicates the mutation rather than executing it twice.
+   */
+  readonly retryMutations?: boolean | undefined;
   /** Custom fetch function (for testing or polyfills) */
   readonly fetchFn?: typeof fetch | undefined;
 }

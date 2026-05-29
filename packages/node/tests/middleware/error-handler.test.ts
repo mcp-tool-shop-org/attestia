@@ -106,3 +106,42 @@ describe("error message sanitization (M2)", () => {
     expect(body.error.message).not.toContain("postgres");
   });
 });
+
+// =============================================================================
+// Domain error → status mapping for new domain errors.
+//
+// REQUESTER_CANNOT_APPROVE (separation-of-duties violation) is a client error
+// and must map to a 4xx, not fall through to a 500. INTEGRITY_VIOLATION stays
+// a 500 (a genuine server-side invariant breach).
+// =============================================================================
+
+describe("domain error status mapping", () => {
+  function throwApp(errorCode: string) {
+    const app = new Hono<AppEnv>();
+    app.onError(handleError);
+    app.get("/throw", () => {
+      const err = new Error("boom") as Error & { code: string };
+      err.code = errorCode;
+      throw err;
+    });
+    return app;
+  }
+
+  it("maps REQUESTER_CANNOT_APPROVE to 403 (not 500)", async () => {
+    const res = await throwApp("REQUESTER_CANNOT_APPROVE").request("/throw");
+    expect(res.status).toBe(403);
+
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("REQUESTER_CANNOT_APPROVE");
+  });
+
+  it("keeps INTEGRITY_VIOLATION as a 500", async () => {
+    const res = await throwApp("INTEGRITY_VIOLATION").request("/throw");
+    expect(res.status).toBe(500);
+
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("INTEGRITY_VIOLATION");
+    // 500s are sanitized to a generic message.
+    expect(body.error.message).toBe("Internal server error");
+  });
+});

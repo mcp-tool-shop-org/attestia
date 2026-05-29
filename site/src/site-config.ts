@@ -9,7 +9,7 @@ export const config: SiteConfig = {
   footerText: 'MIT Licensed — built by <a href="https://github.com/mcp-tool-shop-org" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop-org</a>',
 
   hero: {
-    badge: '14 packages · 1,853 tests · 96.8% coverage',
+    badge: '14 packages · 1,928 tests · 96.8% coverage',
     headline: 'Attestia',
     headlineAccent: 'financial truth infrastructure.',
     description: 'Structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals. We don\'t move your money. We prove what happened.',
@@ -17,7 +17,7 @@ export const config: SiteConfig = {
     secondaryCta: { href: 'handbook/', label: 'Read the Handbook' },
     previews: [
       { label: 'Flow', code: 'Intent → Approve → Execute → Verify' },
-      { label: 'Test', code: 'pnpm test  # 1,853 tests, all green' },
+      { label: 'Test', code: 'pnpm test  # 1,928 tests, all green' },
       { label: 'Attest', code: 'XRPL witnesses. Ethereum settles.' },
     ],
   },
@@ -57,18 +57,18 @@ export const config: SiteConfig = {
       columns: ['Package', 'Tests', 'Purpose'],
       rows: [
         ['@attestia/types', '62', 'Shared domain types (zero deps)'],
-        ['@attestia/registrum', '297', 'Constitutional governance — 11 invariants, dual-witness'],
+        ['@attestia/registrum', '298', 'Constitutional governance — 11 invariants, dual-witness'],
         ['@attestia/ledger', '144', 'Append-only double-entry engine'],
-        ['@attestia/chain-observer', '242', 'Multi-chain read-only observation (EVM + XRPL + Solana + L2s)'],
+        ['@attestia/chain-observer', '251', 'Multi-chain read-only observation (EVM + XRPL + Solana + L2s)'],
         ['@attestia/vault', '67', 'Personal vault — portfolios, budgets, intents'],
         ['@attestia/treasury', '63', 'Org treasury — payroll, distributions, funding gates'],
-        ['@attestia/reconciler', '56', '3D cross-system matching + Registrum attestation'],
-        ['@attestia/witness', '245', 'XRPL on-chain attestation, multi-sig governance, retry'],
-        ['@attestia/verify', '200', 'Replay verification, compliance evidence, SLA enforcement'],
-        ['@attestia/event-store', '190', 'Append-only event persistence, JSONL, hash chain, 34 event types'],
-        ['@attestia/proof', '53', 'Merkle trees, inclusion proofs, attestation proof packaging'],
-        ['@attestia/sdk', '50', 'Typed HTTP client SDK for external consumers'],
-        ['@attestia/node', '184', 'Hono REST API — 30+ endpoints, auth, multi-tenancy'],
+        ['@attestia/reconciler', '57', '3D cross-system matching + Registrum attestation'],
+        ['@attestia/witness', '258', 'XRPL on-chain attestation, multi-sig governance, retry'],
+        ['@attestia/verify', '203', 'Replay verification, compliance evidence, SLA enforcement'],
+        ['@attestia/event-store', '197', 'Append-only event persistence, JSONL, hash chain, 32 event types'],
+        ['@attestia/proof', '57', 'Merkle trees, inclusion proofs, attestation proof packaging'],
+        ['@attestia/sdk', '73', 'Typed HTTP client SDK for external consumers'],
+        ['@attestia/node', '198', 'Hono REST API — 34 endpoints, auth, multi-tenancy'],
       ],
     },
     {
@@ -78,7 +78,7 @@ export const config: SiteConfig = {
       cards: [
         { title: 'Build & test', code: `pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (1,853)
+pnpm test             # Run all tests (1,928)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages` },
         { title: 'XRPL integration', code: `docker compose up -d              # Start standalone rippled

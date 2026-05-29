@@ -36,7 +36,13 @@ export type { Registrar } from "./registrar.js";
 export { isState, isTransition, toInvariantInput } from "./registrar.js";
 
 // Implementation
-export { StructuralRegistrar } from "./structural-registrar.js";
+export { StructuralRegistrar, ParityViolationError } from "./structural-registrar.js";
+export type {
+  RegistrarMode,
+  ParityStatus,
+  StructuralRegistrarOptions,
+  DualWitnessOptions,
+} from "./structural-registrar.js";
 
 // Persistence types
 export type { RegistrarSnapshotV1 } from "./persistence/snapshot.js";

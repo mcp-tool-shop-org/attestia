@@ -63,6 +63,54 @@ describe("isMoney", () => {
   it("rejects non-integer decimals", () => {
     expect(isMoney({ amount: "1", currency: "X", decimals: 6.5 })).toBe(false);
   });
+
+  // --- Numeric format validation of `amount` (D1-A-005) ---
+  // The amount is a string to avoid IEEE-754 error, but it must still be a
+  // canonical decimal numeral. Garbage strings that happen to be `typeof
+  // "string"` must be rejected fail-closed at the system boundary.
+
+  it("accepts canonical decimal amounts", () => {
+    expect(isMoney({ amount: "100.50", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "0", currency: "XRP", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "0.0", currency: "XRP", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "1000000", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "-5.25", currency: "USDC", decimals: 6 })).toBe(true);
+    expect(isMoney({ amount: "-0", currency: "USDC", decimals: 6 })).toBe(true);
+  });
+
+  it("rejects empty amount string", () => {
+    expect(isMoney({ amount: "", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects whitespace in amount", () => {
+    expect(isMoney({ amount: " 100", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "100 ", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1 00", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "\t1", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects NaN / Infinity amounts", () => {
+    expect(isMoney({ amount: "NaN", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "Infinity", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "-Infinity", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects exponential notation", () => {
+    expect(isMoney({ amount: "1e6", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1E6", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1.5e-3", currency: "USDC", decimals: 6 })).toBe(false);
+  });
+
+  it("rejects multi-dot / malformed numerals", () => {
+    expect(isMoney({ amount: "1.2.3", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: ".5", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "5.", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "1,000", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "0x10", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "abc", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "+5", currency: "USDC", decimals: 6 })).toBe(false);
+    expect(isMoney({ amount: "--5", currency: "USDC", decimals: 6 })).toBe(false);
+  });
 });
 
 describe("isAccountRef", () => {

@@ -264,6 +264,15 @@ export interface ConsensusResult {
   /** Whether minimum verifier threshold was met */
   readonly quorumReached: boolean;
 
+  /**
+   * True when the verdict is PASS but the quorum threshold that was applied
+   * was <= 1 — i.e. a single verifier was sufficient to approve. Such a PASS
+   * offers no protection against a compromised lone verifier; fail-closed
+   * callers should refuse it and require an explicit minimumVerifiers >= 2.
+   * Always false for a FAIL verdict.
+   */
+  readonly singleVerifierPass: boolean;
+
   /** Verifier IDs that dissented from the majority */
   readonly dissenters: readonly string[];
 

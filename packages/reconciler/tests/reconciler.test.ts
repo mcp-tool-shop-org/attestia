@@ -268,4 +268,99 @@ describe("Reconciler", () => {
       expect(report.scope).toEqual({});
     });
   });
+
+  describe("deterministic attestation hash (D4-A-001)", () => {
+    // The attestor SHA-256s the report for immutable-attestation replay
+    // verification. Identical reconciliation inputs MUST produce an identical
+    // reportHash so a later replay can prove the attestation was honest.
+    // Volatile fields (id, timestamp) must therefore be excluded from the
+    // integrity hash.
+    const intents: ReconcilableIntent[] = [
+      {
+        id: "intent-det",
+        status: "executed",
+        kind: "transfer",
+        amount: usdc("100.000000"),
+        chainId: "eth:1",
+        txHash: "0xdet",
+        declaredAt: "2024-01-01T00:00:00Z",
+        correlationId: "corr-det",
+      },
+    ];
+    const entries: ReconcilableLedgerEntry[] = [
+      {
+        id: "entry-det",
+        accountId: "expense",
+        type: "debit",
+        money: usdc("100.000000"),
+        timestamp: "2024-01-01T00:00:01Z",
+        intentId: "intent-det",
+        txHash: "0xdet",
+        correlationId: "corr-det",
+      },
+    ];
+    const events: ReconcilableChainEvent[] = [
+      {
+        chainId: "eth:1",
+        txHash: "0xdet",
+        from: "0xsender",
+        to: "0xreceiver",
+        amount: "100000000",
+        decimals: 6,
+        symbol: "USDC",
+        timestamp: "2024-01-01T00:00:01Z",
+      },
+    ];
+
+    it("reconciling identical inputs twice yields the same reportHash", async () => {
+      // Same reconciler reconciled twice: the per-run counter guarantees the
+      // two report ids differ (:1 vs :2), so this deterministically proves
+      // volatile metadata varies while the integrity hash stays constant.
+      const registrar = new StructuralRegistrar({ mode: "legacy" });
+      const reconciler = new Reconciler({ registrar, attestorId: "det-1" });
+
+      const { report: reportA, attestation: attA } = await reconciler.reconcileAndAttest({
+        intents,
+        ledgerEntries: entries,
+        chainEvents: events,
+      });
+      const { report: reportB, attestation: attB } = await reconciler.reconcileAndAttest({
+        intents,
+        ledgerEntries: entries,
+        chainEvents: events,
+      });
+
+      // Volatile metadata differs run-to-run...
+      expect(reportA.id).not.toBe(reportB.id);
+      // ...but the integrity hash must be identical for identical content.
+      expect(attA.reportHash).toBe(attB.reportHash);
+      expect(attA.reportHash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it("changed content (a discrepancy) changes the reportHash", async () => {
+      const registrarClean = new StructuralRegistrar({ mode: "legacy" });
+      const reconcilerClean = new Reconciler({ registrar: registrarClean, attestorId: "det-clean" });
+
+      const registrarDirty = new StructuralRegistrar({ mode: "legacy" });
+      const reconcilerDirty = new Reconciler({ registrar: registrarDirty, attestorId: "det-dirty" });
+
+      const { attestation: cleanAtt } = await reconcilerClean.reconcileAndAttest({
+        intents,
+        ledgerEntries: entries,
+        chainEvents: events,
+      });
+
+      // Same intent, but ledger debit is short by 10 → amount-mismatch.
+      const dirtyEntries: ReconcilableLedgerEntry[] = [
+        { ...entries[0]!, money: usdc("90.000000") },
+      ];
+      const { attestation: dirtyAtt } = await reconcilerDirty.reconcileAndAttest({
+        intents,
+        ledgerEntries: dirtyEntries,
+        chainEvents: events,
+      });
+
+      expect(cleanAtt.reportHash).not.toBe(dirtyAtt.reportHash);
+    });
+  });
 });

@@ -3,10 +3,36 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// Real keypairs so the secure verify-then-count path works end-to-end.
+// (xrpl is mocked below, so generate keys via ripple-keypairs directly.)
+import { generateSeed, deriveKeypair, deriveAddress } from "ripple-keypairs";
 import { MultiSigSubmitter, normalizeTimestamp } from "../../src/governance/multisig-submitter.js";
 import { GovernanceStore } from "../../src/governance/governance-store.js";
 import type { MultiSigConfig } from "../../src/governance/multisig-submitter.js";
 import type { AttestationPayload } from "../../src/types.js";
+
+// =============================================================================
+// Real signer keys — shared between the wallet mock and the governance policy.
+// =============================================================================
+
+interface TestKey {
+  readonly seed: string;
+  readonly address: string;
+  readonly publicKey: string;
+  readonly privateKey: string;
+}
+
+function genKey(): TestKey {
+  const seed = generateSeed();
+  const kp = deriveKeypair(seed);
+  return { seed, address: deriveAddress(kp.publicKey), publicKey: kp.publicKey, privateKey: kp.privateKey };
+}
+
+// Up to 5 signer keys, addressed by index (1-based in helpers).
+const KEYS: TestKey[] = [genKey(), genKey(), genKey(), genKey(), genKey()];
+const KEY_BY_SEED = new Map(KEYS.map((k) => [k.seed, k]));
+
+const MASTER_ACCOUNT = "rMultiSigAccount";
 
 // =============================================================================
 // Mocks
@@ -17,31 +43,41 @@ const mockDisconnect = vi.fn().mockResolvedValue(undefined);
 const mockIsConnected = vi.fn().mockReturnValue(true);
 const mockAutofill = vi.fn();
 const mockSubmitAndWait = vi.fn();
+const mockRequest = vi.fn();
 
-vi.mock("xrpl", () => {
+vi.mock("xrpl", async () => {
+  const actual = await vi.importActual<typeof import("xrpl")>("xrpl");
   return {
+    ...actual,
     Client: vi.fn().mockImplementation(() => ({
       connect: mockConnect,
       disconnect: mockDisconnect,
       isConnected: mockIsConnected,
       autofill: mockAutofill,
       submitAndWait: mockSubmitAndWait,
+      request: mockRequest,
     })),
     Wallet: {
-      fromSeed: vi.fn().mockImplementation((seed: string) => ({
-        address: `rAddr_${seed}`,
-        sign: vi.fn().mockImplementation((tx: Record<string, unknown>, multisign?: boolean) => ({
-          tx_blob: `blob_${seed}_${multisign ? "multi" : "single"}`,
-          // All signers produce the same hash for the same prepared tx
-          // (this matches real XRPL behavior)
-          hash: "consistent_tx_hash",
-        })),
-      })),
+      ...actual.Wallet,
+      fromSeed: vi.fn().mockImplementation((seed: string) => {
+        const key = KEY_BY_SEED.get(seed)!;
+        return {
+          classicAddress: key.address,
+          address: key.address,
+          publicKey: key.publicKey,
+          privateKey: key.privateKey,
+          sign: vi.fn().mockImplementation((tx: Record<string, unknown>, multisign?: boolean) => ({
+            tx_blob: `blob_${key.address}_${multisign ? "multi" : "single"}`,
+            // All signers produce the same XRPL tx hash for the same prepared tx.
+            hash: "consistent_tx_hash",
+          })),
+        };
+      }),
     },
     multisign: vi.fn().mockReturnValue("combined_multisign_blob"),
-    decode: vi.fn().mockImplementation((blob: string) => ({
-      Account: "rMultiSigAccount",
-      Destination: "rMultiSigAccount",
+    decode: vi.fn().mockImplementation(() => ({
+      Account: MASTER_ACCOUNT,
+      Destination: MASTER_ACCOUNT,
       TransactionType: "Payment",
     })),
   };
@@ -67,17 +103,11 @@ function makePayload(hash = "abc123"): AttestationPayload {
 }
 
 function makeConfig(signerCount = 3): MultiSigConfig {
-  const signers = [];
-  for (let i = 1; i <= signerCount; i++) {
-    signers.push({
-      address: `rSigner${i}`,
-      secret: `seed${i}`,
-    });
-  }
+  const signers = KEYS.slice(0, signerCount).map((k) => ({ address: k.address, secret: k.seed }));
   return {
     rpcUrl: "wss://test.xrpl.example.com",
     chainId: "xrpl:testnet",
-    account: "rMultiSigAccount",
+    account: MASTER_ACCOUNT,
     signers,
     timeoutMs: 5000,
   };
@@ -85,8 +115,8 @@ function makeConfig(signerCount = 3): MultiSigConfig {
 
 function makeGovernanceStore(signerCount = 3, quorum = 2): GovernanceStore {
   const store = new GovernanceStore();
-  for (let i = 1; i <= signerCount; i++) {
-    store.addSigner(`rSigner${i}`, `Signer ${i}`);
+  for (const [i, k] of KEYS.slice(0, signerCount).entries()) {
+    store.addSigner(k.address, `Signer ${i + 1}`, 1, k.publicKey);
   }
   store.changeQuorum(quorum);
   return store;
@@ -112,6 +142,8 @@ describe("MultiSigSubmitter", () => {
         ledger_index: 42,
       },
     });
+    // Default: the tx is not yet on-chain (pre-submit idempotency check misses).
+    mockRequest.mockRejectedValue(new Error("txnNotFound"));
   });
 
   describe("constructor and connection", () => {

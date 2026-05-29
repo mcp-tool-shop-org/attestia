@@ -239,6 +239,56 @@ describe("ObserverRegistry", () => {
       expect(result.errors.length).toBe(1);
       expect(result.errors[0]!.error).toContain("Network error");
     });
+
+    // D3-A-005: error.chainId must be attributed to the chain that actually
+    // failed, even when chainIds is a reordered subset of the registered chains.
+    it("attributes the error to the correct chain for a reordered subset", async () => {
+      // Registration (= observers.keys()) order: eip155:1, eip155:8453, xrpl:main
+      registry.register(createMockObserver("eip155:1"));
+      registry.register(createMockObserver("eip155:8453"));
+      const broken = createMockObserver("xrpl:main");
+      (broken.getBalance as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("xrpl down")
+      );
+      registry.register(broken);
+
+      // Query a REORDERED SUBSET: xrpl:main first, then eip155:1.
+      // results = [ rejected(xrpl:main), fulfilled(eip155:1) ]
+      const result = await registry.getBalanceMultiChain({ address: "0xabc" }, [
+        "xrpl:main",
+        "eip155:1",
+      ]);
+
+      expect(result.errors.length).toBe(1);
+      // The failing chain is xrpl:main — NOT eip155:1 (which is observers.keys()[0]).
+      expect(result.errors[0]!.chainId).toBe("xrpl:main");
+      expect(result.errors[0]!.error).toContain("xrpl down");
+      expect(result.successes.length).toBe(1);
+    });
+
+    it("attributes errors correctly when multiple reordered chains fail", async () => {
+      const a = createMockObserver("eip155:1");
+      const b = createMockObserver("eip155:8453");
+      const c = createMockObserver("xrpl:main");
+      (a.getBalance as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("a-fail"));
+      (c.getBalance as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("c-fail"));
+      registry.register(a);
+      registry.register(b);
+      registry.register(c);
+
+      // Reordered subset: xrpl:main (fails), eip155:8453 (ok), eip155:1 (fails)
+      const result = await registry.getBalanceMultiChain({ address: "0xabc" }, [
+        "xrpl:main",
+        "eip155:8453",
+        "eip155:1",
+      ]);
+
+      expect(result.successes.length).toBe(1);
+      expect(result.errors.length).toBe(2);
+      const byChain = new Map(result.errors.map((e) => [e.chainId, e.error]));
+      expect(byChain.get("xrpl:main")).toContain("c-fail");
+      expect(byChain.get("eip155:1")).toContain("a-fail");
+    });
   });
 
   describe("backward compatibility with extended config", () => {

@@ -18,7 +18,7 @@ import type {
   TrialBalance,
   TrialBalanceLine,
 } from "./types.js";
-import { NORMAL_BALANCE } from "./types.js";
+import { LedgerError, NORMAL_BALANCE } from "./types.js";
 import { formatAmount, parseAmount } from "./money-math.js";
 
 /**
@@ -195,4 +195,47 @@ export function computeTrialBalance(
     generatedAt: timestamp,
     balanced,
   };
+}
+
+/**
+ * Assert that a trial balance is in balance (debits = credits per currency),
+ * failing closed if it is not.
+ *
+ * The double-entry invariant (every transaction balances) means a
+ * self-consistent ledger can NEVER legitimately produce an unbalanced trial
+ * balance. An imbalance therefore signals corruption — a bug, tampered state,
+ * or partial write — and must be treated as an error, not a reportable
+ * condition. This is the fail-closed counterpart to {@link computeTrialBalance},
+ * which keeps the boolean flag for standalone reporting.
+ *
+ * Totals are recomputed from the lines (not trusting the `balanced` flag) so a
+ * tampered flag cannot smuggle an imbalanced report past this check.
+ *
+ * @param trialBalance - The trial balance to verify
+ * @returns The same trial balance (for chaining) when balanced
+ * @throws LedgerError("UNBALANCED_TRANSACTION") if any currency is unbalanced
+ */
+export function assertTrialBalanced(trialBalance: TrialBalance): TrialBalance {
+  const totalsByCurrency = new Map<string, { debits: bigint; credits: bigint }>();
+
+  for (const line of trialBalance.lines) {
+    let totals = totalsByCurrency.get(line.currency);
+    if (totals === undefined) {
+      totals = { debits: 0n, credits: 0n };
+      totalsByCurrency.set(line.currency, totals);
+    }
+    totals.debits += parseAmount(line.debitBalance, line.decimals);
+    totals.credits += parseAmount(line.creditBalance, line.decimals);
+  }
+
+  for (const [currency, totals] of totalsByCurrency) {
+    if (totals.debits !== totals.credits) {
+      throw new LedgerError(
+        "UNBALANCED_TRANSACTION",
+        `Trial balance is unbalanced for currency "${currency}": debits=${totals.debits.toString()}, credits=${totals.credits.toString()}. A balanced ledger cannot produce this — state is corrupt.`,
+      );
+    }
+  }
+
+  return trialBalance;
 }

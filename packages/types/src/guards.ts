@@ -19,11 +19,28 @@ import type { SolanaOnChainEvent } from "./solana.js";
 const ACCOUNT_TYPES = new Set(["asset", "liability", "income", "expense", "equity"]);
 const ENTRY_TYPES = new Set<string>(["debit", "credit"]);
 
+/**
+ * Canonical decimal numeral.
+ *
+ * Money.amount is a string (to dodge IEEE-754 error), but it must still be a
+ * well-formed decimal. This anchored pattern accepts only:
+ *   - an optional leading minus
+ *   - one or more integer digits (no leading-dot, no separators)
+ *   - an optional fractional part with at least one digit
+ *
+ * It rejects empty strings, whitespace, "NaN"/"Infinity", exponential
+ * notation, multiple dots, thousands separators, hex, and signs other than a
+ * single leading "-". This is the fail-closed boundary check: a string that is
+ * not a real number must never narrow to Money.
+ */
+const CANONICAL_AMOUNT = /^-?\d+(\.\d+)?$/;
+
 export function isMoney(value: unknown): value is Money {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
     typeof v.amount === "string" &&
+    CANONICAL_AMOUNT.test(v.amount) &&
     typeof v.currency === "string" &&
     typeof v.decimals === "number" &&
     Number.isInteger(v.decimals) &&

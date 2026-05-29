@@ -1,9 +1,15 @@
 /**
- * Rate limiting middleware — token bucket per API key.
+ * Rate limiting middleware — token bucket per authenticated principal.
  *
- * Each unique identity gets a token bucket with configurable
- * fill rate and burst capacity. Returns 429 with Retry-After
- * header when the bucket is empty.
+ * Each unique principal gets a token bucket with configurable fill rate and
+ * burst capacity. Returns 429 with a Retry-After header when the bucket is
+ * empty.
+ *
+ * Scoping (security-critical): the bucket key is `${tenantId}:${identity}`, NOT
+ * `identity` alone. For JWT auth, `identity = claims.sub`, which is only unique
+ * WITHIN a tenant — two tenants reusing the same sub would otherwise share one
+ * bucket, letting one tenant throttle the other (cross-tenant / targeted DoS,
+ * V2-001). This mirrors the tenant-scoped idempotency cache key.
  */
 
 import type { MiddlewareHandler } from "hono";
@@ -94,7 +100,9 @@ export class TokenBucketStore {
 /**
  * Create rate limiting middleware.
  *
- * Must run AFTER auth middleware. Uses auth.identity as the bucket key.
+ * Must run AFTER auth middleware. The bucket key is `${tenantId}:${identity}`
+ * so principals are isolated per tenant (a JWT `sub` is only unique within its
+ * tenant — see the file header, V2-001).
  */
 export function rateLimitMiddleware(
   store: TokenBucketStore,
@@ -103,7 +111,10 @@ export function rateLimitMiddleware(
     const auth = c.get("auth");
     // Write operations cost more tokens than reads
     const cost = c.req.method === "GET" || c.req.method === "HEAD" ? 1 : 5;
-    const result = store.consume(auth.identity, cost);
+    // Scope the bucket per tenant so a shared identity (JWT sub) across tenants
+    // cannot collide into one bucket (cross-tenant throttling / DoS, V2-001).
+    const bucketKey = `${auth.tenantId}:${auth.identity}`;
+    const result = store.consume(bucketKey, cost);
 
     c.header("X-RateLimit-Remaining", String(result.remaining));
 

@@ -21,6 +21,7 @@ export { MerkleTree } from "./merkle-tree.js";
 
 // Attestation proof packaging
 export {
+  hashAttestation,
   packageAttestationProof,
   verifyAttestationProof,
 } from "./attestation-proof.js";

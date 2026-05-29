@@ -76,7 +76,7 @@ All notable changes to Attestia, organized by development phase.
 - RFC-008: Compliance Evidence Generation Protocol
 - RFC-009: External Verification Protocol
 
-**Tests added in Phase 12:** ~302 new tests (1,853 total across 15 packages)
+**Tests added in Phase 12:** ~302 new tests (1,928 total across 15 packages)
 
 ---
 

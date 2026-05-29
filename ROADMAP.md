@@ -6,7 +6,7 @@ Last updated: February 11, 2026
 
 ## Where We Are
 
-**15 packages, 1,853 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
+**15 packages, 1,928 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
 
 | Package | Status | Tests | Purpose |
 |---------|--------|-------|---------|
@@ -442,7 +442,7 @@ Typed client SDK for API consumers.
 | **M5: Audit-Ready** | hash chain, witness retry, export, benchmarks, docs | Auditor can replay to same GlobalStateHash; 1,176 tests | ✅ Done |
 | **M5.5: Category Standard** | 5 RFCs, reference architecture, integration guide, RFC process, readiness checklist | Formal specification + institutional adoption path | ✅ Done |
 | **M6: Multi-Chain** | solana, L2s, XRPL EVM sidechain, multi-sig witness | 4 chain families, N-of-M governance; 1,551 tests | ✅ Done |
-| **M7: Trust Standard** | proof, sdk, public API, compliance, SLA, governance hardening | Externally verifiable, compliance-mappable, SDK-consumable; 1,853 tests | ✅ Done |
+| **M7: Trust Standard** | proof, sdk, public API, compliance, SLA, governance hardening | Externally verifiable, compliance-mappable, SDK-consumable; 1,928 tests | ✅ Done |
 | **M8: Integrated** | pipeline, e2e tests, XRPL testnet | Full intent→proof flow proven | Planned |
 | **M9: Intelligent** | anomaly detection, suggestions, NL queries | AI-assisted (never AI-decided) | Planned |
 | **M10: User-Facing** | vault UI, treasury dashboard, explorer | Non-developers can use Attestia | Planned |

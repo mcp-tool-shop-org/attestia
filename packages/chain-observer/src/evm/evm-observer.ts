@@ -44,6 +44,7 @@ import type {
   ConnectionStatus,
 } from "../observer.js";
 import type { ChainProfile } from "../finality.js";
+import { ObserverError } from "../errors.js";
 
 // =============================================================================
 // Chain ID to viem Chain mapping
@@ -113,6 +114,23 @@ export class EvmObserver implements ChainObserver {
   private readonly config: ObserverConfig;
   private readonly profile: ChainProfile | undefined;
   private readonly nativeToken: { symbol: string; decimals: number };
+
+  /**
+   * Maximum block span for a filterless (all-tokens) Transfer scan.
+   *
+   * Without a token (address) filter, getLogs scans EVERY contract over the
+   * range — expensive, and many RPCs reject address-less getLogs outright. Cap
+   * the span and fail closed (D3-A-006). 200k blocks accommodates realistic L2
+   * scan windows while still rejecting unbounded/whole-chain ranges.
+   */
+  private static readonly MAX_FILTERLESS_BLOCK_SPAN = 200_000;
+
+  /**
+   * Hard ceiling on the block span for any Transfer scan (even token-filtered).
+   * Most providers reject very large getLogs ranges; this fails closed with a
+   * structured error rather than emitting a guaranteed-to-be-rejected RPC call.
+   */
+  private static readonly MAX_BLOCK_SPAN = 1_000_000;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("eip155:")) {
@@ -277,6 +295,12 @@ export class EvmObserver implements ChainObserver {
       ? BigInt(query.toBlock)
       : currentBlock;
 
+    // D3-A-006: bound the block span before issuing any getLogs. An unbounded
+    // (or very large) range is a DoS risk — and a filterless all-tokens scan is
+    // worse, since getLogs without an address scans every contract and many RPCs
+    // reject address-less getLogs entirely. Fail closed with a structured error.
+    this.assertBlockSpan(fromBlock, toBlock, query.token === undefined);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allLogs: any[] = [];
     const now = new Date().toISOString();
@@ -389,6 +413,36 @@ export class EvmObserver implements ChainObserver {
       );
     }
     return this.client;
+  }
+
+  /**
+   * Enforce a bound on the Transfer-scan block span (D3-A-006).
+   *
+   * @param fromBlock Inclusive start block.
+   * @param toBlock Inclusive end block.
+   * @param filterless True when no token (address) filter is applied — the
+   *   dangerous all-contracts path, which gets a much tighter cap.
+   * @throws ObserverError (`BLOCK_RANGE_TOO_LARGE`) if the span exceeds the cap.
+   */
+  private assertBlockSpan(fromBlock: bigint, toBlock: bigint, filterless: boolean): void {
+    const span = toBlock - fromBlock;
+    const limit = filterless
+      ? BigInt(EvmObserver.MAX_FILTERLESS_BLOCK_SPAN)
+      : BigInt(EvmObserver.MAX_BLOCK_SPAN);
+
+    if (span > limit) {
+      const kind = filterless ? "all-tokens (filterless)" : "token-filtered";
+      throw new ObserverError({
+        code: "BLOCK_RANGE_TOO_LARGE",
+        chainId: this.chainId,
+        message:
+          `EvmObserver.getTransfers: block range ${span} exceeds the maximum ` +
+          `${kind} span of ${limit} (fromBlock=${fromBlock}, toBlock=${toBlock}).`,
+        hint: filterless
+          ? `Provide a 'token' to scan a single contract, or narrow the range to <= ${limit} blocks (chunk larger scans).`
+          : `Narrow the range to <= ${limit} blocks, or chunk the scan into smaller windows.`,
+      });
+    }
   }
 
   /**

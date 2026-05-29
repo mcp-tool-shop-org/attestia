@@ -11,7 +11,7 @@
 | Packages | 14 (13 + demo) |
 | Source files (`.ts`) | ~160 |
 | Test files | ~130 |
-| Total tests | 1,853 |
+| Total tests | 1,928 |
 | Root docs | 16 markdown files |
 | Specs (RFCs) | 10 files |
 | Registrum internal docs | 30+ files |
@@ -85,9 +85,10 @@ specs/
 
 ```
 .github/
-├── workflows/
-│   ├── ci.yml                      CI pipeline (Node 20/22, build, test, coverage, bench)
-│   └── docker.yml                  Docker image publishing to GHCR
+├── workflows/                      3 workflows
+│   ├── ci.yml                      CI pipeline (Node 20/22, build, typecheck, test, coverage, dep-scan, bench)
+│   ├── docker.yml                  Docker image publishing to GHCR (release-only)
+│   └── pages.yml                   Build + deploy landing page to GitHub Pages
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.yml              Bug report template
 │   └── feature_request.yml         Feature request template

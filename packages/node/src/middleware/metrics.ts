@@ -181,7 +181,16 @@ export class MetricsCollector {
 /**
  * Create metrics collection middleware.
  *
- * Records method, normalized path, status, and duration for every request.
+ * Records method, route-template path, status, and duration for every request.
+ *
+ * Path labelling (security-critical): the `path` label is the matched ROUTE
+ * TEMPLATE (`c.req.routePath`, e.g. `/api/v1/intents/:id`), NOT the concrete
+ * request path. Labelling by the concrete path leaked arbitrary resource IDs
+ * into the Prometheus `path` label whenever they were not UUID-shaped
+ * (attestation / intent / framework IDs), exposing them when `/metrics` is
+ * unauthenticated and unbounding label cardinality (V2-003). Using the template
+ * keeps IDs out of the label regardless of their format. Unmatched requests
+ * (no route) fall back to the concrete path so 404s are still observable.
  */
 export function metricsMiddleware(
   collector: MetricsCollector,
@@ -191,11 +200,14 @@ export function metricsMiddleware(
     await next();
     const durationMs = performance.now() - start;
 
-    // Normalize path: replace UUID/ID segments with :id
-    const path = c.req.path.replace(
-      /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-      "/:id",
-    );
+    // Prefer the matched route template; it never contains concrete IDs.
+    // routePath is "/*" (or empty) when nothing matched — fall back to the
+    // concrete path so unmatched routes remain visible in metrics.
+    const routePath = c.req.routePath;
+    const path =
+      routePath !== undefined && routePath !== "" && routePath !== "/*"
+        ? routePath
+        : c.req.path;
 
     collector.recordRequest(
       c.req.method,

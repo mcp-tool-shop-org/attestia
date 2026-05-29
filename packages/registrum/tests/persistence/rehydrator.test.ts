@@ -196,10 +196,10 @@ describe("Registrar Rehydration (E.3)", () => {
       );
     });
 
-    it("lineage is preserved after rehydration", () => {
+    it("rehydration restores the live frontier (deep history is replayed, not snapshotted)", () => {
       const original = createLegacyRegistrar();
 
-      // Create a chain
+      // Append-only chain: three versions of the same id "Root".
       original.register(createTransition(null, createRootState("Root", { version: 1 })));
       original.register(
         createTransition("Root", { id: "Root", structure: { version: 2 }, data: null })
@@ -208,13 +208,26 @@ describe("Registrar Rehydration (E.3)", () => {
         createTransition("Root", { id: "Root", structure: { version: 3 }, data: null })
       );
 
+      // The LIVE registrar retains the full version chain (append-only).
+      expect(original.getLineage("Root")).toEqual(["Root", "Root", "Root"]);
+
       const rehydrated = StructuralRegistrar.fromSnapshot(original.snapshot(), {
         mode: "legacy",
         invariants: INITIAL_INVARIANTS,
       });
 
-      // Lineage should match
-      expect(rehydrated.getLineage("Root")).toEqual(original.getLineage("Root"));
+      // The snapshot is a structural projection of the live frontier (latest
+      // version per id), not a history log. Rehydration therefore restores the
+      // frontier — the id is present and ready to continue accepting
+      // transitions — while deep ancestry is the domain of replay.
+      expect(rehydrated.isRegistered("Root")).toBe(true);
+      expect(rehydrated.getRegisteredCount()).toBe(original.getRegisteredCount());
+      expect(rehydrated.getLineage("Root")).toEqual(["Root"]);
+
+      // Snapshot round-trips exactly (frontier identity is preserved).
+      expect(serializeSnapshot(rehydrated.snapshot())).toBe(
+        serializeSnapshot(original.snapshot())
+      );
     });
   });
 
@@ -281,6 +294,30 @@ describe("Registrar Rehydration (E.3)", () => {
           // Missing compiledRegistry
         });
       }).toThrow(RehydrationError);
+    });
+
+    it("rejects constitutional drift: same registry_id, changed predicate (D1-A-003)", () => {
+      // Snapshot taken under the canonical registry.
+      const original = createRegistryRegistrar();
+      original.register(createTransition(null, createRootState("Doc1")));
+      const snapshot = original.snapshot();
+
+      // Load the SAME registry file but mutate one predicate expression in
+      // memory, keeping registry_id identical. A static-id hash would accept
+      // this (catastrophic: the constitution changed silently); a content hash
+      // must reject it fail-closed.
+      const registryPath = path.join(process.cwd(), "invariants", "registry.json");
+      const raw = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+      raw.invariants[0].condition.expression =
+        raw.invariants[0].condition.expression + " && true";
+      const tampered = loadInvariantRegistry(raw);
+
+      expect(() => {
+        StructuralRegistrar.fromSnapshot(snapshot, {
+          mode: "registry",
+          compiledRegistry: tampered,
+        });
+      }).toThrow(RegistryMismatchError);
     });
 
     it("rejects legacy mode without invariants", () => {
@@ -368,7 +405,7 @@ describe("Registrar Rehydration (E.3)", () => {
       expect(json1).toBe(json2);
     });
 
-    it("handles registrar with complex lineage", () => {
+    it("handles registrar with complex lineage (frontier restored for every id)", () => {
       const original = createLegacyRegistrar();
 
       // Create tree structure
@@ -376,7 +413,7 @@ describe("Registrar Rehydration (E.3)", () => {
       original.register(createTransition(null, createRootState("B")));
       original.register(createTransition(null, createRootState("C")));
 
-      // Extend each
+      // Extend A and B with two additional versions each (append-only).
       for (let i = 2; i <= 3; i++) {
         original.register(
           createTransition("A", { id: "A", structure: { version: i }, data: null })
@@ -386,15 +423,26 @@ describe("Registrar Rehydration (E.3)", () => {
         );
       }
 
+      // Live registrar: A and B carry 3 versions, C carries 1.
+      expect(original.getLineage("A")).toEqual(["A", "A", "A"]);
+      expect(original.getLineage("B")).toEqual(["B", "B", "B"]);
+      expect(original.getLineage("C")).toEqual(["C"]);
+      expect(original.getVersionCount()).toBe(7); // 3 roots + 4 extensions
+
       const rehydrated = StructuralRegistrar.fromSnapshot(original.snapshot(), {
         mode: "legacy",
         invariants: INITIAL_INVARIANTS,
       });
 
-      // All lineages should match
-      expect(rehydrated.getLineage("A")).toEqual(original.getLineage("A"));
-      expect(rehydrated.getLineage("B")).toEqual(original.getLineage("B"));
-      expect(rehydrated.getLineage("C")).toEqual(original.getLineage("C"));
+      // Rehydration restores the frontier for every id (one entry each); the
+      // distinct-id count matches and the snapshot round-trips exactly.
+      expect(rehydrated.getRegisteredCount()).toBe(3);
+      expect(rehydrated.getLineage("A")).toEqual(["A"]);
+      expect(rehydrated.getLineage("B")).toEqual(["B"]);
+      expect(rehydrated.getLineage("C")).toEqual(["C"]);
+      expect(serializeSnapshot(rehydrated.snapshot())).toBe(
+        serializeSnapshot(original.snapshot())
+      );
     });
   });
 });

@@ -58,6 +58,9 @@ const STATUS_MAP: Record<string, number> = {
   NOT_GATEKEEPER: 403,
   ALREADY_APPROVED: 409,
   DUPLICATE_GATEKEEPER: 400,
+  // Separation of duties: the requester may not approve their own request.
+  // This is a forbidden action by the authenticated actor, not a server fault.
+  REQUESTER_CANNOT_APPROVE: 403,
 
   // Budget errors
   ENVELOPE_EXISTS: 409,

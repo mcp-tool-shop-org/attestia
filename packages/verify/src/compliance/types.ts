@@ -74,6 +74,24 @@ export interface ControlMapping {
 // =============================================================================
 
 /**
+ * Classification of how strongly a control's evidence is backed.
+ *
+ * - "verified": at least one cryptographically verifiable evidence type
+ *   (hash-chain, replay-verification, merkle-proof, state-snapshot) passed
+ *   against an actual state bundle.
+ * - "asserted": the control's evidence is an architectural claim
+ *   (audit-log, multi-sig-governance, reconciliation, consensus) corroborated
+ *   by the presence of a verified state bundle, but not itself a cryptographic
+ *   proof.
+ * - "failed": the control did not pass (or, for architectural claims, there
+ *   was no bundle to corroborate it — fail-closed).
+ *
+ * Separating verified from asserted prevents a report from scoring high on
+ * pure architectural posture with no corroborating evidence.
+ */
+export type EvidenceClass = "verified" | "asserted" | "failed";
+
+/**
  * An evaluated control — includes runtime evidence check results.
  */
 export interface EvaluatedControl {
@@ -83,6 +101,8 @@ export interface EvaluatedControl {
   readonly passed: boolean;
   /** Reference or evidence detail */
   readonly evidenceDetail: string;
+  /** How strongly the evidence is backed (verified vs asserted vs failed) */
+  readonly evidenceClass: EvidenceClass;
 }
 
 /**
@@ -97,6 +117,17 @@ export interface ComplianceReport {
   readonly totalControls: number;
   /** Controls that passed */
   readonly passedControls: number;
+  /**
+   * Passing controls backed by cryptographically verifiable evidence
+   * (a subset of passedControls).
+   */
+  readonly verifiedControls: number;
+  /**
+   * Passing controls backed only by an architectural claim corroborated by a
+   * state bundle (the remainder of passedControls). Score readers should treat
+   * asserted controls as weaker evidence than verified ones.
+   */
+  readonly assertedControls: number;
   /** Score as a percentage (0-100) */
   readonly score: number;
   /** When this report was generated */

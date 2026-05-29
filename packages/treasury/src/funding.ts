@@ -10,6 +10,16 @@
  * - A single rejection kills the request
  * - Approval order doesn't matter
  * - Executed requests record in the ledger
+ *
+ * Separation of duties (D4-A-003):
+ * - The requester may NOT approve any gate on their own request, even if they
+ *   are also a configured gatekeeper. A gatekeeper who raised a request can
+ *   still approve OTHER requests; they are only barred from self-satisfying a
+ *   gate on the one they originated. Violations throw
+ *   FundingError("REQUESTER_CANNOT_APPROVE"). This preserves the two-distinct-
+ *   approver guarantee: a single person can never supply both the request and
+ *   one of its two approvals. (Submission by a gatekeeper is permitted; the
+ *   control is enforced at approval time.)
  */
 
 import { Ledger } from "@attestia/ledger";
@@ -35,7 +45,8 @@ export type FundingErrorCode =
   | "INVALID_TRANSITION"
   | "NOT_GATEKEEPER"
   | "ALREADY_APPROVED"
-  | "DUPLICATE_GATEKEEPER";
+  | "DUPLICATE_GATEKEEPER"
+  | "REQUESTER_CANNOT_APPROVE";
 
 // =============================================================================
 // Funding Gate
@@ -120,6 +131,16 @@ export class FundingGateManager {
       throw new FundingError(
         "NOT_GATEKEEPER",
         `'${approvedBy}' is not a gatekeeper`,
+      );
+    }
+
+    // Separation of duties: the requester cannot approve their own request,
+    // even if they are also a gatekeeper. Otherwise a single person could
+    // supply both the request and one of the two required approvals (D4-A-003).
+    if (approvedBy === request.requestedBy) {
+      throw new FundingError(
+        "REQUESTER_CANNOT_APPROVE",
+        `Requester cannot approve their own request '${id}' (separation of duties)`,
       );
     }
 

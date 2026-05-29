@@ -6,8 +6,16 @@ export {
   buildCanonicalSigningPayload,
   orderSignatures,
   aggregateSignatures,
+  xrplSignatureVerifier,
+  signPayloadHash,
+  encodePayloadHashForSigning,
 } from "./signing.js";
-export type { SignerSignature, AggregatedSignature } from "./signing.js";
+export type {
+  SignerSignature,
+  AggregatedSignature,
+  SignatureVerifier,
+  AggregateOptions,
+} from "./signing.js";
 export type {
   SignerEntry,
   GovernancePolicy,
@@ -42,4 +50,5 @@ export type {
   RegistrumStateRef,
   AuthorityValidation,
   HistoricalQuorumValidation,
+  HistoricalQuorumOptions,
 } from "./registrum-bridge.js";

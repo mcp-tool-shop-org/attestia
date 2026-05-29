@@ -7,6 +7,19 @@
  *
  * Think: `git hash-object`, not `git push`.
  *
+ * IMPORTANT — `--parity` is an UNVERIFIED human assertion.
+ * This is an OFFLINE tool that operates on a SERIALIZED snapshot. A snapshot
+ * does not retain the runtime dual-witness comparison, so this CLI cannot
+ * verify whether the two witnesses actually agreed — it simply records the
+ * `--parity` value the caller supplied. The resulting payload therefore
+ * attests "the operator CLAIMS parity was AGREED/HALTED", not "the comparator
+ * observed it." Use this for diagnostics, replay, and offline tooling only.
+ *
+ * For LIVE / on-ledger attestations, derive parity from the registrar itself
+ * via `generateAttestationFromRegistrar(registrar, ...)`: it reads the ACTUAL
+ * comparison result from `getLastParityStatus()` and fails closed if no
+ * dual-witness comparison has run. That is the trustworthy path.
+ *
  * Usage:
  *   npx ts-node src/cli/attest.ts \
  *     --snapshot ./snapshots/snapshot.json \
@@ -46,12 +59,25 @@ OPTIONS:
   --snapshot <path>       Path to snapshot JSON file (required)
   --registry-hash <hex>   Registry content hash, 64 hex chars (required)
   --mode <mode>           Attestation mode: dual, legacy-only, registry-only (required)
-  --parity <status>       Parity status: AGREED or HALTED (required)
+  --parity <status>       Parity status: AGREED or HALTED (required).
+                          UNVERIFIED human assertion — see NOTE below.
   --from <n>              First transition index (required)
   --to <n>                Last transition index (required)
   --out <path>            Output file path (default: stdout)
   --xrpl-memos            Output XRPL memo encoding instead of JSON
   --help                  Show this help message
+
+NOTE — --parity is an UNVERIFIED human assertion:
+  This is an OFFLINE tool that reads a SERIALIZED snapshot, which does not
+  retain the runtime dual-witness comparison. It therefore CANNOT confirm that
+  the two witnesses agreed; it records the --parity value you supply verbatim.
+  The payload attests what the OPERATOR CLAIMS, not what the comparator
+  observed. Use it for diagnostics, replay, and offline tooling only.
+
+  For LIVE / on-ledger attestations, do NOT hand-assert parity here. Derive it
+  from the registrar with generateAttestationFromRegistrar(registrar, ...),
+  which reads the ACTUAL result of getLastParityStatus() and fails closed if no
+  dual-witness comparison has run.
 
 EXAMPLES:
   # Generate attestation payload to stdout

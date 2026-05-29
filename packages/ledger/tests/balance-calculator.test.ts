@@ -15,7 +15,10 @@ import { AccountRegistry } from "../src/accounts.js";
 import {
   computeAccountBalance,
   computeTrialBalance,
+  assertTrialBalanced,
 } from "../src/balance-calculator.js";
+import { LedgerError } from "../src/types.js";
+import type { TrialBalance } from "../src/types.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -256,5 +259,62 @@ describe("computeTrialBalance", () => {
     expect(tb.balanced).toBe(true);
     // 2 accounts × 2 currencies = 4 lines
     expect(tb.lines).toHaveLength(4);
+  });
+});
+
+// ─── assertTrialBalanced (D2-A-004 — fail closed) ──────────────────────────
+
+describe("assertTrialBalanced", () => {
+  let accounts: AccountRegistry;
+
+  beforeEach(() => {
+    accounts = new AccountRegistry();
+    accounts.register(CASH, TS);
+    accounts.register(REVENUE, TS);
+  });
+
+  it("does not throw for a balanced trial balance", () => {
+    const entries = [
+      entry("e1", "cash", "debit", usdc("100.000000"), "tx1"),
+      entry("e2", "revenue", "credit", usdc("100.000000"), "tx1"),
+    ];
+    const tb = computeTrialBalance(entries, accounts, TS);
+    expect(() => assertTrialBalanced(tb)).not.toThrow();
+    // Returns the trial balance for chaining.
+    expect(assertTrialBalanced(tb)).toBe(tb);
+  });
+
+  it("throws UNBALANCED_TRANSACTION for an imbalanced trial balance", () => {
+    // Hand-build a corrupt (imbalanced) trial balance — debits != credits.
+    const corrupt: TrialBalance = {
+      generatedAt: TS,
+      balanced: false,
+      lines: [
+        {
+          accountId: "cash",
+          accountType: "asset",
+          currency: "USDC",
+          decimals: 6,
+          debitBalance: "100.000000",
+          creditBalance: "0.000000",
+        },
+        {
+          accountId: "revenue",
+          accountType: "income",
+          currency: "USDC",
+          decimals: 6,
+          debitBalance: "0.000000",
+          creditBalance: "90.000000",
+        },
+      ],
+    };
+
+    expect(() => assertTrialBalanced(corrupt)).toThrow(LedgerError);
+    try {
+      assertTrialBalanced(corrupt);
+      expect.fail("expected assertTrialBalanced to throw");
+    } catch (err) {
+      expect((err as LedgerError).code).toBe("UNBALANCED_TRANSACTION");
+    }
   });
 });

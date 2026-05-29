@@ -68,6 +68,11 @@ export interface CreateAppOptions {
   readonly metricsAuth?: AuthConfig | undefined;
   /** Public verification endpoint configuration */
   readonly publicVerify?: PublicVerifyDeps | undefined;
+  /**
+   * Expose aggregate tenant counts on the unauthenticated /ready probe.
+   * Default: false (fail-closed — see HealthRouteOptions, V2-002).
+   */
+  readonly exposeReadinessCounts?: boolean | undefined;
 }
 
 // =============================================================================
@@ -127,7 +132,9 @@ export function createApp(options: CreateAppOptions): AppInstance {
   app.onError(handleError);
 
   // ─── Health Routes (no auth required) ───────────────────────────
-  const healthRoutes = createHealthRoutes(tenantRegistry);
+  const healthRoutes = createHealthRoutes(tenantRegistry, {
+    exposeReadinessCounts: options.exposeReadinessCounts ?? false,
+  });
   app.route("/", healthRoutes);
 
   // ─── Metrics Route ──────────────────────────────────────────────

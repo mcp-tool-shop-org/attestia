@@ -34,12 +34,28 @@ import { evaluatePredicate } from "./predicate/evaluator.js";
 import type { EvaluationContext } from "./predicate/evaluator.js";
 
 /**
- * Internal state entry for a registered state.
+ * Internal state entry for a single registered VERSION of a state.
+ *
+ * Mirrors StructuralRegistrar's append-only model so the two engines remain
+ * behaviorally equivalent under parity testing: a same-id transition records a
+ * new version (with `parentKey` pointing at the prior version) rather than
+ * overwriting it.
  */
 interface RegisteredState {
   readonly id: StateID;
   readonly parentId: StateID | null;
   readonly orderIndex: number;
+  /** Composite identity of THIS version: `${id}#${orderIndex}`. */
+  readonly versionKey: string;
+  /** Composite identity of the immediately preceding version, or null for a root. */
+  readonly parentKey: string | null;
+}
+
+/**
+ * Build the composite version key for a state id at a given order index.
+ */
+function makeVersionKey(id: StateID, orderIndex: number): string {
+  return `${id}#${orderIndex}`;
 }
 
 /**
@@ -50,9 +66,14 @@ interface RegisteredState {
  */
 export class RegistryDrivenRegistrar implements Registrar {
   /**
-   * Registry of all accepted states.
+   * Append-only history of every accepted version, keyed by versionKey.
    */
-  private readonly registry: Map<StateID, RegisteredState> = new Map();
+  private readonly versionsByKey: Map<string, RegisteredState> = new Map();
+
+  /**
+   * Latest accepted version for each StateID (the live frontier).
+   */
+  private readonly latestById: Map<StateID, RegisteredState> = new Map();
 
   /**
    * Current order index (monotonically increasing).
@@ -130,21 +151,38 @@ export class RegistryDrivenRegistrar implements Registrar {
       };
     }
 
-    // All invariants passed — register the state
+    // All invariants passed — append the new version (append-only).
     const orderIndex = this.currentOrderIndex;
     this.currentOrderIndex += 1;
 
+    const id = transition.to.id;
+    const versionKey = makeVersionKey(id, orderIndex);
+
+    let parentKey: string | null = null;
+    if (transition.from !== null) {
+      const parentFrontier = this.latestById.get(transition.from);
+      parentKey = parentFrontier ? parentFrontier.versionKey : null;
+    }
+
     const registeredState: RegisteredState = {
-      id: transition.to.id,
+      id,
       parentId: transition.from,
       orderIndex,
+      versionKey,
+      parentKey,
     };
 
-    this.registry.set(transition.to.id, registeredState);
+    if (this.versionsByKey.has(versionKey)) {
+      throw new Error(
+        `Append-only violation: version key '${versionKey}' already exists`
+      );
+    }
+    this.versionsByKey.set(versionKey, registeredState);
+    this.latestById.set(id, registeredState);
 
     return {
       kind: "accepted",
-      stateId: transition.to.id,
+      stateId: id,
       orderIndex,
       appliedInvariants,
     };
@@ -221,22 +259,23 @@ export class RegistryDrivenRegistrar implements Registrar {
    */
   getLineage(stateId: StateID): LineageTrace {
     const lineage: StateID[] = [];
-    let currentId: StateID | null = stateId;
-    const visited = new Set<StateID>();
+    const visited = new Set<string>();
 
-    while (currentId !== null) {
-      if (visited.has(currentId)) {
+    // Walk the append-only version chain from the latest version of the id.
+    let current = this.latestById.get(stateId) ?? null;
+
+    while (current !== null) {
+      if (visited.has(current.versionKey)) {
         break;
       }
-      visited.add(currentId);
+      visited.add(current.versionKey);
 
-      const entry = this.registry.get(currentId);
-      if (!entry) {
-        break;
-      }
+      lineage.push(current.id);
 
-      lineage.push(currentId);
-      currentId = entry.parentId;
+      current =
+        current.parentKey !== null
+          ? this.versionsByKey.get(current.parentKey) ?? null
+          : null;
     }
 
     return lineage;
@@ -276,7 +315,7 @@ export class RegistryDrivenRegistrar implements Registrar {
       },
       registry: {
         contains_state: (id: StateID | null) =>
-          id !== null && this.registry.has(id),
+          id !== null && this.latestById.has(id),
         max_order_index: () => this.currentOrderIndex - 1,
         compute_order_index: () => this.currentOrderIndex,
       },
@@ -304,7 +343,7 @@ export class RegistryDrivenRegistrar implements Registrar {
       },
       registry: {
         contains_state: (id: StateID | null) =>
-          id !== null && this.registry.has(id),
+          id !== null && this.latestById.has(id),
         max_order_index: () => this.currentOrderIndex - 1,
         compute_order_index: () => this.currentOrderIndex,
       },
@@ -332,7 +371,7 @@ export class RegistryDrivenRegistrar implements Registrar {
       },
       registry: {
         contains_state: (id: StateID | null) =>
-          id !== null && this.registry.has(id),
+          id !== null && this.latestById.has(id),
         max_order_index: () => this.currentOrderIndex - 1,
         compute_order_index: () => this.currentOrderIndex,
       },
@@ -345,11 +384,15 @@ export class RegistryDrivenRegistrar implements Registrar {
   // =========================================================================
 
   getRegisteredCount(): number {
-    return this.registry.size;
+    return this.latestById.size;
+  }
+
+  getVersionCount(): number {
+    return this.versionsByKey.size;
   }
 
   isRegistered(stateId: StateID): boolean {
-    return this.registry.has(stateId);
+    return this.latestById.has(stateId);
   }
 
   getCurrentOrderIndex(): number {

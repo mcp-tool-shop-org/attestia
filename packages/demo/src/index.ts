@@ -11,16 +11,27 @@
 
 import chalk from "chalk";
 import crypto from "node:crypto";
+import { canonicalize } from "json-canonicalize";
 import { Vault } from "@attestia/vault";
 import { Ledger } from "@attestia/ledger";
 import { InMemoryEventStore, isHashedEvent } from "@attestia/event-store";
 import type { HashedStoredEvent } from "@attestia/event-store";
 import { StructuralRegistrar } from "@attestia/registrum";
 import { ObserverRegistry } from "@attestia/chain-observer";
+import type {
+  ChainObserver,
+  ConnectionStatus,
+  BalanceQuery,
+  BalanceResult,
+  TokenBalanceQuery,
+  TokenBalance,
+  TransferQuery,
+  TransferEvent,
+} from "@attestia/chain-observer";
 import { Reconciler } from "@attestia/reconciler";
 import { computeGlobalStateHash } from "@attestia/verify";
 import { MerkleTree, packageAttestationProof, verifyAttestationProof } from "@attestia/proof";
-import type { DomainEvent, LedgerEntry } from "@attestia/types";
+import type { ChainId, DomainEvent, LedgerEntry } from "@attestia/types";
 import type { ReconcilableIntent, ReconcilableLedgerEntry, ReconcilableChainEvent } from "@attestia/reconciler";
 
 // =============================================================================
@@ -75,16 +86,82 @@ function ok(msg: string): void {
 }
 
 function info(label: string, value: string): void {
-  console.log(chalk.gray("    → ") + chalk.gray(label.padEnd(16)) + chalk.white(value));
+  console.log(chalk.gray("    → ") + chalk.gray(label.padEnd(18)) + chalk.white(value));
 }
 
 function hashLine(label: string, hash: string): void {
   const short = hash.length > 16 ? `${hash.slice(0, 16)}...${hash.slice(-8)}` : hash;
-  console.log(chalk.gray("    → ") + chalk.gray(label.padEnd(16)) + chalk.yellow(short));
+  console.log(chalk.gray("    → ") + chalk.gray(label.padEnd(18)) + chalk.yellow(short));
 }
 
 function warn(msg: string): void {
   console.log(chalk.yellow("    ! ") + chalk.yellow(msg));
+}
+
+/** Print a per-check pass/fail line (used for proof verification output). */
+function check(label: string, passed: boolean): void {
+  const mark = passed ? chalk.green("✓") : chalk.red("✗");
+  const value = passed ? chalk.green("pass") : chalk.red("fail");
+  console.log(chalk.gray("    ") + mark + " " + chalk.gray(label.padEnd(18)) + value);
+}
+
+/** SHA-256 over the RFC 8785 canonical JSON form — identical to @attestia/proof. */
+function canonicalSha256(value: unknown): string {
+  return crypto.createHash("sha256").update(canonicalize(value)).digest("hex");
+}
+
+/**
+ * A read-only stub chain observer for the demo.
+ *
+ * Satisfies the real {@link ChainObserver} interface and is registered on the
+ * real {@link ObserverRegistry}, so reconciliation consumes an *observation*
+ * rather than a hand-authored literal. It returns canned data instead of
+ * hitting a live RPC endpoint — clearly a demo stub, not a mock of the
+ * matching/verification logic (which runs for real).
+ */
+class DemoChainObserver implements ChainObserver {
+  readonly chainId: ChainId;
+  private readonly transfer: TransferEvent;
+  private connected = false;
+
+  constructor(chainId: ChainId, transfer: TransferEvent) {
+    this.chainId = chainId;
+    this.transfer = transfer;
+  }
+
+  async connect(): Promise<void> {
+    this.connected = true;
+  }
+
+  async disconnect(): Promise<void> {
+    this.connected = false;
+  }
+
+  async getStatus(): Promise<ConnectionStatus> {
+    return {
+      chainId: this.chainId,
+      connected: this.connected,
+      latestBlock: this.transfer.blockNumber,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  async getBalance(_query: BalanceQuery): Promise<BalanceResult> {
+    throw new Error("DemoChainObserver: getBalance is not implemented (demo stub)");
+  }
+
+  async getTokenBalance(_query: TokenBalanceQuery): Promise<TokenBalance> {
+    throw new Error("DemoChainObserver: getTokenBalance is not implemented (demo stub)");
+  }
+
+  async getTransfers(query: TransferQuery): Promise<readonly TransferEvent[]> {
+    // Return the canned transfer when it concerns the queried address.
+    const addr = query.address.toLowerCase();
+    const involvesAddress =
+      this.transfer.from.toLowerCase() === addr ||
+      this.transfer.to.toLowerCase() === addr;
+    return involvesAddress ? [this.transfer] : [];
+  }
 }
 
 const TOTAL_STEPS = 14;
@@ -96,7 +173,10 @@ const TOTAL_STEPS = 14;
 async function run(): Promise<void> {
   banner();
   console.log(chalk.gray("  Walk-through of the full Attestia pipeline."));
-  console.log(chalk.gray("  Every step uses real domain packages — no mocks.\n"));
+  console.log(chalk.gray("  Every step runs the real domain packages — matching, hashing,"));
+  console.log(chalk.gray("  attestation, and proof are all computed for real."));
+  console.log(chalk.gray("  The on-chain leg uses a local stub observer (no live RPC),"));
+  console.log(chalk.gray("  clearly labelled where it appears.\n"));
 
   await sleep(DELAY_MS);
 
@@ -140,10 +220,13 @@ async function run(): Promise<void> {
   stepHeader(2, TOTAL_STEPS, "Declare Intent");
 
   const intentId = "payroll-jan-2025";
+  // Amounts are decimal strings (50,000 USDC at 6 decimals). The on-chain leg
+  // expresses the same value in raw base units (50000000000), so all three
+  // reconciliation legs agree.
   const intent = vault.declareIntent(intentId, "transfer", "January 2025 payroll — 5 employees", {
     fromAddress: "0xTreasury",
     toAddress: "0xPayrollContract",
-    amount: { amount: "50000000000", currency: "USDC", decimals: 6 },
+    amount: { amount: "50000", currency: "USDC", decimals: 6 },
   });
 
   info("id", intent.id);
@@ -201,7 +284,7 @@ async function run(): Promise<void> {
       id: "le-payroll-debit",
       accountId: "treasury",
       type: "debit",
-      money: { amount: "50000000000", currency: "USDC", decimals: 6 },
+      money: { amount: "50000", currency: "USDC", decimals: 6 },
       timestamp: now,
       intentId,
       txHash: "0xabc123def456",
@@ -211,7 +294,7 @@ async function run(): Promise<void> {
       id: "le-payroll-credit",
       accountId: "payroll",
       type: "credit",
-      money: { amount: "50000000000", currency: "USDC", decimals: 6 },
+      money: { amount: "50000", currency: "USDC", decimals: 6 },
       timestamp: now,
       intentId,
       txHash: "0xabc123def456",
@@ -235,13 +318,18 @@ async function run(): Promise<void> {
 
   stepHeader(6, TOTAL_STEPS, "Verify Intent");
 
-  const verified = vault.verifyIntent(intentId, true);
-  info("matched", "true");
-  info("discrepancies", "none");
+  // NOTE: vault.verifyIntent(intentId, verdict) RECORDS an attestor-supplied
+  // verdict on the intent — the boolean is an INPUT the vault stores, not a
+  // value the vault computes. The actual cross-system match is computed in
+  // Step 7 (reconciliation), and its result is surfaced here for honesty.
+  const attestorVerdict = true;
+  const verified = vault.verifyIntent(intentId, attestorVerdict);
+  info("attestor verdict", `${String(attestorVerdict)} (recorded, not computed)`);
+  warn("This is the attestor's input — the computed match is Step 7 below");
   ok(`Status: ${chalk.bold(verified.status)}`);
 
   eventStore.append("vault.intents", [
-    domainEvent("vault.intent.verified", { intentId, matched: true }),
+    domainEvent("vault.intent.verified", { intentId, attestorVerdict }),
   ]);
 
   await sleep(DELAY_MS);
@@ -250,12 +338,15 @@ async function run(): Promise<void> {
 
   stepHeader(7, TOTAL_STEPS, "Reconcile (3-way match)");
 
+  // Intent/ledger amounts are decimal strings (50,000 USDC at 6 decimals).
+  // The matchers scale these by `decimals`; the on-chain leg below carries the
+  // same value as raw base units, so all three legs reconcile cleanly.
   const reconcilableIntents: readonly ReconcilableIntent[] = [
     {
       id: intentId,
       status: "executed",
       kind: "transfer",
-      amount: { amount: "50000000000", currency: "USDC", decimals: 6 },
+      amount: { amount: "50000", currency: "USDC", decimals: 6 },
       chainId: "evm:1",
       txHash: "0xabc123def456",
       declaredAt: now,
@@ -268,7 +359,7 @@ async function run(): Promise<void> {
       id: "le-payroll-debit",
       accountId: "treasury",
       type: "debit",
-      money: { amount: "50000000000", currency: "USDC", decimals: 6 },
+      money: { amount: "50000", currency: "USDC", decimals: 6 },
       timestamp: now,
       intentId,
       txHash: "0xabc123def456",
@@ -276,18 +367,41 @@ async function run(): Promise<void> {
     },
   ];
 
-  const reconcilableChainEvents: readonly ReconcilableChainEvent[] = [
-    {
-      chainId: "evm:1",
-      txHash: "0xabc123def456",
-      from: "0xTreasury",
-      to: "0xPayrollContract",
-      amount: "50000000000",
-      decimals: 6,
-      symbol: "USDC",
-      timestamp: now,
-    },
-  ];
+  // Register a read-only stub observer on the (previously unused) registry and
+  // OBSERVE the on-chain transfer, rather than hand-authoring the chain event.
+  // The observer returns canned data (no live RPC) but flows through the real
+  // ObserverRegistry + ChainObserver interface and the real matchers.
+  const observedTransfer: TransferEvent = {
+    chainId: "evm:1",
+    txHash: "0xabc123def456",
+    blockNumber: 19_000_000,
+    from: "0xTreasury",
+    to: "0xPayrollContract",
+    amount: "50000000000", // raw base units = 50,000.000000 USDC
+    decimals: 6,
+    symbol: "USDC",
+    timestamp: now,
+    observedAt: new Date().toISOString(),
+  };
+  observerRegistry.register(new DemoChainObserver("evm:1", observedTransfer));
+  await observerRegistry.connectAll();
+
+  const observed = await observerRegistry
+    .get("evm:1")
+    .getTransfers({ address: "0xTreasury", direction: "outgoing" });
+
+  const reconcilableChainEvents: readonly ReconcilableChainEvent[] = observed.map((t) => ({
+    chainId: t.chainId,
+    txHash: t.txHash,
+    from: t.from,
+    to: t.to,
+    amount: t.amount,
+    decimals: t.decimals,
+    symbol: t.symbol,
+    timestamp: t.timestamp,
+  }));
+
+  warn(`chain leg: observed via STUB observer (no live RPC) — ${observed.length} transfer(s)`);
 
   const report = reconciler.reconcile({
     intents: reconcilableIntents,
@@ -299,7 +413,14 @@ async function run(): Promise<void> {
   info("ledger <> chain", `${report.ledgerChainMatches.length} match(es)`);
   info("intent <> chain", `${report.intentChainMatches.length} match(es)`);
   info("all reconciled", String(report.summary.allReconciled));
-  ok(`Reconciliation complete — ${report.summary.matchedCount} matched, ${report.summary.mismatchCount} mismatches`);
+  if (report.summary.allReconciled) {
+    ok(`Reconciliation complete — ${report.summary.matchedCount} matched, ${report.summary.mismatchCount} mismatches`);
+  } else {
+    warn(`Reconciliation found discrepancies — ${report.summary.matchedCount} matched, ${report.summary.mismatchCount} mismatches`);
+    for (const d of report.summary.discrepancies) {
+      warn(`  ${d}`);
+    }
+  }
 
   eventStore.append("reconciler", [
     domainEvent("reconciler.reconciliation.completed", { reportId: report.id, allReconciled: report.summary.allReconciled }, "registrum"),
@@ -347,14 +468,24 @@ async function run(): Promise<void> {
   // InMemoryEventStore stores HashedStoredEvent at runtime
   const hashedEvents = allEvents.filter(isHashedEvent) as readonly HashedStoredEvent[];
   const eventHashes = hashedEvents.map((e) => e.hash);
-  const tree = MerkleTree.build(eventHashes);
+
+  // The attestation EVENT's hash (an envelope hash from the store) has a
+  // different preimage than the attestation OBJECT we package as a proof.
+  // To make the proof's leaf preimage equal what packageAttestationProof
+  // hashes, append the attestation's OWN canonical hash as an explicit leaf.
+  const attestationHash = canonicalSha256(attestation);
+  const merkleLeaves: readonly string[] = [...eventHashes, attestationHash];
+
+  const tree = MerkleTree.build(merkleLeaves);
   const root = tree.getRoot();
 
-  info("leaves", `${tree.getLeafCount()} events`);
+  info("event leaves", `${eventHashes.length} event hashes`);
+  info("attestation leaf", "1 (canonical hash of the attestation)");
+  info("total leaves", `${tree.getLeafCount()}`);
   if (root !== null) {
     hashLine("merkle root", root);
   }
-  ok("Binary SHA-256 hash tree built from event hashes");
+  ok("Binary SHA-256 hash tree built from event hashes + attestation hash");
 
   await sleep(DELAY_MS);
 
@@ -362,14 +493,22 @@ async function run(): Promise<void> {
 
   stepHeader(11, TOTAL_STEPS, "Generate Attestation Proof");
 
-  // The attestation event is the last one we appended
-  const attestationEventIndex = eventHashes.length - 1;
-  const proofPkg = packageAttestationProof(
-    attestation,
-    eventHashes,
-    tree,
-    attestationEventIndex,
-  );
+  // Locate the attestation leaf by IDENTITY (its canonical hash), not by
+  // assuming it is the last appended store event. lastIndexOf finds the leaf
+  // we explicitly appended above; guarding against -1 keeps this honest if the
+  // leaf set ever changes.
+  const attestationLeafIndex = merkleLeaves.lastIndexOf(attestationHash);
+  // Verified for real in Step 12; surfaced in the Step 14 summary.
+  let proofValid = false;
+  const proofPkg =
+    attestationLeafIndex >= 0
+      ? packageAttestationProof(
+          attestation,
+          merkleLeaves,
+          tree,
+          attestationLeafIndex,
+        )
+      : null;
 
   if (proofPkg !== null) {
     hashLine("attestation hash", proofPkg.attestationHash);
@@ -388,15 +527,28 @@ async function run(): Promise<void> {
   stepHeader(12, TOTAL_STEPS, "Verify Attestation Proof");
 
   if (proofPkg !== null) {
-    const proofValid = verifyAttestationProof(proofPkg);
-    info("package hash", "verified");
-    info("merkle path", "verified");
-    info("inclusion", "verified");
+    // Compute the verdict FIRST, then report each check against actual results.
+    proofValid = verifyAttestationProof(proofPkg);
+
+    // Per-check breakdown — each line reflects a real recomputation, mirroring
+    // the checks inside verifyAttestationProof (never printed unconditionally).
+    const hashMatches = proofPkg.attestationHash === canonicalSha256(proofPkg.attestation);
+    const merklePathValid = MerkleTree.verifyProof(proofPkg.inclusionProof);
+    const leafIsAttestation = proofPkg.inclusionProof.leafHash === proofPkg.attestationHash;
+    const rootConsistent = proofPkg.merkleRoot === proofPkg.inclusionProof.root;
+
+    check("attestation hash", hashMatches);
+    check("merkle path", merklePathValid);
+    check("leaf == att hash", leafIsAttestation);
+    check("root consistency", rootConsistent);
+
     if (proofValid) {
       ok(chalk.green.bold("PROOF VALID") + " — attestation is cryptographically included in the event tree");
     } else {
-      warn("Proof verification failed");
+      warn("PROOF INVALID — one or more checks failed (see above)");
     }
+  } else {
+    warn("No proof package to verify");
   }
 
   await sleep(DELAY_MS);
@@ -434,7 +586,12 @@ async function run(): Promise<void> {
   }
   console.log(chalk.white("    Global state hash:   ") + chalk.yellow(globalState.hash.slice(0, 16) + "..." + globalState.hash.slice(-8)));
   if (proofPkg !== null) {
-    console.log(chalk.white("    Proof package:       ") + chalk.green.bold("VALID"));
+    console.log(
+      chalk.white("    Proof package:       ") +
+        (proofValid ? chalk.green.bold("VALID") : chalk.red.bold("INVALID")),
+    );
+  } else {
+    console.log(chalk.white("    Proof package:       ") + chalk.red.bold("NOT GENERATED"));
   }
 
   console.log();

@@ -177,6 +177,113 @@ describe("IntentChainMatcher", () => {
     });
   });
 
+  describe("unauthorized chain events (D4-A-002)", () => {
+    // An on-chain transfer with no declared/approved intent is an
+    // unauthorized withdrawal. Fail-closed: it MUST be surfaced as
+    // missing-intent, never silently ignored.
+    it("flags a chain event that matches no intent as missing-intent", () => {
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xrogue",
+          from: "0xtreasury",
+          to: "0xattacker",
+          amount: "1000000000", // 1000 USDC drained
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+      ];
+
+      // No intents at all — a transfer happened that nobody declared.
+      const results = matcher.match([], events);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.status).toBe("missing-intent");
+      expect(results[0]!.txHash).toBe("0xrogue");
+      expect(results[0]!.chainId).toBe("eth:1");
+      expect(results[0]!.discrepancies).toHaveLength(1);
+      expect(results[0]!.discrepancies[0]).toMatch(/no.*intent/i);
+    });
+
+    it("accepts a chain event that DOES match an intent (no false positive)", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-ok",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          chainId: "eth:1",
+          txHash: "0xauthorized",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xauthorized",
+          from: "0xtreasury",
+          to: "0xvendor",
+          amount: "100000000",
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+      ];
+
+      const results = matcher.match(intents, events);
+
+      // Exactly one result: the authorized match. No spurious missing-intent.
+      expect(results).toHaveLength(1);
+      expect(results[0]!.status).toBe("matched");
+      expect(results.some((r) => r.status === "missing-intent")).toBe(false);
+    });
+
+    it("separates authorized from unauthorized in a mixed batch", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-ok",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          chainId: "eth:1",
+          txHash: "0xauthorized",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xauthorized",
+          from: "0xtreasury",
+          to: "0xvendor",
+          amount: "100000000",
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+        {
+          chainId: "eth:1",
+          txHash: "0xrogue",
+          from: "0xtreasury",
+          to: "0xattacker",
+          amount: "5000000000",
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:02Z",
+        },
+      ];
+
+      const results = matcher.match(intents, events);
+      const rogue = results.find((r) => r.txHash === "0xrogue");
+      const ok = results.find((r) => r.txHash === "0xauthorized");
+
+      expect(ok!.status).toBe("matched");
+      expect(rogue).toBeDefined();
+      expect(rogue!.status).toBe("missing-intent");
+    });
+  });
+
   describe("cross-decimal matching", () => {
     it("handles different decimal bases correctly", () => {
       const intents: ReconcilableIntent[] = [

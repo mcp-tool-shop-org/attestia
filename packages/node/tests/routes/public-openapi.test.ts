@@ -82,6 +82,29 @@ describe("GET /public/v1/openapi.json", () => {
     expect(body.components.schemas.ErrorEnvelope).toBeDefined();
   });
 
+  // V1-002 [MEDIUM, contract-drift]: the published ConsensusResult schema must
+  // match the served shape — including the singleVerifierPass weak-quorum flag.
+  it("documents singleVerifierPass on ConsensusResult (matches served shape)", async () => {
+    const { app } = createTestApp();
+    const res = await app.request(makeRequest("/public/v1/openapi.json"));
+
+    const body = (await res.json()) as {
+      components: {
+        schemas: {
+          ConsensusResult: {
+            properties: Record<string, { type?: string }>;
+            required: string[];
+          };
+        };
+      };
+    };
+
+    const consensus = body.components.schemas.ConsensusResult;
+    expect(consensus.properties.singleVerifierPass).toBeDefined();
+    expect(consensus.properties.singleVerifierPass.type).toBe("boolean");
+    expect(consensus.required).toContain("singleVerifierPass");
+  });
+
   it("includes rate limiting response definition", async () => {
     const { app } = createTestApp();
     const res = await app.request(makeRequest("/public/v1/openapi.json"));

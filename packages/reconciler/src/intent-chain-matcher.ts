@@ -140,6 +140,31 @@ export class IntentChainMatcher {
       }
     }
 
+    // Flag on-chain events that correspond to NO declared/approved intent.
+    // An unmatched chain transfer is an unauthorized withdrawal — fail-closed:
+    // it must surface as missing-intent (which the summary counts toward
+    // missingCount, flipping allReconciled to false), never silently ignored
+    // (D4-A-002). Dedup by txHash so events sharing a hash yield one finding,
+    // mirroring the txHash-indexed matching above.
+    const reportedOrphanTxHashes = new Set<string>();
+    for (const event of chainEvents) {
+      if (matchedTxHashes.has(event.txHash)) continue;
+      if (reportedOrphanTxHashes.has(event.txHash)) continue;
+      reportedOrphanTxHashes.add(event.txHash);
+
+      results.push({
+        intentId: "", // no intent declared this transfer
+        txHash: event.txHash,
+        chainId: event.chainId,
+        status: "missing-intent",
+        chainAmount: event.amount,
+        chainDecimals: event.decimals,
+        discrepancies: [
+          `Chain event ${event.txHash} (${event.amount} ${event.symbol}) has no matching intent`,
+        ],
+      });
+    }
+
     return results;
   }
 }

@@ -241,6 +241,72 @@ describe("EvmObserver", () => {
     });
   });
 
+  describe("getTransfers — block-range DoS guard (D3-A-006)", () => {
+    it("rejects an over-large range for the all-tokens (filterless) path", async () => {
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      // No `token` → filterless getLogs across ALL contracts. A huge span must
+      // be rejected fail-closed rather than scanning the whole chain.
+      await expect(
+        observer.getTransfers({
+          address: "0x1234567890abcdef1234567890abcdef12345678",
+          fromBlock: 0,
+          toBlock: 5_000_000,
+        }),
+      ).rejects.toThrow(/range|span|block/i);
+
+      // The over-large query must NOT have hit the RPC.
+      expect(mockGetLogs).not.toHaveBeenCalled();
+    });
+
+    it("throws a structured ObserverError with a code and hint", async () => {
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      try {
+        await observer.getTransfers({
+          address: "0x1234567890abcdef1234567890abcdef12345678",
+          fromBlock: 0,
+          toBlock: 5_000_000,
+        });
+        expect.fail("expected getTransfers to throw");
+      } catch (err) {
+        expect(err).toHaveProperty("code");
+        expect((err as { code: string }).code).toBe("BLOCK_RANGE_TOO_LARGE");
+        expect((err as { hint?: string }).hint).toBeTruthy();
+      }
+    });
+
+    it("allows a bounded all-tokens range", async () => {
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      const result = await observer.getTransfers({
+        address: "0x1234567890abcdef1234567890abcdef12345678",
+        fromBlock: 100,
+        toBlock: 200,
+      });
+
+      expect(result).toEqual([]);
+      expect(mockGetLogs).toHaveBeenCalled();
+    });
+
+    it("rejects an over-large range even with a token filter (hard ceiling)", async () => {
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      await expect(
+        observer.getTransfers({
+          address: "0x1234567890abcdef1234567890abcdef12345678",
+          token: "0xtoken",
+          fromBlock: 0,
+          toBlock: 100_000_000,
+        }),
+      ).rejects.toThrow(/range|span|block/i);
+    });
+  });
+
   describe("dynamic native token metadata", () => {
     it("returns POL symbol for Polygon", async () => {
       const observer = new EvmObserver(createConfig(CHAINS.POLYGON));

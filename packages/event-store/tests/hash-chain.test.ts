@@ -148,6 +148,45 @@ describe("verifyHashChain", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.position === 2)).toBe(true);
   });
+
+  // D2-A-001: a fully-hashed chain MUST begin at genesis. Otherwise a verifier
+  // that adopts the first event's self-claimed previousHash cannot tell a
+  // genuine head from a head-truncated tail.
+  it("detects head truncation — chain does not start at genesis", () => {
+    const store = new InMemoryEventStore();
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+    const events = [...store.readAll()] as Array<StoredEvent & { hash: string; previousHash: string }>;
+
+    // Drop the first (genesis) event — the surviving head now links to a hash,
+    // not GENESIS_HASH.
+    const truncated = events.slice(1);
+    expect(truncated[0]!.previousHash).not.toBe(GENESIS_HASH);
+
+    const result = verifyHashChain(truncated);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => /genesis/i.test(e.reason))).toBe(true);
+  });
+
+  it("rejects a chain whose first event's previousHash is not genesis", () => {
+    const store = new InMemoryEventStore();
+    store.append("s", [makeEvent("a"), makeEvent("b")]);
+    const events = [...store.readAll()] as Array<StoredEvent & { hash: string; previousHash: string }>;
+
+    // Tamper the genesis event to claim a different predecessor.
+    events[0] = { ...events[0]!, previousHash: "a".repeat(64) };
+
+    const result = verifyHashChain(events);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.position === 1)).toBe(true);
+  });
+
+  it("still validates a genuine genesis-rooted chain", () => {
+    const store = new InMemoryEventStore();
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+    const result = verifyHashChain(store.readAll());
+    expect(result.valid).toBe(true);
+    expect(result.lastVerifiedPosition).toBe(3);
+  });
 });
 
 // =============================================================================

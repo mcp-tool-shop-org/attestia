@@ -28,6 +28,14 @@ function generateRequestId(): string {
   return `sdk-${randomBytes(12).toString("hex")}`;
 }
 
+/** Generate a cryptographically secure idempotency key */
+function generateIdempotencyKey(): string {
+  return `idem-${randomBytes(16).toString("hex")}`;
+}
+
+/** HTTP methods that are safe to retry blindly (no side effects). */
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 /** Sleep for the given number of milliseconds */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -103,6 +111,7 @@ export class HttpClient {
   private readonly apiKey: string | undefined;
   private readonly timeout: number;
   private readonly maxRetries: number;
+  private readonly retryMutations: boolean;
   private readonly fetchFn: typeof fetch;
 
   constructor(config: AttestiaClientConfig) {
@@ -111,6 +120,7 @@ export class HttpClient {
     this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? 30000;
     this.maxRetries = config.retries ?? 3;
+    this.retryMutations = config.retryMutations ?? false;
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
   }
 
@@ -209,6 +219,12 @@ export class HttpClient {
     const url = `${this.baseUrl}${path}`;
     const requestId = generateRequestId();
 
+    const isIdempotent = IDEMPOTENT_METHODS.has(method.toUpperCase());
+    // Only retry safe (idempotent) methods unless the caller has explicitly
+    // opted into mutation retries. This prevents a lost-response network error
+    // after a successful POST from duplicating the server-side mutation.
+    const canRetry = isIdempotent || this.retryMutations;
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "Accept": "application/json",
@@ -217,6 +233,14 @@ export class HttpClient {
 
     if (this.apiKey !== undefined) {
       headers["X-Api-Key"] = this.apiKey;
+    }
+
+    // For non-idempotent methods, attach a stable Idempotency-Key generated
+    // once per logical request and reused across every retry attempt. With a
+    // tenant/route-scoped server store, retries then dedupe to a single
+    // mutation instead of replaying it.
+    if (!isIdempotent) {
+      headers["Idempotency-Key"] = generateIdempotencyKey();
     }
 
     const init: RequestInit = {
@@ -268,8 +292,8 @@ export class HttpClient {
           );
         }
 
-        // 5xx → retry with backoff
-        if (response.status >= 500 && attempt < this.maxRetries) {
+        // 5xx → retry with backoff (only when this method is retryable)
+        if (response.status >= 500 && canRetry && attempt < this.maxRetries) {
           const backoffMs = Math.min(1000 * Math.pow(2, attempt), 10000);
           await sleep(backoffMs);
           lastError = new AttestiaError(
@@ -294,8 +318,8 @@ export class HttpClient {
           throw error;
         }
 
-        // Network / timeout errors → retry
-        if (attempt < this.maxRetries) {
+        // Network / timeout errors → retry (only when this method is retryable)
+        if (canRetry && attempt < this.maxRetries) {
           lastError = error instanceof Error ? error : new Error(String(error));
           const backoffMs = Math.min(1000 * Math.pow(2, attempt), 10000);
           await sleep(backoffMs);

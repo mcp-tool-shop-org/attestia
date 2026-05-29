@@ -28,6 +28,7 @@ export {
   ATTESTATION_VERSION,
   REGISTRUM_VERSION,
   generateAttestationPayload,
+  generateAttestationFromRegistrar,
   computeSnapshotHashForAttestation,
   canonicalizeForHash,
   serializeAttestationPayload,
@@ -37,6 +38,8 @@ export {
   decodeXrplMemos,
   validateAttestationPayload,
 } from "./generator.js";
+
+export type { RegistrarAttestationOptions } from "./generator.js";
 
 // Configuration
 export type {

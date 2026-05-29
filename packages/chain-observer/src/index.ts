@@ -30,6 +30,10 @@ export {
   ObserverRegistry,
 } from "./registry.js";
 
+// Structured errors
+export { ObserverError } from "./errors.js";
+export type { ObserverErrorCode } from "./errors.js";
+
 // Chain definitions
 export {
   CHAINS,

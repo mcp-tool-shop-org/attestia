@@ -75,11 +75,35 @@ export class IntentLedgerMatcher {
       // Compare amounts — sum the debit entries to get total outflow
       const debitEntries = entries.filter((e) => e.type === "debit");
       if (debitEntries.length === 0) {
+        // An amount-bearing outflow intent linked only to credit entries has
+        // NOT been debited — the recorded outflow is zero. Reporting that as a
+        // clean "matched" hides a real discrepancy (intent amount vs 0). Flag
+        // it as amount-mismatch (D4-A-004). Only when the intent carries no
+        // amount is the absence of a debit legitimately clean.
+        if (intent.amount) {
+          const intentRaw = parseAmount(intent.amount.amount, intent.amount.decimals);
+          results.push({
+            intentId: intent.id,
+            correlationId: entries[0]!.correlationId,
+            status: "amount-mismatch",
+            intentAmount: intent.amount,
+            ledgerAmount: {
+              amount: formatAmount(0n, intent.amount.decimals),
+              currency: intent.amount.currency,
+              decimals: intent.amount.decimals,
+            },
+            discrepancies: [
+              `Amount mismatch: intent=${formatAmount(intentRaw, intent.amount.decimals)} ` +
+              `ledger=${formatAmount(0n, intent.amount.decimals)} (no debit entries)`,
+            ],
+          });
+          continue;
+        }
+
         results.push({
           intentId: intent.id,
           correlationId: entries[0]!.correlationId,
           status: "matched",
-          ...(intent.amount ? { intentAmount: intent.amount } : {}),
           discrepancies: [],
         });
         continue;

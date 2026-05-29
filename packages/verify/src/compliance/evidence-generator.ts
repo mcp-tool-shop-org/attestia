@@ -19,6 +19,7 @@ import type {
   EvaluatedControl,
   ComplianceReport,
   EvidenceType,
+  EvidenceClass,
 } from "./types.js";
 
 // =============================================================================
@@ -26,24 +27,70 @@ import type {
 // =============================================================================
 
 /**
+ * Result of checking one evidence type.
+ * `kind` records whether a PASS is cryptographically verified or merely an
+ * architectural assertion; on failure it is "failed".
+ */
+interface EvidenceResult {
+  readonly passed: boolean;
+  readonly detail: string;
+  readonly kind: EvidenceClass;
+}
+
+/**
+ * The architectural evidence types: capabilities that exist by design but are
+ * NOT themselves cryptographic proofs. A bundle cannot "prove" them, so they
+ * are fail-closed without a corroborating, integral state bundle and, even
+ * when corroborated, are reported as "asserted" rather than "verified".
+ */
+const ARCHITECTURAL_TYPES: Record<
+  Extract<
+    EvidenceType,
+    "audit-log" | "multi-sig-governance" | "reconciliation" | "consensus"
+  >,
+  string
+> = {
+  "audit-log": "Append-only audit log",
+  "multi-sig-governance": "Multi-signature governance framework",
+  reconciliation: "Three-way reconciliation engine",
+  consensus: "Multi-verifier consensus framework",
+};
+
+/**
+ * Whether a present bundle is corroborated (integral) — used to decide if an
+ * architectural claim may be reported as "asserted" rather than failing closed.
+ */
+function bundleIsCorroborated(
+  bundle: ExportableStateBundle | null,
+  bundleVerification: BundleVerificationResult | null,
+): boolean {
+  return (
+    bundle !== null &&
+    bundleVerification !== null &&
+    bundleVerification.bundleHashValid
+  );
+}
+
+/**
  * Check if a specific evidence type passes for the given bundle.
- * Returns a description of what was checked and the result.
+ * Returns a description of what was checked, the result, and its class.
  */
 function checkEvidence(
   evidenceType: EvidenceType,
   bundle: ExportableStateBundle | null,
   bundleVerification: BundleVerificationResult | null,
-): { passed: boolean; detail: string } {
+): EvidenceResult {
   switch (evidenceType) {
     case "hash-chain":
       if (bundle === null) {
-        return { passed: false, detail: "No state bundle available for hash chain verification" };
+        return { passed: false, kind: "failed", detail: "No state bundle available for hash chain verification" };
       }
       if (bundleVerification === null) {
-        return { passed: false, detail: "Bundle verification not performed" };
+        return { passed: false, kind: "failed", detail: "Bundle verification not performed" };
       }
       return {
         passed: bundleVerification.bundleHashValid,
+        kind: bundleVerification.bundleHashValid ? "verified" : "failed",
         detail: bundleVerification.bundleHashValid
           ? "Bundle hash chain is intact"
           : `Hash chain broken: ${bundleVerification.discrepancies.join("; ")}`,
@@ -51,60 +98,61 @@ function checkEvidence(
 
     case "replay-verification":
       if (bundleVerification === null) {
-        return { passed: false, detail: "Replay verification not performed" };
+        return { passed: false, kind: "failed", detail: "Replay verification not performed" };
       }
       return {
         passed: bundleVerification.globalHashValid,
+        kind: bundleVerification.globalHashValid ? "verified" : "failed",
         detail: bundleVerification.globalHashValid
           ? "State replay verification passed — global hash matches"
           : `Replay mismatch: ${bundleVerification.discrepancies.join("; ")}`,
       };
 
-    case "state-snapshot":
+    case "state-snapshot": {
       if (bundle === null) {
-        return { passed: false, detail: "No state snapshot available" };
+        return { passed: false, kind: "failed", detail: "No state snapshot available" };
       }
+      const ok = bundle.version >= 1 && bundle.exportedAt !== undefined;
       return {
-        passed: bundle.version >= 1 && bundle.exportedAt !== undefined,
+        passed: ok,
+        kind: ok ? "verified" : "failed",
         detail: `State snapshot v${bundle.version} exported at ${bundle.exportedAt ?? "unknown"}`,
       };
+    }
 
-    case "merkle-proof":
+    case "merkle-proof": {
       if (bundle === null) {
-        return { passed: false, detail: "No bundle for Merkle proof verification" };
+        return { passed: false, kind: "failed", detail: "No bundle for Merkle proof verification" };
       }
+      const ok = bundle.eventHashes.length > 0;
       return {
-        passed: bundle.eventHashes.length > 0,
+        passed: ok,
+        kind: ok ? "verified" : "failed",
         detail: `${bundle.eventHashes.length} event hashes available for Merkle tree construction`,
       };
+    }
 
     case "audit-log":
-      // Audit log is always available if the system is running
-      return {
-        passed: true,
-        detail: "Append-only audit log is structurally present",
-      };
-
     case "multi-sig-governance":
-      // Governance is an architectural feature, not bundle-dependent
-      return {
-        passed: true,
-        detail: "Multi-signature governance framework is available",
-      };
-
     case "reconciliation":
-      // Reconciliation capability is always available
+    case "consensus": {
+      // Architectural claim. Fail-closed without a corroborating bundle so a
+      // report cannot score on pure posture; when corroborated, report it as
+      // "asserted" (weaker than cryptographically verified) rather than a free PASS.
+      const name = ARCHITECTURAL_TYPES[evidenceType];
+      if (!bundleIsCorroborated(bundle, bundleVerification)) {
+        return {
+          passed: false,
+          kind: "failed",
+          detail: `${name} is asserted but uncorroborated (no integral state bundle) — fail-closed`,
+        };
+      }
       return {
         passed: true,
-        detail: "Three-way reconciliation engine is available",
+        kind: "asserted",
+        detail: `${name} present; asserted (architectural claim corroborated by an integral state bundle, not a cryptographic proof)`,
       };
-
-    case "consensus":
-      // Consensus capability is always available
-      return {
-        passed: true,
-        detail: "Multi-verifier consensus framework is available",
-      };
+    }
   }
 }
 
@@ -141,6 +189,20 @@ export function generateComplianceEvidence(
     // For "not-applicable" controls, always pass
     const passed = mapping.status === "not-applicable" || allPassed;
 
+    // Classify the control's evidence:
+    //  - not passing → "failed"
+    //  - passing with any cryptographically verified evidence → "verified"
+    //  - passing only on architectural assertions → "asserted"
+    // (not-applicable controls carry no evidence, so they count as "asserted".)
+    let evidenceClass: EvidenceClass;
+    if (!passed) {
+      evidenceClass = "failed";
+    } else if (evidenceResults.some((r) => r.kind === "verified")) {
+      evidenceClass = "verified";
+    } else {
+      evidenceClass = "asserted";
+    }
+
     const evidenceDetail = evidenceResults
       .map((r) => `[${r.passed ? "PASS" : "FAIL"}] ${r.detail}`)
       .join("; ");
@@ -149,10 +211,17 @@ export function generateComplianceEvidence(
       mapping,
       passed,
       evidenceDetail,
+      evidenceClass,
     };
   });
 
   const passedControls = evaluations.filter((e) => e.passed).length;
+  const verifiedControls = evaluations.filter(
+    (e) => e.evidenceClass === "verified",
+  ).length;
+  const assertedControls = evaluations.filter(
+    (e) => e.evidenceClass === "asserted",
+  ).length;
   const totalControls = evaluations.length;
   const score =
     totalControls > 0 ? Math.round((passedControls / totalControls) * 100) : 0;
@@ -162,6 +231,8 @@ export function generateComplianceEvidence(
     evaluations,
     totalControls,
     passedControls,
+    verifiedControls,
+    assertedControls,
     score,
     generatedAt: new Date().toISOString(),
   };
