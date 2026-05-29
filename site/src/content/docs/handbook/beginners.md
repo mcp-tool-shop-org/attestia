@@ -83,7 +83,7 @@ Attestia includes an interactive CLI demo (`@attestia/demo`) that walks through 
 
 ### Prerequisites
 
-- Node.js 18 or later
+- Node.js 20 or later
 - pnpm (the project uses pnpm workspaces)
 
 ### Steps
@@ -106,7 +106,7 @@ The demo runs the full Attestia pipeline locally: declare an intent, approve it,
 After running the demo, try the test suite to see the full scope of the project:
 
 ```bash
-# Run all 1,928 tests
+# Run all 2,220 tests
 pnpm test
 
 # Run with coverage reporting

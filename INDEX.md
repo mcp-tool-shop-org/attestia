@@ -11,7 +11,7 @@
 | Packages | 14 (13 + demo) |
 | Source files (`.ts`) | ~160 |
 | Test files | ~130 |
-| Total tests | 1,928 |
+| Total tests | 2,220 |
 | Root docs | 16 markdown files |
 | Specs (RFCs) | 10 files |
 | Registrum internal docs | 30+ files |
@@ -775,7 +775,7 @@ packages/registrum/docs/
 | `.md` (node) | 2 | API docs |
 | `.md` (resources) | 7 | Research materials |
 | `.json` | 17 | package.json (15) + tsconfig (1) + invariants (1) |
-| `.yml` | 5 | CI (2), Docker Compose, issue templates, alerts |
+| `.yml` | 8 | workflows (3: ci, docker, pages), Docker Compose, issue templates (2), alerts, codecov |
 | `.png` | 1 | Logo |
 
 ---

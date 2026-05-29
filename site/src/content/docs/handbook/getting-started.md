@@ -31,7 +31,7 @@ The monorepo provides top-level scripts that operate across all 14 packages:
 |---------|-------------|
 | `pnpm install` | Install all dependencies across the workspace |
 | `pnpm build` | Build all packages in dependency order |
-| `pnpm test` | Run the full test suite (1,928 tests) |
+| `pnpm test` | Run the full test suite (2,220 tests) |
 | `pnpm test:coverage` | Run tests with coverage reporting (target: 96.80%) |
 | `pnpm typecheck` | Type-check all packages with TypeScript |
 | `pnpm bench` | Run performance benchmarks |
@@ -43,7 +43,7 @@ A typical development cycle looks like:
 ```bash
 pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (1,928)
+pnpm test             # Run all tests (2,220)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages
 pnpm verify           # All three in sequence (build + typecheck + test)
