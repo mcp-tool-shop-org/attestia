@@ -20,9 +20,22 @@ export type Currency = string;
  * A precise monetary amount.
  * String representation to avoid IEEE 754 floating-point issues.
  * Use a bigint or decimal library for arithmetic.
+ *
+ * **Precision contract:** `amount` and `decimals` together declare the scale
+ * of the value, and they must be coherent — the number of fractional digits in
+ * `amount` must not exceed `decimals`. `{ amount: "100.50", decimals: 2 }` and
+ * `{ amount: "100", decimals: 6 }` are valid; `{ amount: "100.999",
+ * decimals: 2 }` is NOT, because it carries 3 fractional digits while declaring
+ * 2. Consumers scale by `10 ** decimals` to reach the canonical integer
+ * representation, so an over-precise amount would silently misround. The
+ * {@link isMoney} guard enforces this fail-closed at system boundaries.
  */
 export interface Money {
-  /** String representation of the amount (e.g., "100.50", "1000000") */
+  /**
+   * String representation of the amount (e.g., "100.50", "1000000").
+   * Must be a canonical decimal numeral with at most `decimals` fractional
+   * digits (see the precision contract on {@link Money}).
+   */
   readonly amount: string;
 
   /** Currency symbol or identifier (e.g., "USDC", "XRP", "RLUSD") */
@@ -31,6 +44,7 @@ export interface Money {
   /**
    * Number of decimal places for this currency.
    * XRP = 6 (drops), USDC = 6, ETH = 18 (wei).
+   * `amount` must not carry more fractional digits than this.
    */
   readonly decimals: number;
 }

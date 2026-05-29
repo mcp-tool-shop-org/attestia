@@ -75,6 +75,20 @@ Attestia is three systems, one truth:
 
 ---
 
+## Try it in 2 minutes
+
+The fastest way to understand Attestia is to watch one payment flow all the way through. The interactive demo runs the **full Intent → Approve → Execute → Verify → Attest → Proof** pipeline end to end — every stage computed for real against the actual domain packages (matching, hashing, XRPL-style attestation, Merkle proof), not a mock.
+
+```bash
+pnpm install   # Install all dependencies
+pnpm build     # Build all packages
+pnpm demo      # Walk the full pipeline (~10s, paced for readability)
+```
+
+You'll see a single payroll payment become an independently verifiable cryptographic proof, step by step. Add `--fast` to skip the pacing and run instantly: `pnpm demo --fast` (`pnpm demo --help` lists all flags).
+
+---
+
 ## Core Pattern
 
 Every interaction follows one flow:

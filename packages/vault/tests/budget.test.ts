@@ -185,6 +185,46 @@ describe("BudgetEngine", () => {
       expect(env.spent).toBe("0.000000");
       expect(env.available).toBe("1000.000000");
     });
+
+    it("reverses a partial spend, leaving the remainder spent", () => {
+      budget.createEnvelope("rent", "Rent");
+      budget.allocate("rent", usdc("1000"));
+      budget.spend("rent", usdc("400"));
+      const env = budget.reverseSpend("rent", usdc("150"));
+      expect(env.spent).toBe("250.000000");
+      expect(env.available).toBe("750.000000");
+    });
+
+    it("allows reversing exactly the spent amount", () => {
+      budget.createEnvelope("rent", "Rent");
+      budget.allocate("rent", usdc("1000"));
+      budget.spend("rent", usdc("400"));
+      const env = budget.reverseSpend("rent", usdc("400"));
+      expect(env.spent).toBe("0.000000");
+      expect(env.available).toBe("1000.000000");
+    });
+
+    it("rejects over-reversal that would drive spent negative", () => {
+      budget.createEnvelope("rent", "Rent");
+      budget.allocate("rent", usdc("1000"));
+      budget.spend("rent", usdc("400"));
+      // Over-reversing (e.g. double failure-handling) must not drive spent
+      // negative and inflate available beyond allocated — fail closed.
+      expect(() => budget.reverseSpend("rent", usdc("500"))).toThrow(BudgetError);
+      expect(() => budget.reverseSpend("rent", usdc("500"))).toThrow(
+        /exceed|spent/i,
+      );
+      // State must be unchanged after the rejected over-reversal.
+      const env = budget.getEnvelope("rent");
+      expect(env.spent).toBe("400.000000");
+      expect(env.available).toBe("600.000000");
+    });
+
+    it("rejects reversing from an envelope with nothing spent", () => {
+      budget.createEnvelope("rent", "Rent");
+      budget.allocate("rent", usdc("1000"));
+      expect(() => budget.reverseSpend("rent", usdc("1"))).toThrow(BudgetError);
+    });
   });
 
   // ─── Snapshot ───────────────────────────────────────────────────────

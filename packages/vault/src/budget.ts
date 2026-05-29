@@ -226,11 +226,29 @@ export class BudgetEngine {
 
   /**
    * Reverse a spend (e.g., when an intent fails or is refunded).
+   *
+   * Fails closed if {@link amount} exceeds the envelope's recorded `spent`:
+   * over-reversing (e.g. double failure-handling on the same intent) would
+   * drive `spent` negative and inflate `available` beyond `allocated`,
+   * corrupting the envelope. You can never un-spend more than was spent.
    */
   reverseSpend(envelopeId: string, amount: Money): Envelope {
     const envelope = this.getEnvelope(envelopeId);
     this.assertCurrency(amount);
     this.assertPositive(amount);
+
+    // Floor at zero: cannot reverse more than has been spent.
+    const spent: Money = {
+      amount: envelope.spent,
+      currency: this.currency,
+      decimals: this.decimals,
+    };
+    if (compareMoney(amount, spent) > 0) {
+      throw new BudgetError(
+        "INVALID_AMOUNT",
+        `Cannot reverse ${amount.amount} from '${envelopeId}': exceeds spent amount (${envelope.spent})`,
+      );
+    }
 
     const newSpent = this.subtract(envelope.spent, amount.amount);
     const newAvailable = this.subtract(envelope.allocated, newSpent);

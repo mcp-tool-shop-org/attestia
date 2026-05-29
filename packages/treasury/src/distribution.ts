@@ -50,6 +50,7 @@ export type DistributionErrorCode =
   | "PLAN_NOT_FOUND"
   | "INVALID_TRANSITION"
   | "INVALID_SHARES"
+  | "DUPLICATE_RECIPIENT"
   | "POOL_EXCEEDED"
   | "NO_RECIPIENTS";
 
@@ -87,6 +88,40 @@ export class DistributionEngine {
 
     if (recipients.length === 0) {
       throw new DistributionError("NO_RECIPIENTS", `Plan '${id}' must have at least one recipient`);
+    }
+
+    // Reject duplicate payeeIds: on execute they collide on correlationId
+    // (`distribution:${plan.id}:${payeeId}`) and would silently double-credit.
+    const seen = new Set<string>();
+    for (const r of recipients) {
+      if (seen.has(r.payeeId)) {
+        throw new DistributionError(
+          "DUPLICATE_RECIPIENT",
+          `Plan '${id}' has duplicate recipient payeeId '${r.payeeId}'`,
+        );
+      }
+      seen.add(r.payeeId);
+    }
+
+    // Validate every individual share before it flows into BigInt(share) and
+    // bigint arithmetic during resolution. A fractional value throws an opaque
+    // RangeError in BigInt(); a negative mints a negative payout; NaN/Infinity
+    // corrupt the math. For proportional/milestone, share is basis points and
+    // must also be ≤ 10000. For fixed, share is an absolute amount (unbounded).
+    const boundShares = strategy === "proportional" || strategy === "milestone";
+    for (const r of recipients) {
+      if (!Number.isInteger(r.share) || r.share < 0) {
+        throw new DistributionError(
+          "INVALID_SHARES",
+          `Recipient '${r.payeeId}' has invalid share ${String(r.share)}: must be a non-negative integer`,
+        );
+      }
+      if (boundShares && r.share > 10000) {
+        throw new DistributionError(
+          "INVALID_SHARES",
+          `Recipient '${r.payeeId}' has invalid share ${String(r.share)}: basis points must not exceed 10000`,
+        );
+      }
     }
 
     // Validate proportional shares
