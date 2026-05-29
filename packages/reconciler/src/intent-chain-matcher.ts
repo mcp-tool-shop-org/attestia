@@ -12,6 +12,8 @@
  */
 
 import { parseAmount, formatAmount } from "@attestia/ledger";
+import { makeDiscrepancy } from "./discrepancy.js";
+import type { Discrepancy } from "./discrepancy.js";
 import type {
   IntentChainMatch,
   ReconcilableIntent,
@@ -52,14 +54,17 @@ export class IntentChainMatcher {
       const events = byTxHash.get(intent.txHash);
 
       if (!events || events.length === 0) {
+        const msg =
+          `Intent ${intent.id} executed with txHash ${intent.txHash} but no on-chain event found`;
         results.push({
           intentId: intent.id,
           txHash: intent.txHash,
           ...(intent.chainId ? { chainId: intent.chainId } : {}),
           status: "missing-chain",
           ...(intent.amount ? { intentAmount: intent.amount } : {}),
-          discrepancies: [
-            `Intent ${intent.id} executed with txHash ${intent.txHash} but no on-chain event found`,
+          discrepancies: [msg],
+          structuredDiscrepancies: [
+            makeDiscrepancy("MISSING_CHAIN", "presence", msg),
           ],
         });
         continue;
@@ -74,6 +79,9 @@ export class IntentChainMatcher {
         );
 
         if (!matchingEvent) {
+          const expected = intent.amount.currency;
+          const actual = events[0]!.symbol;
+          const msg = `Currency mismatch: intent=${expected} chain=${actual}`;
           results.push({
             intentId: intent.id,
             txHash: intent.txHash,
@@ -82,8 +90,9 @@ export class IntentChainMatcher {
             intentAmount: intent.amount,
             chainAmount: events[0]!.amount,
             chainDecimals: events[0]!.decimals,
-            discrepancies: [
-              `Currency mismatch: intent=${intent.amount.currency} chain=${events[0]!.symbol}`,
+            discrepancies: [msg],
+            structuredDiscrepancies: [
+              makeDiscrepancy("CURRENCY_MISMATCH", "currency", msg, { expected, actual }),
             ],
           });
           continue;
@@ -93,14 +102,18 @@ export class IntentChainMatcher {
         const chainRaw = BigInt(matchingEvent.amount);
 
         const discrepancies: string[] = [];
+        const structuredDiscrepancies: Discrepancy[] = [];
         let amountMatches: boolean;
 
         if (intent.amount.decimals === matchingEvent.decimals) {
           amountMatches = intentRaw === chainRaw;
           if (!amountMatches) {
-            discrepancies.push(
-              `Amount mismatch: intent=${formatAmount(intentRaw, intent.amount.decimals)} ` +
-              `chain=${formatAmount(chainRaw, matchingEvent.decimals)}`,
+            const expected = formatAmount(intentRaw, intent.amount.decimals);
+            const actual = formatAmount(chainRaw, matchingEvent.decimals);
+            const msg = `Amount mismatch: intent=${expected} chain=${actual}`;
+            discrepancies.push(msg);
+            structuredDiscrepancies.push(
+              makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
             );
           }
         } else {
@@ -109,9 +122,12 @@ export class IntentChainMatcher {
           const cNorm = chainRaw * 10n ** BigInt(maxDec - matchingEvent.decimals);
           amountMatches = iNorm === cNorm;
           if (!amountMatches) {
-            discrepancies.push(
-              `Amount mismatch (cross-decimal): intent=${formatAmount(intentRaw, intent.amount.decimals)} ` +
-              `chain=${formatAmount(chainRaw, matchingEvent.decimals)}`,
+            const expected = formatAmount(intentRaw, intent.amount.decimals);
+            const actual = formatAmount(chainRaw, matchingEvent.decimals);
+            const msg = `Amount mismatch (cross-decimal): intent=${expected} chain=${actual}`;
+            discrepancies.push(msg);
+            structuredDiscrepancies.push(
+              makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
             );
           }
         }
@@ -125,6 +141,7 @@ export class IntentChainMatcher {
           chainAmount: matchingEvent.amount,
           chainDecimals: matchingEvent.decimals,
           discrepancies,
+          structuredDiscrepancies,
         });
       } else {
         // Intent has no amount — just verify chain event exists
@@ -136,6 +153,7 @@ export class IntentChainMatcher {
           chainAmount: events[0]!.amount,
           chainDecimals: events[0]!.decimals,
           discrepancies: [],
+          structuredDiscrepancies: [],
         });
       }
     }
@@ -152,6 +170,8 @@ export class IntentChainMatcher {
       if (reportedOrphanTxHashes.has(event.txHash)) continue;
       reportedOrphanTxHashes.add(event.txHash);
 
+      const msg =
+        `Chain event ${event.txHash} (${event.amount} ${event.symbol}) has no matching intent`;
       results.push({
         intentId: "", // no intent declared this transfer
         txHash: event.txHash,
@@ -159,8 +179,9 @@ export class IntentChainMatcher {
         status: "missing-intent",
         chainAmount: event.amount,
         chainDecimals: event.decimals,
-        discrepancies: [
-          `Chain event ${event.txHash} (${event.amount} ${event.symbol}) has no matching intent`,
+        discrepancies: [msg],
+        structuredDiscrepancies: [
+          makeDiscrepancy("MISSING_INTENT", "presence", msg),
         ],
       });
     }

@@ -10,19 +10,30 @@
  */
 
 import type { Money, ChainId, TxHash } from "@attestia/types";
+import type { Discrepancy } from "./discrepancy.js";
 
 // =============================================================================
 // Match Results
 // =============================================================================
 
-/** A single match between an intent and its ledger trace. */
+/**
+ * A single match between an intent and its ledger trace.
+ *
+ * `discrepancies` is the legacy human-readable prose (kept for backward
+ * compatibility); `structuredDiscrepancies` is the machine-readable companion
+ * (D4-B-002). The two are in lockstep — every prose string has a structured
+ * counterpart with the same `message`.
+ */
 export interface IntentLedgerMatch {
   readonly intentId: string;
   readonly correlationId: string;
   readonly status: MatchStatus;
   readonly intentAmount?: Money;
   readonly ledgerAmount?: Money;
+  /** Human-readable prose (legacy; preserved for existing consumers). */
   readonly discrepancies: readonly string[];
+  /** Machine-readable discrepancies (D4-B-002). */
+  readonly structuredDiscrepancies: readonly Discrepancy[];
 }
 
 /** A single match between a ledger entry and an on-chain event. */
@@ -34,7 +45,10 @@ export interface LedgerChainMatch {
   readonly ledgerAmount?: Money;
   readonly chainAmount?: string;
   readonly chainDecimals?: number;
+  /** Human-readable prose (legacy; preserved for existing consumers). */
   readonly discrepancies: readonly string[];
+  /** Machine-readable discrepancies (D4-B-002). */
+  readonly structuredDiscrepancies: readonly Discrepancy[];
 }
 
 /** A single match between an intent and its on-chain execution. */
@@ -46,7 +60,10 @@ export interface IntentChainMatch {
   readonly intentAmount?: Money;
   readonly chainAmount?: string;
   readonly chainDecimals?: number;
+  /** Human-readable prose (legacy; preserved for existing consumers). */
   readonly discrepancies: readonly string[];
+  /** Machine-readable discrepancies (D4-B-002). */
+  readonly structuredDiscrepancies: readonly Discrepancy[];
 }
 
 export type MatchStatus =
@@ -103,7 +120,15 @@ export interface ReconciliationSummary {
   readonly missingCount: number;
 
   readonly allReconciled: boolean;
+  /** Human-readable prose, flattened across all matches (legacy). */
   readonly discrepancies: readonly string[];
+  /** Machine-readable discrepancies, flattened across all matches (D4-B-002). */
+  readonly structuredDiscrepancies: readonly Discrepancy[];
+  /**
+   * Discrepancy counts aggregated by {@link Discrepancy.code}. Absent codes are
+   * omitted (no zero entries). Suitable for charting or metric emission.
+   */
+  readonly discrepancyCountsByCode: Readonly<Record<string, number>>;
 }
 
 // =============================================================================

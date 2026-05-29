@@ -16,7 +16,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import type { AttestiaClientConfig } from "./types.js";
+import type { AttestiaClientConfig, AttestiaErrorDetails } from "./types.js";
 import { AttestiaError } from "./types.js";
 
 // =============================================================================
@@ -191,13 +191,14 @@ export class HttpClient {
     // Error handling
     if (response.status >= 400 && response.status < 500) {
       const errorBody = responseBody as {
-        error?: { code?: string; message?: string; details?: unknown };
+        error?: { code?: string; message?: string; hint?: string; details?: AttestiaErrorDetails };
       };
       throw new AttestiaError(
         errorBody.error?.code ?? "CLIENT_ERROR",
         errorBody.error?.message ?? `HTTP ${response.status}`,
         response.status,
         errorBody.error?.details,
+        errorBody.error?.hint,
       );
     }
 
@@ -282,13 +283,14 @@ export class HttpClient {
         // 4xx → don't retry (client errors)
         if (response.status >= 400 && response.status < 500) {
           const errorBody = responseBody as {
-            error?: { code?: string; message?: string; details?: unknown };
+            error?: { code?: string; message?: string; hint?: string; details?: AttestiaErrorDetails };
           };
           throw new AttestiaError(
             errorBody.error?.code ?? "CLIENT_ERROR",
             errorBody.error?.message ?? `HTTP ${response.status}`,
             response.status,
             errorBody.error?.details,
+            errorBody.error?.hint,
           );
         }
 

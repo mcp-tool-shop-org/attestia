@@ -22,7 +22,8 @@ import {
   isNegative,
   compareMoney,
 } from "@attestia/ledger";
-import type { Money, Currency } from "@attestia/types";
+import type { Money, Currency, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type { Envelope, BudgetSnapshot } from "./types.js";
 
 // =============================================================================
@@ -54,11 +55,23 @@ export class BudgetEngine {
   private readonly ownerId: string;
   private readonly currency: Currency;
   private readonly decimals: number;
+  private readonly telemetry: Telemetry;
 
-  constructor(ownerId: string, currency: Currency, decimals: number) {
+  /**
+   * @param telemetry Optional observability sink (D4-B-001). Defaults to
+   *   {@link NOOP_TELEMETRY}, so budgeting stays silent unless a host injects a
+   *   sink. Raw amounts/ids go in event `message`, never `attributes`.
+   */
+  constructor(
+    ownerId: string,
+    currency: Currency,
+    decimals: number,
+    telemetry: Telemetry = NOOP_TELEMETRY,
+  ) {
     this.ownerId = ownerId;
     this.currency = currency;
     this.decimals = decimals;
+    this.telemetry = telemetry;
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -221,6 +234,17 @@ export class BudgetEngine {
     };
 
     this.envelopes.set(envelopeId, updated);
+
+    // Raw envelope id + amount live in `message` (high-cardinality); attributes
+    // stay empty to remain metric-safe.
+    this.telemetry.record({
+      package: "@attestia/vault",
+      op: "budget.spend",
+      level: "info",
+      outcome: "ok",
+      message: `spent ${amount.amount} ${amount.currency} from envelope '${envelopeId}' (available ${newAvailable})`,
+    });
+
     return updated;
   }
 
@@ -260,6 +284,15 @@ export class BudgetEngine {
     };
 
     this.envelopes.set(envelopeId, updated);
+
+    this.telemetry.record({
+      package: "@attestia/vault",
+      op: "budget.reverse",
+      level: "info",
+      outcome: "ok",
+      message: `reversed ${amount.amount} ${amount.currency} on envelope '${envelopeId}' (available ${newAvailable})`,
+    });
+
     return updated;
   }
 
@@ -295,13 +328,18 @@ export class BudgetEngine {
   }
 
   /**
-   * Restore from a snapshot.
+   * Restore from a snapshot. An optional telemetry sink can be re-attached to
+   * the restored engine (snapshots carry no sink — it is a runtime concern).
    */
-  static fromSnapshot(snapshot: BudgetSnapshot): BudgetEngine {
+  static fromSnapshot(
+    snapshot: BudgetSnapshot,
+    telemetry: Telemetry = NOOP_TELEMETRY,
+  ): BudgetEngine {
     const engine = new BudgetEngine(
       snapshot.ownerId,
       snapshot.currency,
       snapshot.envelopes[0]?.decimals ?? 6,
+      telemetry,
     );
 
     for (const env of snapshot.envelopes) {

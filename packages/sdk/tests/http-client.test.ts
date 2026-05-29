@@ -273,6 +273,42 @@ describe("HttpClient error handling", () => {
     }
   });
 
+  it("surfaces the actionable hint and typed validation issues on 4xx (D6-B-014)", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "The request was invalid.",
+            hint: "Check the request body against the API schema, then retry.",
+            details: { issues: [{ path: "body.amount", message: "Required" }] },
+          },
+        },
+      },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 0,
+    });
+
+    try {
+      await client.post("/api/v1/items", {});
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AttestiaError);
+      const e = error as AttestiaError;
+      expect(e.hint).toBe(
+        "Check the request body against the API schema, then retry.",
+      );
+      // details.issues is now typed (ValidationIssue[]) — no cast required.
+      expect(e.details?.issues?.[0]?.path).toBe("body.amount");
+      expect(e.details?.issues?.[0]?.message).toBe("Required");
+    }
+  });
+
   it("does not retry on 4xx errors", async () => {
     const mockFetch = createMockFetch([
       { status: 404, body: { error: { code: "NOT_FOUND", message: "Not found" } } },

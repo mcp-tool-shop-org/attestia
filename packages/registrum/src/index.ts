@@ -25,6 +25,7 @@ export type {
   Invariant,
   ViolationClassification,
   InvariantViolation,
+  InvariantViolationDetails,
   RegistrationResult,
   ValidationReport,
   InvariantDescriptor,
@@ -36,7 +37,11 @@ export type { Registrar } from "./registrar.js";
 export { isState, isTransition, toInvariantInput } from "./registrar.js";
 
 // Implementation
-export { StructuralRegistrar, ParityViolationError } from "./structural-registrar.js";
+export {
+  StructuralRegistrar,
+  ParityViolationError,
+  AppendOnlyViolationError,
+} from "./structural-registrar.js";
 export type {
   RegistrarMode,
   ParityStatus,

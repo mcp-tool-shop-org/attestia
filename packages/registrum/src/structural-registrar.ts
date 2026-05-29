@@ -33,6 +33,7 @@ import type {
 import type { Registrar } from "./registrar.js";
 import { isState, isTransition } from "./registrar.js";
 import { INITIAL_INVARIANTS } from "./invariants.js";
+import { enrichViolation, type ViolationOperands } from "./violation-detail.js";
 import type { CompiledInvariantRegistry } from "./registry/loader.js";
 import { evaluatePredicate } from "./registry/predicate/evaluator.js";
 import type { EvaluationContext } from "./registry/predicate/evaluator.js";
@@ -46,6 +47,11 @@ import {
   rehydrate,
   type RehydrationOptions,
 } from "./persistence/rehydrator.js";
+import {
+  type Telemetry,
+  type ObservabilityEvent,
+  NOOP_TELEMETRY,
+} from "@attestia/types";
 
 /**
  * Registrar mode.
@@ -80,6 +86,12 @@ export type ParityStatus = "AGREED" | "HALTED";
  * right. No state is mutated when this is thrown.
  */
 export class ParityViolationError extends Error {
+  /**
+   * Stable error code: `"PARITY_HALT"`. Part of the public contract — this is
+   * a HALT-class corruption signal callers may switch on.
+   */
+  readonly code = "PARITY_HALT" as const;
+
   constructor(
     message: string,
     public readonly registryOutcome: string,
@@ -87,6 +99,36 @@ export class ParityViolationError extends Error {
   ) {
     super(`[HALT] Dual-witness parity violation: ${message}`);
     this.name = "ParityViolationError";
+  }
+}
+
+/**
+ * Thrown when the append-only history would be corrupted by reusing a composite
+ * version key (`stateId#orderIndex`).
+ *
+ * The monotonic order counter makes this structurally impossible under normal
+ * operation, so reaching it means the registrar's internal state is corrupt
+ * (e.g. a bad rehydration or a counter that was rewound). Like
+ * {@link ParityViolationError}, this is a HALT-class corruption signal: it is
+ * NOT an ordinary rejection verdict, it means the constitution's append-only
+ * guarantee was about to be broken. The offending `versionKey` is carried for
+ * diagnostics; no state is mutated when this is thrown.
+ */
+export class AppendOnlyViolationError extends Error {
+  /**
+   * Stable error code: `"APPEND_ONLY_VIOLATION"`. Part of the public contract —
+   * a HALT-class corruption signal callers may switch on.
+   */
+  readonly code = "APPEND_ONLY_VIOLATION" as const;
+
+  constructor(
+    /** The composite version key (`stateId#orderIndex`) that already existed. */
+    public readonly versionKey: string
+  ) {
+    super(
+      `[HALT] Append-only violation: version key '${versionKey}' already exists`
+    );
+    this.name = "AppendOnlyViolationError";
   }
 }
 
@@ -133,6 +175,29 @@ function makeVersionKey(id: StateID, orderIndex: number): string {
 }
 
 /**
+ * Current wall-clock time in milliseconds. Dependency-free; used only to measure
+ * `durationMs` for telemetry. Never affects a verdict.
+ */
+function now(): number {
+  return Date.now();
+}
+
+/**
+ * Extract a LOW-CARDINALITY error identifier for a telemetry attribute: the
+ * stable `code` if the error carries one (per D1-B-005), otherwise the class
+ * name. Never the message (which is unbounded and belongs in `message`).
+ */
+function errorCode(e: unknown): string {
+  if (typeof e === "object" && e !== null) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+    const name = (e as { name?: unknown }).name;
+    if (typeof name === "string") return name;
+  }
+  return "UNKNOWN";
+}
+
+/**
  * StructuralRegistrar configuration options.
  */
 export interface StructuralRegistrarOptions {
@@ -154,6 +219,17 @@ export interface StructuralRegistrarOptions {
    * Compiled registry (required when mode is "registry" or "dual").
    */
   readonly compiledRegistry?: CompiledInvariantRegistry;
+
+  /**
+   * Optional observability sink (D1-B-002).
+   *
+   * When supplied, the registrar records structured events for `register`,
+   * `validate`, and degraded `predicate.eval` (a predicate that threw and was
+   * coerced to false). Defaults to {@link NOOP_TELEMETRY}, so observability is
+   * opt-in and imposes no cost on callers that don't want it. `record` MUST NOT
+   * throw — telemetry never affects a verdict.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -167,6 +243,10 @@ export interface DualWitnessOptions {
    * Defaults to the canonical INITIAL_INVARIANTS.
    */
   readonly invariants?: readonly Invariant[];
+  /**
+   * Optional observability sink (see {@link StructuralRegistrarOptions.telemetry}).
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -228,6 +308,13 @@ export class StructuralRegistrar implements Registrar {
   private readonly compiledRegistry: CompiledInvariantRegistry | null;
 
   /**
+   * Observability sink (D1-B-002). Defaults to {@link NOOP_TELEMETRY}.
+   * All emission goes through {@link emit}, which additionally guards against a
+   * misbehaving sink so telemetry can NEVER affect a verdict.
+   */
+  private readonly telemetry: Telemetry;
+
+  /**
    * Parity status of the most recent register()/validate() in dual mode.
    * Reflects the ACTUAL witness comparison (not an input). Null until the
    * first dual-mode operation; remains null in single-witness modes.
@@ -238,6 +325,7 @@ export class StructuralRegistrar implements Registrar {
     this.mode = options.mode ?? "registry";
     this.invariants = options.invariants ?? INITIAL_INVARIANTS;
     this.compiledRegistry = options.compiledRegistry ?? null;
+    this.telemetry = options.telemetry ?? NOOP_TELEMETRY;
 
     // Validate registry mode has required registry
     if (this.mode === "registry" && !this.compiledRegistry) {
@@ -251,6 +339,21 @@ export class StructuralRegistrar implements Registrar {
       throw new Error(
         "StructuralRegistrar: dual mode requires compiledRegistry option"
       );
+    }
+  }
+
+  /**
+   * Emit a telemetry event, guarding against a misbehaving sink.
+   *
+   * The {@link Telemetry} contract states `record` MUST NOT throw, but a buggy
+   * host sink might. Observability must never break the operation it observes,
+   * so we swallow any sink error here — a verdict is never lost to telemetry.
+   */
+  private emit(event: ObservabilityEvent): void {
+    try {
+      this.telemetry.record(event);
+    } catch {
+      /* a misbehaving sink must never affect a verdict — intentionally ignored */
     }
   }
 
@@ -272,6 +375,9 @@ export class StructuralRegistrar implements Registrar {
       mode: "dual",
       compiledRegistry: options.compiledRegistry,
       invariants: options.invariants ?? INITIAL_INVARIANTS,
+      ...(options.telemetry !== undefined
+        ? { telemetry: options.telemetry }
+        : {}),
     });
   }
 
@@ -369,14 +475,43 @@ export class StructuralRegistrar implements Registrar {
    * - Rejection with all violations
    */
   register(transition: Transition): RegistrationResult {
-    // Delegate to mode-specific implementation
-    if (this.mode === "dual") {
-      return this.registerWithDualWitness(transition);
+    const start = now();
+    try {
+      // Delegate to mode-specific implementation.
+      const result =
+        this.mode === "dual"
+          ? this.registerWithDualWitness(transition)
+          : this.mode === "registry"
+            ? this.registerWithRegistry(transition)
+            : this.registerWithLegacy(transition);
+
+      // A completed verdict (accepted OR rejected) means the operation worked:
+      // the registrar produced its structured answer. `outcome` is "ok"; the
+      // accepted/rejected distinction rides in a low-cardinality attribute.
+      this.emit({
+        package: "@attestia/registrum",
+        op: "register",
+        level: "info",
+        outcome: "ok",
+        durationMs: now() - start,
+        attributes: { mode: this.mode, result: result.kind },
+      });
+      return result;
+    } catch (e) {
+      // A thrown error here is a HALT-class corruption signal (parity divergence
+      // or append-only violation), not an ordinary refusal — record it as
+      // failed. `record` never throws, so this cannot mask the original error.
+      this.emit({
+        package: "@attestia/registrum",
+        op: "register",
+        level: "error",
+        outcome: "failed",
+        durationMs: now() - start,
+        attributes: { mode: this.mode, error: errorCode(e) },
+        message: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
     }
-    if (this.mode === "registry") {
-      return this.registerWithRegistry(transition);
-    }
-    return this.registerWithLegacy(transition);
   }
 
   /**
@@ -476,11 +611,14 @@ export class StructuralRegistrar implements Registrar {
       if (!invariant.predicate(input)) {
         const classification =
           invariant.failureMode === "halt" ? "HALT" : "REJECT";
-        violations.push({
-          invariantId: invariant.id,
-          classification,
-          message: `Invariant violation: ${invariant.description}`,
-        });
+        violations.push(
+          this.makeViolation(
+            invariant.id,
+            invariant.description,
+            classification,
+            this.registrationOperands(transition)
+          )
+        );
         if (invariant.failureMode === "halt") shouldHalt = true;
       }
     }
@@ -511,14 +649,17 @@ export class StructuralRegistrar implements Registrar {
     for (const invariant of registry.invariants) {
       appliedInvariants.push(invariant.id);
 
-      if (!evaluatePredicate(invariant.ast, context)) {
+      if (!evaluatePredicate(invariant.ast, context, this.telemetry, invariant.id)) {
         const classification =
           invariant.failure_mode === "halt" ? "HALT" : "REJECT";
-        violations.push({
-          invariantId: invariant.id,
-          classification,
-          message: `Invariant violation: ${invariant.description}`,
-        });
+        violations.push(
+          this.makeViolation(
+            invariant.id,
+            invariant.description,
+            classification,
+            this.registrationOperands(transition)
+          )
+        );
         if (invariant.failure_mode === "halt") shouldHalt = true;
       }
     }
@@ -641,9 +782,7 @@ export class StructuralRegistrar implements Registrar {
     // An identical versionKey would mean the order index was reused, which the
     // monotonic counter forbids; guard against it as a fail-closed invariant.
     if (this.versionsByKey.has(versionKey)) {
-      throw new Error(
-        `Append-only violation: version key '${versionKey}' already exists`
-      );
+      throw new AppendOnlyViolationError(versionKey);
     }
     this.versionsByKey.set(versionKey, registeredState);
 
@@ -656,6 +795,67 @@ export class StructuralRegistrar implements Registrar {
       orderIndex,
       appliedInvariants,
     };
+  }
+
+  /**
+   * Assemble the normalized {@link ViolationOperands} for a registration-scope
+   * evaluation of `transition` against the current frontier. Shared by both
+   * engines so their enriched messages/details are identical (parity-safe).
+   */
+  private registrationOperands(transition: Transition): ViolationOperands {
+    return {
+      from: transition.from,
+      toId: transition.to.id,
+      isRoot: transition.to.structure["isRoot"] === true,
+      parentRegistered:
+        transition.from !== null && this.latestById.has(transition.from),
+      idAlreadyRegistered: this.latestById.has(transition.to.id),
+      orderIndex: this.currentOrderIndex,
+    };
+  }
+
+  /**
+   * Operands for a transition-scope evaluation (no registration context, so the
+   * registry-membership/order fields are omitted).
+   */
+  private transitionOperands(transition: Transition): ViolationOperands {
+    return {
+      from: transition.from,
+      toId: transition.to.id,
+      isRoot: transition.to.structure["isRoot"] === true,
+    };
+  }
+
+  /**
+   * Operands for a pure state-scope evaluation (only the id is meaningful).
+   */
+  private stateOperands(state: State): ViolationOperands {
+    return {
+      toId: state.id,
+      isRoot: state.structure["isRoot"] === true,
+    };
+  }
+
+  /**
+   * Build a single enriched {@link InvariantViolation}: value-interpolated
+   * message + structured `details` when the operands are known. Centralizes the
+   * call to {@link enrichViolation} so every site stays consistent.
+   */
+  private makeViolation(
+    invariantId: string,
+    description: string,
+    classification: "REJECT" | "HALT",
+    operands: ViolationOperands
+  ): InvariantViolation {
+    const enriched = enrichViolation(invariantId, description, operands);
+    return enriched.details !== undefined
+      ? {
+          invariantId,
+          classification,
+          message: enriched.message,
+          details: enriched.details,
+        }
+      : { invariantId, classification, message: enriched.message };
   }
 
   /**
@@ -697,13 +897,37 @@ export class StructuralRegistrar implements Registrar {
    * Does not modify registrar state.
    */
   validate(target: State | Transition): ValidationReport {
-    if (this.mode === "dual") {
-      return this.validateWithDualWitness(target);
+    const start = now();
+    try {
+      const report =
+        this.mode === "dual"
+          ? this.validateWithDualWitness(target)
+          : this.mode === "registry"
+            ? this.validateWithRegistry(target)
+            : this.validateWithLegacy(target);
+
+      this.emit({
+        package: "@attestia/registrum",
+        op: "validate",
+        level: "info",
+        outcome: "ok",
+        durationMs: now() - start,
+        attributes: { mode: this.mode, valid: report.valid },
+      });
+      return report;
+    } catch (e) {
+      // Thrown here means a dual-witness parity HALT — fail-closed and observable.
+      this.emit({
+        package: "@attestia/registrum",
+        op: "validate",
+        level: "error",
+        outcome: "failed",
+        durationMs: now() - start,
+        attributes: { mode: this.mode, error: errorCode(e) },
+        message: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
     }
-    if (this.mode === "registry") {
-      return this.validateWithRegistry(target);
-    }
-    return this.validateWithLegacy(target);
   }
 
   /**
@@ -751,11 +975,14 @@ export class StructuralRegistrar implements Registrar {
         if (invariant.scope === "state") {
           const passed = invariant.predicate(stateInput);
           if (!passed) {
-            violations.push({
-              invariantId: invariant.id,
-              classification: invariant.failureMode === "halt" ? "HALT" : "REJECT",
-              message: `Invariant violation: ${invariant.description}`,
-            });
+            violations.push(
+              this.makeViolation(
+                invariant.id,
+                invariant.description,
+                invariant.failureMode === "halt" ? "HALT" : "REJECT",
+                this.stateOperands(target)
+              )
+            );
           }
         }
       }
@@ -785,11 +1012,14 @@ export class StructuralRegistrar implements Registrar {
         if (input) {
           const passed = invariant.predicate(input);
           if (!passed) {
-            violations.push({
-              invariantId: invariant.id,
-              classification: invariant.failureMode === "halt" ? "HALT" : "REJECT",
-              message: `Invariant violation: ${invariant.description}`,
-            });
+            violations.push(
+              this.makeViolation(
+                invariant.id,
+                invariant.description,
+                invariant.failureMode === "halt" ? "HALT" : "REJECT",
+                this.transitionOperands(target)
+              )
+            );
           }
         }
       }
@@ -814,13 +1044,16 @@ export class StructuralRegistrar implements Registrar {
       for (const invariant of registry.invariants) {
         if (invariant.scope !== "state") continue;
 
-        const passed = evaluatePredicate(invariant.ast, context);
+        const passed = evaluatePredicate(invariant.ast, context, this.telemetry, invariant.id);
         if (!passed) {
-          violations.push({
-            invariantId: invariant.id,
-            classification: invariant.failure_mode === "halt" ? "HALT" : "REJECT",
-            message: `Invariant violation: ${invariant.description}`,
-          });
+          violations.push(
+            this.makeViolation(
+              invariant.id,
+              invariant.description,
+              invariant.failure_mode === "halt" ? "HALT" : "REJECT",
+              this.stateOperands(target)
+            )
+          );
         }
       }
     } else if (isTransition(target)) {
@@ -831,13 +1064,16 @@ export class StructuralRegistrar implements Registrar {
           continue;
         }
 
-        const passed = evaluatePredicate(invariant.ast, context);
+        const passed = evaluatePredicate(invariant.ast, context, this.telemetry, invariant.id);
         if (!passed) {
-          violations.push({
-            invariantId: invariant.id,
-            classification: invariant.failure_mode === "halt" ? "HALT" : "REJECT",
-            message: `Invariant violation: ${invariant.description}`,
-          });
+          violations.push(
+            this.makeViolation(
+              invariant.id,
+              invariant.description,
+              invariant.failure_mode === "halt" ? "HALT" : "REJECT",
+              this.transitionOperands(target)
+            )
+          );
         }
       }
     }

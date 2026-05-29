@@ -40,7 +40,8 @@ import {
 } from "node:fs";
 import { constants } from "node:fs";
 import { basename, dirname } from "node:path";
-import type { DomainEvent } from "@attestia/types";
+import type { DomainEvent, Telemetry, ObservabilityEvent } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type {
   AppendOptions,
   AppendResult,
@@ -76,6 +77,17 @@ export interface JsonlEventStoreOptions {
    * @default true
    */
   readonly verifyOnLoad?: boolean;
+
+  /**
+   * Optional telemetry sink. When provided, the store emits structured
+   * {@link Telemetry} events (package `"@attestia/event-store"`) at the
+   * operationally-critical points: load, integrity verify, append, and lock
+   * acquisition. Emission is best-effort and never affects store behavior —
+   * `record` is contractually non-throwing.
+   *
+   * @default NOOP_TELEMETRY (no events emitted)
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -130,6 +142,9 @@ export class JsonlEventStore implements EventStore {
   /** Path to the lockfile for concurrent append protection */
   private readonly _lockPath: string;
 
+  /** Injected telemetry sink (defaults to a no-op; never throws). */
+  private readonly _telemetry: Telemetry;
+
   /**
    * Create a new JsonlEventStore.
    *
@@ -140,20 +155,41 @@ export class JsonlEventStore implements EventStore {
   constructor(options: JsonlEventStoreOptions) {
     this._filePath = options.filePath;
     this._lockPath = this._filePath + ".lock";
+    this._telemetry = options.telemetry ?? NOOP_TELEMETRY;
 
     // Ensure parent directory exists
     const dir = dirname(this._filePath);
     mkdirSync(dir, { recursive: true });
 
-    // Load existing events from file
-    this._loadFromFile();
+    // Load existing events from file (timed for observability)
+    const loadStart = Date.now();
+    const { eventsLoaded, skippedLines } = this._loadFromFile();
+    this._emit({
+      op: "load",
+      level: "info",
+      outcome: "ok",
+      durationMs: Date.now() - loadStart,
+      attributes: { eventsLoaded, skippedLines },
+      message: `loaded ${eventsLoaded} event(s) from ${basename(this._filePath)}`,
+    });
 
     // Fail-closed: unless explicitly opted out, verify the hash chain on load
     // so a tampered or truncated log refuses to open rather than silently
     // serving corrupt history.
     const verifyOnLoad = options.verifyOnLoad ?? true;
     if (verifyOnLoad) {
+      const verifyStart = Date.now();
       const result = verifyHashChain(this._globalLog);
+      this._emit({
+        op: "verify",
+        level: result.valid ? "info" : "error",
+        outcome: result.valid ? "ok" : "failed",
+        durationMs: Date.now() - verifyStart,
+        attributes: { valid: result.valid, errorCount: result.errors.length },
+        message: result.valid
+          ? `hash chain verified (${this._globalLog.length} event(s))`
+          : `hash chain verification failed with ${result.errors.length} error(s)`,
+      });
       if (!result.valid) {
         const first = result.errors[0];
         const detail = first !== undefined
@@ -187,6 +223,7 @@ export class JsonlEventStore implements EventStore {
     events: readonly DomainEvent[],
     options?: AppendOptions,
   ): AppendResult {
+    const appendStart = Date.now();
     this._validateStreamId(streamId);
 
     if (events.length === 0) {
@@ -292,6 +329,19 @@ export class JsonlEventStore implements EventStore {
 
       // Dispatch to subscribers
       this._dispatch(streamId, storedEvents);
+
+      // Emit after the durable commit + dispatch so globalPosition reflects the
+      // committed head. durationMs covers validation → write+fsync → commit.
+      this._emit({
+        op: "append",
+        level: "info",
+        outcome: "ok",
+        durationMs: Date.now() - appendStart,
+        attributes: {
+          count: events.length,
+          globalPosition: this._nextGlobalPosition - 1,
+        },
+      });
 
       return {
         streamId,
@@ -434,6 +484,19 @@ export class JsonlEventStore implements EventStore {
 
   // ─── Internal ───────────────────────────────────────────────────────
 
+  /**
+   * Emit a telemetry event tagged with this package. Best-effort: the
+   * {@link Telemetry} contract forbids `record` from throwing, but we guard
+   * defensively so a misbehaving sink can never break a store operation.
+   */
+  private _emit(event: Omit<ObservabilityEvent, "package">): void {
+    try {
+      this._telemetry.record({ package: "@attestia/event-store", ...event });
+    } catch {
+      // Observability must never break the operation it observes.
+    }
+  }
+
   private _validateStreamId(streamId: string): void {
     if (streamId.length === 0) {
       throw new EventStoreError(
@@ -453,10 +516,16 @@ export class JsonlEventStore implements EventStore {
    * (for chain verification). Legacy files without these fields
    * are loaded normally — chain verification starts from the first
    * hashed event.
+   *
+   * @returns load statistics for observability: number of events loaded and
+   *   number of non-empty lines skipped (corrupt JSON or missing fields).
    */
-  private _loadFromFile(): void {
+  private _loadFromFile(): { eventsLoaded: number; skippedLines: number } {
+    let eventsLoaded = 0;
+    let skippedLines = 0;
+
     if (!existsSync(this._filePath)) {
-      return;
+      return { eventsLoaded, skippedLines };
     }
 
     const content = readFileSync(this._filePath, "utf-8");
@@ -473,6 +542,7 @@ export class JsonlEventStore implements EventStore {
         record = JSON.parse(trimmed) as JsonlRecord;
       } catch {
         // Corrupt/partial line — skip (crash safety)
+        skippedLines++;
         continue;
       }
 
@@ -483,6 +553,7 @@ export class JsonlEventStore implements EventStore {
         typeof record.globalPosition !== "number" ||
         record.event === undefined
       ) {
+        skippedLines++;
         continue;
       }
 
@@ -524,7 +595,11 @@ export class JsonlEventStore implements EventStore {
       if (stored.globalPosition >= this._nextGlobalPosition) {
         this._nextGlobalPosition = stored.globalPosition + 1;
       }
+
+      eventsLoaded++;
     }
+
+    return { eventsLoaded, skippedLines };
   }
 
   /**
@@ -537,7 +612,9 @@ export class JsonlEventStore implements EventStore {
   private _acquireLock(): void {
     const maxWaitMs = 5_000;
     const spinMs = 5;
-    const deadline = Date.now() + maxWaitMs;
+    const lockStart = Date.now();
+    const deadline = lockStart + maxWaitMs;
+    let contended = false;
 
     while (true) {
       try {
@@ -546,12 +623,30 @@ export class JsonlEventStore implements EventStore {
         // Write PID for debugging stale locks
         writeFileSync(fd, String(process.pid), "utf-8");
         closeSync(fd);
+        this._emit({
+          op: "lock.acquire",
+          // Promote to debug-with-attribute only when we actually waited; an
+          // uncontended acquire is the common case and stays low-noise.
+          level: "debug",
+          outcome: "ok",
+          durationMs: Date.now() - lockStart,
+          attributes: { contended },
+        });
         return;
       } catch (err: unknown) {
         if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
           throw err;
         }
+        contended = true;
         if (Date.now() >= deadline) {
+          this._emit({
+            op: "lock.acquire",
+            level: "error",
+            outcome: "failed",
+            durationMs: Date.now() - lockStart,
+            attributes: { contended, code: "LOCK_TIMEOUT" },
+            message: `lock acquisition timed out after ${maxWaitMs}ms on ${basename(this._lockPath)}`,
+          });
           throw new EventStoreError(
             "LOCK_TIMEOUT",
             `Failed to acquire lock on ${this._lockPath} within ${maxWaitMs}ms — another process may be writing`,

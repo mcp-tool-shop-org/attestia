@@ -16,6 +16,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
+import { NOOP_TELEMETRY, type Telemetry } from "@attestia/types";
 import type {
   ExportableStateBundle,
   VerifierConfig,
@@ -44,6 +45,37 @@ function generateReportId(verifierId: string, bundleHash: string): string {
   return sha256(canonicalize({ verifierId, bundleHash, nonce }));
 }
 
+/**
+ * Emit a `"verify.phase"` telemetry event for one verification phase.
+ *
+ * Attributes are kept to `{ phase, passed }` only — both low-cardinality and
+ * safe as metric labels. The verifier id is deliberately NOT an attribute (raw
+ * ids are unbounded; they belong in `message`, per the Telemetry contract).
+ * The emit is defensively guarded: observability must never break the
+ * verification it observes, so a throwing sink is swallowed (the
+ * {@link Telemetry} contract forbids throwing, but we do not trust a host to
+ * honor it).
+ */
+function emitPhase(
+  telemetry: Telemetry,
+  verifierId: string,
+  phase: string,
+  passed: boolean,
+): void {
+  try {
+    telemetry.record({
+      package: "@attestia/verify",
+      op: "verify.phase",
+      level: passed ? "debug" : "warn",
+      outcome: passed ? "ok" : "failed",
+      attributes: { phase, passed },
+      message: `verifier ${verifierId}: phase "${phase}" ${passed ? "passed" : "failed"}`,
+    });
+  } catch {
+    /* a sink must not break verification — see NOOP_TELEMETRY contract */
+  }
+}
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -67,12 +99,16 @@ export function runVerification(
 ): VerifierReport {
   const discrepancies: string[] = [];
   const subsystemChecks: SubsystemCheck[] = [];
+  // Optional observability — defaults to a silent no-op sink, so verification
+  // is unobserved (and free) unless a host injects a telemetry sink.
+  const telemetry = config.telemetry ?? NOOP_TELEMETRY;
 
   // Step 1: Verify bundle integrity
   const bundleResult = verifyBundleIntegrity(bundle);
   if (bundleResult.verdict === "FAIL") {
     discrepancies.push(...bundleResult.discrepancies);
   }
+  emitPhase(telemetry, config.verifierId, "bundle-integrity", bundleResult.verdict === "PASS");
 
   // Step 2: Replay verification
   // NOTE: We do NOT pass expectedHash here because the bundle's globalStateHash
@@ -88,38 +124,44 @@ export function runVerification(
       discrepancies.push(d.description);
     }
   }
+  emitPhase(telemetry, config.verifierId, "replay", replayResult.verdict === "PASS");
 
   // Step 3: Per-subsystem hash checks
   const ledgerHash = hashLedgerSnapshot(bundle.ledgerSnapshot);
   const registrumHash = hashRegistrumSnapshot(bundle.registrumSnapshot);
 
+  const ledgerMatches = bundle.globalStateHash.subsystems.ledger === ledgerHash;
   subsystemChecks.push({
     subsystem: "ledger",
     expected: bundle.globalStateHash.subsystems.ledger,
     actual: ledgerHash,
-    matches: bundle.globalStateHash.subsystems.ledger === ledgerHash,
+    matches: ledgerMatches,
   });
 
-  if (!subsystemChecks[subsystemChecks.length - 1]!.matches) {
+  if (!ledgerMatches) {
     discrepancies.push(
       `Ledger hash mismatch: bundle claims ${bundle.globalStateHash.subsystems.ledger}, ` +
         `recomputed ${ledgerHash}`,
     );
   }
+  emitPhase(telemetry, config.verifierId, "subsystem-ledger", ledgerMatches);
 
+  const registrumMatches =
+    bundle.globalStateHash.subsystems.registrum === registrumHash;
   subsystemChecks.push({
     subsystem: "registrum",
     expected: bundle.globalStateHash.subsystems.registrum,
     actual: registrumHash,
-    matches: bundle.globalStateHash.subsystems.registrum === registrumHash,
+    matches: registrumMatches,
   });
 
-  if (!subsystemChecks[subsystemChecks.length - 1]!.matches) {
+  if (!registrumMatches) {
     discrepancies.push(
       `Registrum hash mismatch: bundle claims ${bundle.globalStateHash.subsystems.registrum}, ` +
         `recomputed ${registrumHash}`,
     );
   }
+  emitPhase(telemetry, config.verifierId, "subsystem-registrum", registrumMatches);
 
   // Step 4: Global hash check
   // Recompute global hash from replayed snapshots + bundle's chain hashes
@@ -130,28 +172,33 @@ export function runVerification(
     bundle.chainHashes,
   );
 
+  const globalMatches = bundle.globalStateHash.hash === recomputedGlobal.hash;
   subsystemChecks.push({
     subsystem: "global",
     expected: bundle.globalStateHash.hash,
     actual: recomputedGlobal.hash,
-    matches: bundle.globalStateHash.hash === recomputedGlobal.hash,
+    matches: globalMatches,
   });
 
-  if (bundle.globalStateHash.hash !== recomputedGlobal.hash) {
+  if (!globalMatches) {
     discrepancies.push(
       `Global hash mismatch: bundle claims ${bundle.globalStateHash.hash}, ` +
         `recomputed ${recomputedGlobal.hash}`,
     );
   }
+  emitPhase(telemetry, config.verifierId, "global-hash", globalMatches);
 
   // Step 5: Chain hashes (strict mode)
   if (config.strictMode === true) {
     const bundleChains = bundle.globalStateHash.subsystems.chains;
-    if (bundleChains === undefined || Object.keys(bundleChains).length === 0) {
+    const chainsPresent =
+      bundleChains !== undefined && Object.keys(bundleChains).length > 0;
+    if (!chainsPresent) {
       discrepancies.push(
         "Strict mode: no chain hashes found in bundle (expected chain observer data)",
       );
     }
+    emitPhase(telemetry, config.verifierId, "strict-chains", chainsPresent);
   }
 
   // Step 6: If chain hashes present, record them

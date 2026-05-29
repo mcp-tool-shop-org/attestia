@@ -17,7 +17,13 @@
  * There is NO update(), delete(), or modify(). This is by design.
  */
 
-import type { AccountRef, LedgerEntry } from "@attestia/types";
+import type {
+  AccountRef,
+  LedgerEntry,
+  ObservabilityEvent,
+  Telemetry,
+} from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import { AccountRegistry } from "./accounts.js";
 import {
   assertTrialBalanced,
@@ -31,6 +37,7 @@ import type {
   AppendResult,
   EntryFilter,
   LedgerAccount,
+  LedgerOptions,
   LedgerSnapshot,
   LedgerTransaction,
   TrialBalance,
@@ -51,6 +58,30 @@ export class Ledger {
   private readonly _entries: LedgerEntry[] = [];
   private readonly _entryIds: Set<string> = new Set();
   private readonly _transactions: LedgerTransaction[] = [];
+
+  /** Injected telemetry sink (defaults to a no-op; never throws). */
+  private readonly _telemetry: Telemetry;
+
+  /**
+   * Create a new ledger.
+   *
+   * @param options - Optional configuration, including an observability sink.
+   */
+  constructor(options?: LedgerOptions) {
+    this._telemetry = options?.telemetry ?? NOOP_TELEMETRY;
+  }
+
+  /**
+   * Emit a telemetry event tagged with this package. Best-effort and guarded:
+   * a misbehaving sink can never break a ledger operation.
+   */
+  private _emit(event: Omit<ObservabilityEvent, "package">): void {
+    try {
+      this._telemetry.record({ package: "@attestia/ledger", ...event });
+    } catch {
+      // Observability must never break the operation it observes.
+    }
+  }
 
   // ─── Account Management ──────────────────────────────────────────────
 
@@ -101,6 +132,8 @@ export class Ledger {
    * Throws LedgerError if any validation fails.
    */
   append(entries: readonly LedgerEntry[], options?: AppendOptions): AppendResult {
+    const appendStart = Date.now();
+
     // Rule 1: Non-empty
     if (entries.length === 0) {
       throw new LedgerError("EMPTY_TRANSACTION", "Cannot append an empty set of entries");
@@ -175,6 +208,14 @@ export class Ledger {
     };
     this._transactions.push(transaction);
 
+    this._emit({
+      op: "append",
+      level: "info",
+      outcome: "ok",
+      durationMs: Date.now() - appendStart,
+      attributes: { entryCount: entries.length },
+    });
+
     return {
       correlationId,
       entryCount: entries.length,
@@ -237,9 +278,25 @@ export class Ledger {
    */
   getTrialBalance(timestamp?: string): TrialBalance {
     const ts = timestamp ?? new Date().toISOString();
-    return assertTrialBalanced(
-      computeTrialBalance(this._entries, this._accounts, ts),
-    );
+    const report = computeTrialBalance(this._entries, this._accounts, ts);
+    try {
+      return assertTrialBalanced(report);
+    } catch (err) {
+      // A self-consistent ledger can never produce an unbalanced trial balance,
+      // so this signals corruption — surface it on the telemetry channel before
+      // failing closed, then rethrow unchanged.
+      this._emit({
+        op: "trialBalance",
+        level: "error",
+        outcome: "failed",
+        attributes: {
+          lineCount: report.lines.length,
+          code: err instanceof LedgerError ? err.code : "UNKNOWN",
+        },
+        message: "trial balance is unbalanced — ledger corruption suspected",
+      });
+      throw err;
+    }
   }
 
   /**

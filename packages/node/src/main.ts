@@ -68,6 +68,9 @@ async function main(): Promise<void> {
     logFn: (entry) => {
       logger.info(entry, `${entry.method} ${entry.path} ${entry.status}`);
     },
+    // Bridge backend observability events (event-store/ledger/vault/treasury/
+    // reconciler/registrum/witness) onto this same pino logger + Prometheus.
+    logger,
     idempotencyTtlMs: config.IDEMPOTENCY_TTL_MS,
     auth: authConfig,
     rateLimit: { rpm: config.RATE_LIMIT_RPM, burst: config.RATE_LIMIT_BURST },

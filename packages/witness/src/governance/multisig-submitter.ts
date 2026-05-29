@@ -23,6 +23,8 @@ import {
   isRetryableXrplError,
   type RetryConfig,
 } from "../retry.js";
+import { SubmitTelemetry } from "../telemetry.js";
+import type { Telemetry } from "@attestia/types";
 import {
   buildCanonicalSigningPayload,
   aggregateSignatures,
@@ -75,6 +77,16 @@ export interface MultiSigConfig {
 
   /** Optional retry configuration */
   readonly retry?: RetryConfig;
+
+  /**
+   * Optional telemetry sink for structured observability events.
+   *
+   * When omitted, the submitter emits nothing (default NOOP). When provided, it
+   * emits the same `submit` / `submit.retry` / `submit.idempotent_hit` events as
+   * the single-sig {@link XrplSubmitter}, under package `"@attestia/witness"`.
+   * txHash/ledgerIndex go in the event `message`, never in `attributes`.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -107,10 +119,12 @@ export class MultiSigSubmitter {
   private wallets: Map<string, Wallet> = new Map();
   private readonly config: MultiSigConfig;
   private readonly retryConfig: RetryConfig;
+  private readonly telemetry: SubmitTelemetry;
 
   constructor(config: MultiSigConfig) {
     this.config = config;
     this.retryConfig = config.retry ?? DEFAULT_RETRY_CONFIG;
+    this.telemetry = new SubmitTelemetry(config.telemetry);
   }
 
   /**
@@ -213,13 +227,33 @@ export class MultiSigSubmitter {
     const prepared = await client.autofill(tx);
     const multiSignResult = this.buildMultiSign(payload, policy, prepared);
 
+    // D3-B-001: emit submission telemetry (same shape as single-sig submitter).
+    const startedAt = Date.now();
+    this.telemetry.attempt();
+
+    let invocation = 0;
+
     try {
-      return await withRetry(
-        async () => this._submitSigned(payload, client, multiSignResult),
+      const record = await withRetry(
+        async () => {
+          invocation += 1;
+          if (invocation > 1) {
+            this.telemetry.retry(invocation - 1);
+          }
+          return this._submitSigned(payload, client, multiSignResult);
+        },
         this.retryConfig,
         isRetryableXrplError,
       );
+      this.telemetry.final(
+        "ok",
+        Date.now() - startedAt,
+        `witnessed txHash=${record.txHash} ledgerIndex=${record.ledgerIndex}`,
+      );
+      return record;
     } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.telemetry.final("failed", Date.now() - startedAt, `submission failed: ${detail}`);
       if (err instanceof WitnessSubmitError) {
         throw err;
       }
@@ -373,6 +407,11 @@ export class MultiSigSubmitter {
     // Pre-submit replay/idempotency guard: is this exact tx already on-chain?
     const existing = await this._checkExistingTx(client, multiSignResult.txHash);
     if (existing) {
+      // D3-B-001: lost-but-applied multi-sig tx recovered via the fixed-hash
+      // check — critical operational signal. Emit before returning.
+      this.telemetry.idempotentHit(
+        `txHash=${multiSignResult.txHash} ledgerIndex=${existing.ledgerIndex}`,
+      );
       return {
         id: `witness:multisig:${payload.hash.slice(0, 16)}`,
         payload,

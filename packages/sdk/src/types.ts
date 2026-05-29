@@ -74,21 +74,54 @@ export interface PaginatedList<T> {
 // =============================================================================
 
 /**
+ * A single field-level validation problem, as returned in `details.issues`
+ * by the API's `VALIDATION_ERROR` responses. Lets consumers render
+ * field-specific errors without casting `details` from `unknown`.
+ */
+export interface ValidationIssue {
+  /** Path to the offending field (e.g. "body.amount"). */
+  readonly path: string;
+  /** Human-readable description of the problem. */
+  readonly message: string;
+}
+
+/**
+ * Structured error details. `issues` is populated for validation errors;
+ * other codes may attach their own fields (kept open via the index signature).
+ */
+export interface AttestiaErrorDetails {
+  readonly issues?: readonly ValidationIssue[];
+  readonly [key: string]: unknown;
+}
+
+/**
  * Structured error from the Attestia API.
+ *
+ * Surfaces the full `{ code, message, hint }` envelope the API now returns for
+ * client (4xx) errors, plus structured `details` (e.g. validation `issues`).
  */
 export class AttestiaError extends Error {
   /** Error code from the API (e.g., "NOT_FOUND", "VALIDATION_ERROR") */
   readonly code: string;
   /** HTTP status code */
   readonly statusCode: number;
-  /** Additional error details (validation errors, etc.) */
-  readonly details?: unknown;
+  /** Actionable next step from the API, when provided. */
+  readonly hint?: string | undefined;
+  /** Additional error details (e.g. validation `issues`). */
+  readonly details?: AttestiaErrorDetails | undefined;
 
-  constructor(code: string, message: string, statusCode: number, details?: unknown) {
+  constructor(
+    code: string,
+    message: string,
+    statusCode: number,
+    details?: AttestiaErrorDetails | undefined,
+    hint?: string | undefined,
+  ) {
     super(message);
     this.name = "AttestiaError";
     this.code = code;
     this.statusCode = statusCode;
     this.details = details;
+    this.hint = hint;
   }
 }

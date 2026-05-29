@@ -29,6 +29,8 @@ import type {
 } from "../types.js";
 import type { Registrar } from "../registrar.js";
 import { isState, isTransition } from "../registrar.js";
+import { AppendOnlyViolationError } from "../structural-registrar.js";
+import { enrichViolation } from "../violation-detail.js";
 import type { CompiledInvariantRegistry, CompiledInvariant } from "./loader.js";
 import { evaluatePredicate } from "./predicate/evaluator.js";
 import type { EvaluationContext } from "./predicate/evaluator.js";
@@ -110,15 +112,38 @@ export class RegistryDrivenRegistrar implements Registrar {
       }
 
       // Evaluate the predicate AST
-      const passed = evaluatePredicate(invariant.ast, context);
+      const passed = evaluatePredicate(
+        invariant.ast,
+        context,
+        undefined,
+        invariant.id
+      );
 
       if (!passed) {
         const classification = invariant.failure_mode === "halt" ? "HALT" : "REJECT";
-        violations.push({
-          invariantId: invariant.id,
-          classification,
-          message: `Invariant violation: ${invariant.description}`,
+        const enriched = enrichViolation(invariant.id, invariant.description, {
+          from: transition.from,
+          toId: transition.to.id,
+          isRoot: transition.to.structure["isRoot"] === true,
+          parentRegistered:
+            transition.from !== null && this.latestById.has(transition.from),
+          idAlreadyRegistered: this.latestById.has(transition.to.id),
+          orderIndex: this.currentOrderIndex,
         });
+        violations.push(
+          enriched.details !== undefined
+            ? {
+                invariantId: invariant.id,
+                classification,
+                message: enriched.message,
+                details: enriched.details,
+              }
+            : {
+                invariantId: invariant.id,
+                classification,
+                message: enriched.message,
+              }
+        );
 
         if (invariant.failure_mode === "halt") {
           shouldHalt = true;
@@ -173,9 +198,7 @@ export class RegistryDrivenRegistrar implements Registrar {
     };
 
     if (this.versionsByKey.has(versionKey)) {
-      throw new Error(
-        `Append-only violation: version key '${versionKey}' already exists`
-      );
+      throw new AppendOnlyViolationError(versionKey);
     }
     this.versionsByKey.set(versionKey, registeredState);
     this.latestById.set(id, registeredState);

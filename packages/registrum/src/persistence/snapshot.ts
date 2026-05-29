@@ -116,6 +116,9 @@ export interface RegistrarSnapshotV1 {
  * Thrown when snapshot validation fails.
  */
 export class SnapshotValidationError extends Error {
+  /** Stable error code: `"SNAPSHOT_INVALID"`. */
+  readonly code = "SNAPSHOT_INVALID" as const;
+
   constructor(
     message: string,
     public readonly field?: string

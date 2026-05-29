@@ -15,7 +15,8 @@
  * - No durability guarantees
  */
 
-import type { DomainEvent } from "@attestia/types";
+import type { DomainEvent, Telemetry, ObservabilityEvent } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type {
   AppendOptions,
   AppendResult,
@@ -29,6 +30,20 @@ import type {
 } from "./types.js";
 import { EventStoreError } from "./types.js";
 import { computeEventHash, GENESIS_HASH, verifyHashChain } from "./hash-chain.js";
+
+/**
+ * Options for creating an {@link InMemoryEventStore}.
+ */
+export interface InMemoryEventStoreOptions {
+  /**
+   * Optional telemetry sink. When provided, the store emits structured
+   * {@link Telemetry} events (package `"@attestia/event-store"`) on append and
+   * integrity verification. Emission never affects store behavior.
+   *
+   * @default NOOP_TELEMETRY (no events emitted)
+   */
+  readonly telemetry?: Telemetry;
+}
 
 /**
  * In-memory event store.
@@ -61,6 +76,13 @@ export class InMemoryEventStore implements EventStore {
   /** Hash of the last appended event (for chain linking) */
   private _lastHash: string = GENESIS_HASH;
 
+  /** Injected telemetry sink (defaults to a no-op; never throws). */
+  private readonly _telemetry: Telemetry;
+
+  constructor(options?: InMemoryEventStoreOptions) {
+    this._telemetry = options?.telemetry ?? NOOP_TELEMETRY;
+  }
+
   // ─── Append ─────────────────────────────────────────────────────────
 
   append(
@@ -68,6 +90,7 @@ export class InMemoryEventStore implements EventStore {
     events: readonly DomainEvent[],
     options?: AppendOptions,
   ): AppendResult {
+    const appendStart = Date.now();
     // Validate inputs
     this._validateStreamId(streamId);
 
@@ -146,6 +169,17 @@ export class InMemoryEventStore implements EventStore {
 
     // Dispatch to subscribers
     this._dispatch(streamId, storedEvents);
+
+    this._emit({
+      op: "append",
+      level: "info",
+      outcome: "ok",
+      durationMs: Date.now() - appendStart,
+      attributes: {
+        count: events.length,
+        globalPosition: this._nextGlobalPosition - 1,
+      },
+    });
 
     return {
       streamId,
@@ -272,10 +306,31 @@ export class InMemoryEventStore implements EventStore {
    * Verify the hash chain integrity of all events in the store.
    */
   verifyIntegrity(): EventStoreIntegrityResult {
-    return verifyHashChain(this._globalLog);
+    const verifyStart = Date.now();
+    const result = verifyHashChain(this._globalLog);
+    this._emit({
+      op: "verify",
+      level: result.valid ? "info" : "error",
+      outcome: result.valid ? "ok" : "failed",
+      durationMs: Date.now() - verifyStart,
+      attributes: { valid: result.valid, errorCount: result.errors.length },
+    });
+    return result;
   }
 
   // ─── Internal ───────────────────────────────────────────────────────
+
+  /**
+   * Emit a telemetry event tagged with this package. Best-effort and guarded:
+   * a misbehaving sink can never break a store operation.
+   */
+  private _emit(event: Omit<ObservabilityEvent, "package">): void {
+    try {
+      this._telemetry.record({ package: "@attestia/event-store", ...event });
+    } catch {
+      // Observability must never break the operation it observes.
+    }
+  }
 
   private _validateStreamId(streamId: string): void {
     if (streamId.length === 0) {

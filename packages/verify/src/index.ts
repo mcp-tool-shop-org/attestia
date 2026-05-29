@@ -43,6 +43,12 @@ export {
   isConsensusReached,
 } from "./verification-consensus.js";
 
+// Human-readable report formatters
+export {
+  formatVerifierReport,
+  formatComplianceReport,
+} from "./report-formatter.js";
+
 // Cross-chain invariants
 export {
   checkAssetConservation,

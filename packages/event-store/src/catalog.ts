@@ -151,6 +151,7 @@ export class EventCatalog {
     const entry = this._entries.get(eventType);
     if (entry === undefined) {
       throw new CatalogError(
+        "UNKNOWN_EVENT_TYPE",
         `Cannot register migration for unknown event type "${eventType}"`,
       );
     }
@@ -241,10 +242,22 @@ export class EventCatalog {
       const migration = entry.migrations.get(v);
       if (migration === undefined) {
         throw new CatalogError(
-          `Missing migration for "${eventType}" from version ${v} to ${v + 1}`,
+          "MISSING_MIGRATION",
+          `Missing migration for "${eventType}" from version ${v} to ${v + 1} ` +
+            `(migrating ${fromVersion} → target version ${targetVersion}). ` +
+            `Hint: register it with catalog.registerMigration("${eventType}", ${v}, fn) ` +
+            `before reading events stored at version ${fromVersion}.`,
         );
       }
-      current = migration(current);
+      try {
+        current = migration(current);
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        throw new CatalogError(
+          "MIGRATION_FAILED",
+          `Migration for "${eventType}" from version ${v} to ${v + 1} threw: ${reason}`,
+        );
+      }
     }
 
     return current;
@@ -307,12 +320,34 @@ export class EventCatalog {
 // =============================================================================
 
 /**
+ * Stable, machine-readable codes for {@link CatalogError}.
+ *
+ * - `UNKNOWN_EVENT_TYPE` — an operation referenced an event type that is not
+ *   registered in the catalog (e.g. registering a migration for it).
+ * - `MISSING_MIGRATION` — a migration step is required to reach the target
+ *   schema version but none is registered for that version hop.
+ * - `MIGRATION_FAILED` — a registered migration function threw while
+ *   transforming a payload.
+ */
+export type CatalogErrorCode =
+  | "UNKNOWN_EVENT_TYPE"
+  | "MISSING_MIGRATION"
+  | "MIGRATION_FAILED";
+
+/**
  * Error thrown by catalog operations.
+ *
+ * Carries a stable {@link CatalogErrorCode} so callers can branch on the
+ * failure class without parsing the human-readable message.
  */
 export class CatalogError extends Error {
-  constructor(message: string) {
+  /** Stable, machine-readable failure class. */
+  public readonly code: CatalogErrorCode;
+
+  constructor(code: CatalogErrorCode, message: string) {
     super(message);
     this.name = "CatalogError";
+    this.code = code;
   }
 }
 

@@ -30,6 +30,8 @@ import {
   computeGlobalStateHash,
 } from "@attestia/verify";
 import type { ReplayInput, ReplayResult, VerificationResult, GlobalStateHash } from "@attestia/verify";
+import { NOOP_TELEMETRY } from "@attestia/types";
+import type { Telemetry } from "@attestia/types";
 
 // =============================================================================
 // Configuration
@@ -39,6 +41,13 @@ export interface AttestiaServiceConfig {
   readonly ownerId: string;
   readonly defaultCurrency: string;
   readonly defaultDecimals: number;
+  /**
+   * Optional observability sink, threaded into every domain package this
+   * service composes (event-store, ledger, vault, treasury, reconciler,
+   * registrum). Defaults to {@link NOOP_TELEMETRY} so the service stays silent
+   * unless a host (the Hono app) injects a bridge to its logger + metrics.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 // =============================================================================
@@ -57,10 +66,18 @@ export class AttestiaService {
   private _ready = false;
 
   constructor(config: AttestiaServiceConfig) {
-    this.registrar = new StructuralRegistrar({ mode: "legacy" });
-    this.ledger = new Ledger();
-    this.eventStore = new InMemoryEventStore();
+    // Single shared sink for every domain package. The bridge is stateless, so
+    // sharing one instance across all of them is intentional (and cheaper than
+    // one sink each). NOOP when the host injects nothing.
+    const telemetry = config.telemetry ?? NOOP_TELEMETRY;
 
+    this.registrar = new StructuralRegistrar({ mode: "legacy", telemetry });
+    this.ledger = new Ledger({ telemetry });
+    this.eventStore = new InMemoryEventStore({ telemetry });
+
+    // ObserverRegistry holds pre-built observers; telemetry is configured per
+    // observer (ObserverConfig.telemetry) at registration time, not here. No
+    // live observers are registered by this service, so nothing to wire.
     const observerRegistry = new ObserverRegistry();
     this.vault = new Vault(
       {
@@ -70,19 +87,24 @@ export class AttestiaService {
         defaultDecimals: config.defaultDecimals,
       },
       observerRegistry,
+      telemetry,
     );
 
-    this.treasury = new Treasury({
-      orgId: config.ownerId,
-      name: `${config.ownerId}-treasury`,
-      defaultCurrency: config.defaultCurrency,
-      defaultDecimals: config.defaultDecimals,
-      gatekeepers: ["gatekeeper-1", "gatekeeper-2"],
-    });
+    this.treasury = new Treasury(
+      {
+        orgId: config.ownerId,
+        name: `${config.ownerId}-treasury`,
+        defaultCurrency: config.defaultCurrency,
+        defaultDecimals: config.defaultDecimals,
+        gatekeepers: ["gatekeeper-1", "gatekeeper-2"],
+      },
+      telemetry,
+    );
 
     this.reconciler = new Reconciler({
       registrar: this.registrar,
       attestorId: "attestia-node",
+      telemetry,
     });
 
     this._ready = true;

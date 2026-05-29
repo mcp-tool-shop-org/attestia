@@ -12,6 +12,7 @@
 
 import type { ASTNode } from "./ast.js";
 import type { StateID } from "../../types.js";
+import { type Telemetry, NOOP_TELEMETRY } from "@attestia/types";
 
 /**
  * Evaluation context provided to predicates.
@@ -47,8 +48,17 @@ export interface EvaluationContext {
 
 /**
  * Evaluation error class.
+ *
+ * Raised internally when a predicate AST cannot be evaluated against a context
+ * (e.g. type mismatch in a comparison). `evaluatePredicate` catches these and
+ * fails closed (returns `false`); the `code` is the stable identifier
+ * `"PREDICATE_EVAL"` from the registrum error vocabulary for callers that
+ * inspect a re-thrown or surfaced instance.
  */
 export class EvaluationError extends Error {
+  /** Stable error code: `"PREDICATE_EVAL"`. */
+  readonly code = "PREDICATE_EVAL" as const;
+
   constructor(message: string) {
     super(message);
     this.name = "EvaluationError";
@@ -58,17 +68,48 @@ export class EvaluationError extends Error {
 /**
  * Evaluate a predicate AST against a context.
  * Returns boolean result.
+ *
+ * Fail-closed semantics are UNCHANGED: an {@link EvaluationError} (e.g. a
+ * structurally-broken invariant that compares incompatible types) is coerced to
+ * `false`, never propagated. Previously that error was silently swallowed,
+ * making a broken invariant indistinguishable from a legitimately-false one.
+ *
+ * D1-B-002 makes the swallow OBSERVABLE: when a `telemetry` sink is supplied and
+ * a predicate throws, a `degraded` warn-level event is recorded (op
+ * `"predicate.eval"`, low-cardinality `attributes.invariantId`) before returning
+ * `false`. The default sink is {@link NOOP_TELEMETRY}, so callers that pass
+ * nothing keep the exact prior behavior at zero cost.
+ *
+ * @param ast - the validated predicate AST
+ * @param context - the evaluation context
+ * @param telemetry - optional sink for the degraded-eval signal (default no-op)
+ * @param invariantId - optional id, emitted as a low-cardinality attribute
  */
 export function evaluatePredicate(
   ast: ASTNode,
-  context: EvaluationContext
+  context: EvaluationContext,
+  telemetry: Telemetry = NOOP_TELEMETRY,
+  invariantId?: string
 ): boolean {
   try {
     const result = evaluate(ast, context);
     return toBoolean(result);
   } catch (e) {
-    // Fail closed: errors become false
+    // Fail closed: errors become false.
     if (e instanceof EvaluationError) {
+      // Surface the swallowed error as a degraded telemetry signal so a broken
+      // invariant is observable rather than silent. `record` never throws (per
+      // the Telemetry contract), so this cannot affect the fail-closed result.
+      telemetry.record({
+        package: "@attestia/registrum",
+        op: "predicate.eval",
+        level: "warn",
+        outcome: "degraded",
+        ...(invariantId !== undefined
+          ? { attributes: { invariantId } }
+          : {}),
+        message: e.message,
+      });
       return false;
     }
     throw e;

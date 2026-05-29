@@ -22,6 +22,7 @@
 import { createHash } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../types/api-contract.js";
+import { createErrorEnvelope } from "../types/error.js";
 
 // =============================================================================
 // Idempotency Store Interface
@@ -121,12 +122,11 @@ export function idempotencyMiddleware(
       // Same key but different body → cache poisoning attempt
       if (cached.bodyHash !== requestBodyHash) {
         return c.json(
-          {
-            error: {
-              code: "IDEMPOTENCY_MISMATCH",
-              message: "Idempotency key reuse with different request body",
-            },
-          },
+          createErrorEnvelope(
+            "IDEMPOTENCY_MISMATCH",
+            "Idempotency key reuse with different request body",
+            "Reuse this Idempotency-Key only for byte-identical retries; use a fresh key for a different request.",
+          ),
           422,
         );
       }

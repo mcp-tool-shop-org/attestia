@@ -36,6 +36,7 @@ export function checkIfMatch(
       createErrorEnvelope(
         "PRECONDITION_FAILED",
         "If-Match header does not match current entity state",
+        "Re-fetch the resource to get its current ETag, then retry with that value in If-Match.",
         { currentETag },
       ),
       412,

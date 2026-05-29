@@ -31,7 +31,7 @@ export {
 } from "./registry.js";
 
 // Structured errors
-export { ObserverError } from "./errors.js";
+export { ObserverError, classifyRpcError, toObserverError } from "./errors.js";
 export type { ObserverErrorCode } from "./errors.js";
 
 // Chain definitions

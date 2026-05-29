@@ -56,6 +56,7 @@ export type {
   TrialBalanceLine,
   TrialBalance,
   LedgerErrorCode,
+  LedgerOptions,
   AppendOptions,
   AppendResult,
   LedgerSnapshot,

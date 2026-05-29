@@ -36,11 +36,12 @@ export { computeEventHash, verifyHashChain, GENESIS_HASH } from "./hash-chain.js
 
 // Implementations
 export { InMemoryEventStore } from "./in-memory-store.js";
+export type { InMemoryEventStoreOptions } from "./in-memory-store.js";
 export { JsonlEventStore } from "./jsonl-store.js";
 export type { JsonlEventStoreOptions } from "./jsonl-store.js";
 
 // Catalog & schema versioning
-export type { EventSchema, EventMigration } from "./catalog.js";
+export type { EventSchema, EventMigration, CatalogErrorCode } from "./catalog.js";
 export { EventCatalog, CatalogError } from "./catalog.js";
 export { createVersionedEvent, getSchemaVersion } from "./catalog.js";
 

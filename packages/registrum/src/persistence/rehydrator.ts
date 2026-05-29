@@ -27,8 +27,20 @@ import type { CompiledInvariantRegistry } from "../registry/loader.js";
 
 /**
  * Base error for rehydration failures.
+ *
+ * `code` is a stable, machine-readable identifier. The base value is
+ * `"REHYDRATION_FAILED"`; specialized subclasses (e.g.
+ * {@link RegistryMismatchError}) assign a more specific code in their
+ * constructor. The field is part of the public contract — callers may switch on
+ * it across patch/minor releases.
  */
 export class RehydrationError extends Error {
+  /**
+   * Stable error code. `"REHYDRATION_FAILED"` for the base class; subclasses
+   * may set a more specific code (e.g. `"REGISTRY_DRIFT"`).
+   */
+  readonly code: "REHYDRATION_FAILED" | "REGISTRY_DRIFT" = "REHYDRATION_FAILED";
+
   constructor(message: string) {
     super(`Rehydration failed: ${message}`);
     this.name = "RehydrationError";
@@ -36,9 +48,15 @@ export class RehydrationError extends Error {
 }
 
 /**
- * Error for registry hash mismatch.
+ * Error for registry hash mismatch — the snapshot was written under a different
+ * constitution than the one being rehydrated against (constitutional drift).
+ *
+ * `code` is the stable identifier `"REGISTRY_DRIFT"`.
  */
 export class RegistryMismatchError extends RehydrationError {
+  /** Stable error code: `"REGISTRY_DRIFT"`. */
+  override readonly code = "REGISTRY_DRIFT" as const;
+
   constructor(
     public readonly expectedHash: string,
     public readonly actualHash: string
@@ -52,6 +70,8 @@ export class RegistryMismatchError extends RehydrationError {
 
 /**
  * Error for mode mismatch.
+ *
+ * Inherits the base `code` `"REHYDRATION_FAILED"`.
  */
 export class ModeMismatchError extends RehydrationError {
   constructor(

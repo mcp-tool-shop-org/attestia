@@ -26,16 +26,19 @@ import {
   isRetryableXrplError,
   type RetryConfig,
 } from "./retry.js";
+import { SubmitTelemetry } from "./telemetry.js";
 
 export class XrplSubmitter {
   private client: XrplClient | null = null;
   private wallet: Wallet | null = null;
   private readonly config: WitnessConfig;
   private readonly retryConfig: RetryConfig;
+  private readonly telemetry: SubmitTelemetry;
 
   constructor(config: WitnessConfig) {
     this.config = config;
     this.retryConfig = config.retry ?? DEFAULT_RETRY_CONFIG;
+    this.telemetry = new SubmitTelemetry(config.telemetry);
   }
 
   /**
@@ -114,13 +117,38 @@ export class XrplSubmitter {
     const prepared = await client.autofill(tx);
     const signed = wallet.sign(prepared);
 
+    // D3-B-001: emit submission telemetry. attempt (info) once up-front; a
+    // submit.retry (warn) on each re-invocation of the retried callback; the
+    // final submit outcome (ok|failed) with durationMs. txHash/ledgerIndex go in
+    // the event message, never in low-cardinality attributes.
+    const startedAt = Date.now();
+    this.telemetry.attempt();
+
+    // The callback is invoked once per attempt by withRetry. The first invocation
+    // is the initial attempt; invocations 2..N are retries (emit submit.retry).
+    let invocation = 0;
+
     try {
-      return await withRetry(
-        async () => this._submitSigned(payload, client, signed.tx_blob, signed.hash),
+      const record = await withRetry(
+        async () => {
+          invocation += 1;
+          if (invocation > 1) {
+            this.telemetry.retry(invocation - 1);
+          }
+          return this._submitSigned(payload, client, signed.tx_blob, signed.hash);
+        },
         this.retryConfig,
         isRetryableXrplError,
       );
+      this.telemetry.final(
+        "ok",
+        Date.now() - startedAt,
+        `witnessed txHash=${record.txHash} ledgerIndex=${record.ledgerIndex}`,
+      );
+      return record;
     } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.telemetry.final("failed", Date.now() - startedAt, `submission failed: ${detail}`);
       // Wrap RetryExhaustedError in WitnessSubmitError for domain-specific error type
       if (err instanceof WitnessSubmitError) {
         throw err;
@@ -204,6 +232,10 @@ export class XrplSubmitter {
     // attestations when a retry fires after a successful-but-lost response).
     const existing = await this._checkExistingTx(client, txHash);
     if (existing) {
+      // D3-B-001: a lost-but-applied tx recovered via the fixed-hash check — a
+      // critical operational signal (the submission "succeeded" on a path that
+      // didn't return a response). Emit before returning the recovered record.
+      this.telemetry.idempotentHit(`txHash=${txHash} ledgerIndex=${existing.ledgerIndex}`);
       return {
         id: `witness:${payload.hash.slice(0, 16)}`,
         payload,

@@ -17,8 +17,15 @@ import type { ASTNode } from "./ast.js";
 
 /**
  * Validation error class.
+ *
+ * Raised when a predicate AST is statically unsafe (forbidden symbol, semantic
+ * field access, depth limit, etc.). `code` is the stable identifier
+ * `"PREDICATE_UNSAFE"` from the registrum error vocabulary.
  */
 export class ValidationError extends Error {
+  /** Stable error code: `"PREDICATE_UNSAFE"`. */
+  readonly code = "PREDICATE_UNSAFE" as const;
+
   constructor(message: string) {
     super(message);
     this.name = "ValidationError";

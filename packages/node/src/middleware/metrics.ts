@@ -42,8 +42,27 @@ export class MetricsCollector {
     Map<string, { labels: Record<string, string>; count: number }>
   >();
 
+  /** Custom HELP text per named counter, set via {@link registerCounter}. */
+  private readonly _counterHelp = new Map<string, string>();
+
   constructor(buckets: readonly number[] = DEFAULT_BUCKETS) {
     this._buckets = buckets;
+  }
+
+  /**
+   * Pre-declare a named counter with descriptive HELP text.
+   *
+   * Registration is optional — {@link incrementCounter} lazily creates a series
+   * on first use — but declaring up front lets a host document its business
+   * metrics (e.g. `attestia_witness_total`, `attestia_telemetry_total`) and
+   * surface the correct `# HELP` line in the exposition even before the first
+   * increment. Idempotent: re-registering the same name overwrites the help.
+   */
+  registerCounter(name: string, help: string): void {
+    this._counterHelp.set(name, help);
+    if (!this._namedCounters.has(name)) {
+      this._namedCounters.set(name, new Map());
+    }
   }
 
   /**
@@ -149,7 +168,7 @@ export class MetricsCollector {
 
     // Named counters (business metrics)
     for (const [name, entries] of this._namedCounters) {
-      lines.push(`# HELP ${name} Business metric counter`);
+      lines.push(`# HELP ${name} ${this._counterHelp.get(name) ?? "Business metric counter"}`);
       lines.push(`# TYPE ${name} counter`);
       for (const { labels, count } of entries.values()) {
         const labelStr = Object.entries(labels)

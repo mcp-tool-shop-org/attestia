@@ -24,4 +24,10 @@ export {
   hashAttestation,
   packageAttestationProof,
   verifyAttestationProof,
+  verifyAttestationProofDetailed,
+} from "./attestation-proof.js";
+
+export type {
+  AttestationCheck,
+  AttestationVerificationResult,
 } from "./attestation-proof.js";

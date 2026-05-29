@@ -7,9 +7,12 @@
  */
 
 import { Hono } from "hono";
+import { pino } from "pino";
+import type { Logger } from "pino";
 import type { AppEnv } from "./types/api-contract.js";
 import { TenantRegistry } from "./services/tenant-registry.js";
 import type { AttestiaServiceConfig } from "./services/attestia-service.js";
+import { TelemetryBridge } from "./observability/telemetry-bridge.js";
 import { handleError } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { loggerMiddleware } from "./middleware/logger.js";
@@ -51,6 +54,12 @@ import { AuditLog } from "./services/audit-log.js";
 export interface CreateAppOptions {
   readonly serviceConfig: AttestiaServiceConfig;
   readonly logFn?: (entry: RequestLogEntry) => void;
+  /**
+   * Pino logger the telemetry bridge logs backend observability events to.
+   * When omitted, a silent pino instance is used so tests stay quiet while the
+   * metrics half of the bridge still records. `main.ts` passes its real logger.
+   */
+  readonly logger?: Logger | undefined;
   readonly idempotencyTtlMs?: number;
   /** Default tenant ID used when no auth/tenant middleware is active */
   readonly defaultTenantId?: string;
@@ -92,11 +101,22 @@ export interface AppInstance {
  * Create the Hono application with all middleware and routes.
  */
 export function createApp(options: CreateAppOptions): AppInstance {
-  const tenantRegistry = new TenantRegistry(options.serviceConfig);
+  const metricsCollector = new MetricsCollector();
+
+  // Telemetry bridge: fans backend observability events out to pino + the
+  // Prometheus collector. A single shared instance is threaded into every
+  // domain service (it is stateless). When no logger is supplied (tests),
+  // a silent pino keeps logs quiet while metrics still record.
+  const bridgeLogger = options.logger ?? pino({ level: "silent" });
+  const telemetryBridge = new TelemetryBridge(bridgeLogger, metricsCollector);
+
+  const tenantRegistry = new TenantRegistry({
+    ...options.serviceConfig,
+    telemetry: options.serviceConfig.telemetry ?? telemetryBridge,
+  });
   const idempotencyStore = new InMemoryIdempotencyStore(
     options.idempotencyTtlMs ?? 86400000,
   );
-  const metricsCollector = new MetricsCollector();
   const auditLog = new AuditLog();
   const defaultTenantId = options.defaultTenantId ?? options.serviceConfig.ownerId;
   const enableMetrics = options.enableMetrics !== false;

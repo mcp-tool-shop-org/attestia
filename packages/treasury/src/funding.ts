@@ -23,7 +23,8 @@
  */
 
 import { Ledger } from "@attestia/ledger";
-import type { Currency, LedgerEntry, Money } from "@attestia/types";
+import type { Currency, LedgerEntry, Money, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import type { FundingRequest, FundingGate, FundingStatus } from "./types.js";
 
 // =============================================================================
@@ -55,11 +56,19 @@ export type FundingErrorCode =
 export class FundingGateManager {
   private readonly requests: Map<string, FundingRequest> = new Map();
   private readonly gatekeepers: readonly [string, string];
+  private readonly telemetry: Telemetry;
 
+  /**
+   * @param telemetry Optional observability sink (D4-B-001). Defaults to
+   *   {@link NOOP_TELEMETRY}. Gate decisions emit `funding.gate` with
+   *   `{ gate, decision }` attributes (low-cardinality); execution emits
+   *   `funding.execute`. Raw request ids/amounts stay in `message`.
+   */
   constructor(
     gatekeepers: readonly [string, string],
     _currency: Currency,
     _decimals: number,
+    telemetry: Telemetry = NOOP_TELEMETRY,
   ) {
     if (gatekeepers[0] === gatekeepers[1]) {
       throw new FundingError(
@@ -68,6 +77,7 @@ export class FundingGateManager {
       );
     }
     this.gatekeepers = gatekeepers;
+    this.telemetry = telemetry;
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -166,6 +176,13 @@ export class FundingGateManager {
         gate1: gate,
       };
       this.requests.set(id, updated);
+      this.telemetry.record({
+        package: "@attestia/treasury",
+        op: "funding.gate",
+        level: "info",
+        attributes: { gate: "gate1", decision: "approved" },
+        message: `funding request '${id}' gate1 approved`,
+      });
       return updated;
     }
 
@@ -183,6 +200,13 @@ export class FundingGateManager {
       gate2: gate,
     };
     this.requests.set(id, updated);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.gate",
+      level: "info",
+      attributes: { gate: "gate2", decision: "approved" },
+      message: `funding request '${id}' gate2 approved (fully approved)`,
+    });
     return updated;
   }
 
@@ -213,11 +237,19 @@ export class FundingGateManager {
     };
 
     // Determine which gate slot to use for the rejection record
+    const slot = request.gate1 ? "gate2" : "gate1";
     const updated: FundingRequest = request.gate1
       ? { ...request, status: "rejected", gate2: gate }
       : { ...request, status: "rejected", gate1: gate };
 
     this.requests.set(id, updated);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.gate",
+      level: "warn",
+      attributes: { gate: slot, decision: "rejected" },
+      message: `funding request '${id}' rejected at ${slot}`,
+    });
     return updated;
   }
 
@@ -284,6 +316,13 @@ export class FundingGateManager {
       executedAt: new Date().toISOString(),
     };
     this.requests.set(id, executed);
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "funding.execute",
+      level: "info",
+      outcome: "ok",
+      message: `funding request '${id}' executed for ${request.amount.amount} ${request.amount.currency}`,
+    });
     return executed;
   }
 

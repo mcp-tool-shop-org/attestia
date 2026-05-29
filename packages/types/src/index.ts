@@ -76,3 +76,12 @@ export {
   isOnChainEvent,
   isSolanaOnChainEvent,
 } from "./guards.js";
+
+// Observability contract (injectable telemetry sink)
+export type {
+  ObservabilityLevel,
+  ObservabilityOutcome,
+  ObservabilityEvent,
+  Telemetry,
+} from "./observability.js";
+export { NOOP_TELEMETRY } from "./observability.js";

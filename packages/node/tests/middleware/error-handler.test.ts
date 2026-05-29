@@ -84,11 +84,17 @@ describe("error message sanitization (M2)", () => {
     const res = await app.request("/throw");
     expect(res.status).toBe(422);
 
-    const body = (await res.json()) as { error: { code: string; message: string } };
+    const body = (await res.json()) as {
+      error: { code: string; message: string; hint?: string };
+    };
     expect(body.error.code).toBe("BUDGET_EXCEEDED");
-    // Message should be the error code, NOT the sensitive details
-    expect(body.error.message).toBe("BUDGET_EXCEEDED");
+    // D6-B-002: 4xx returns a curated human message + hint, NOT the bare code
+    // and NEVER the raw (sensitive) thrown message.
+    expect(body.error.message).toBe("The action would exceed the configured budget.");
+    expect(body.error.message).not.toBe("BUDGET_EXCEEDED");
     expect(body.error.message).not.toContain("acc_secret_123");
+    expect(body.error.hint).toBeDefined();
+    expect(body.error.hint).not.toContain("acc_secret_123");
   });
 
   it("500 errors return generic 'Internal server error'", async () => {
@@ -139,9 +145,75 @@ describe("domain error status mapping", () => {
     const res = await throwApp("INTEGRITY_VIOLATION").request("/throw");
     expect(res.status).toBe(500);
 
-    const body = (await res.json()) as { error: { code: string; message: string } };
+    const body = (await res.json()) as { error: { code: string; message: string; hint?: string } };
     expect(body.error.code).toBe("INTEGRITY_VIOLATION");
-    // 500s are sanitized to a generic message.
+    // 500s are sanitized to a generic message with no hint.
     expect(body.error.message).toBe("Internal server error");
+    expect(body.error.hint).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// D6-B-002: curated human 4xx messages + hints
+//
+// 4xx responses must carry a safe, human-readable message AND an actionable
+// hint — never the bare error code, and never the raw thrown message. 5xx
+// stays a generic sanitized message with no hint.
+// =============================================================================
+
+describe("curated 4xx messages + hints (D6-B-002)", () => {
+  function throwApp(errorCode: string, errorMessage = "raw internal detail tableX") {
+    const app = new Hono<AppEnv>();
+    app.onError(handleError);
+    app.get("/throw", () => {
+      const err = new Error(errorMessage) as Error & { code: string };
+      err.code = errorCode;
+      throw err;
+    });
+    return app;
+  }
+
+  // (code, expectedStatus) pairs spanning the common 4xx codes.
+  const cases: ReadonlyArray<readonly [string, number]> = [
+    ["INTENT_NOT_FOUND", 404],
+    ["INVALID_TRANSITION", 409],
+    ["BUDGET_EXCEEDED", 422],
+    ["REQUESTER_CANNOT_APPROVE", 403],
+    ["CONCURRENCY_CONFLICT", 409],
+    ["INSUFFICIENT_BUDGET", 422],
+  ];
+
+  for (const [code, status] of cases) {
+    it(`${code} → ${status} with curated message + hint, no leak`, async () => {
+      const res = await throwApp(code).request("/throw");
+      expect(res.status).toBe(status);
+
+      const body = (await res.json()) as {
+        error: { code: string; message: string; hint?: string };
+      };
+      // Code preserved for machine handling.
+      expect(body.error.code).toBe(code);
+      // Message is human prose, not the bare code, not the raw thrown message.
+      expect(body.error.message).not.toBe(code);
+      expect(body.error.message).not.toContain("tableX");
+      expect(body.error.message.length).toBeGreaterThan(code.length);
+      // A hint is present and actionable for these curated codes.
+      expect(typeof body.error.hint).toBe("string");
+      expect((body.error.hint ?? "").length).toBeGreaterThan(0);
+      expect(body.error.hint).not.toContain("tableX");
+    });
+  }
+
+  it("falls back to a safe generic message for an unmapped 4xx code", async () => {
+    // CURRENCY_MISMATCH maps to 400 in STATUS_MAP. Even if a code had no curated
+    // entry, the status-class fallback applies. Use a mapped-but-this-test we
+    // assert: an unknown-but-4xx-mapped code never returns the bare code.
+    const res = await throwApp("INVALID_AMOUNT").request("/throw");
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("INVALID_AMOUNT");
+    expect(body.error.message).not.toBe("INVALID_AMOUNT");
+    expect(body.error.message).not.toContain("tableX");
   });
 });

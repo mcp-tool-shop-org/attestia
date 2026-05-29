@@ -11,7 +11,8 @@
  */
 
 import type { ObserverRegistry } from "@attestia/chain-observer";
-import type { Money, ChainId, TxHash } from "@attestia/types";
+import type { Money, ChainId, TxHash, Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY } from "@attestia/types";
 import { PortfolioObserver } from "./portfolio.js";
 import { BudgetEngine } from "./budget.js";
 import { IntentManager } from "./intent-manager.js";
@@ -38,15 +39,24 @@ export class Vault {
   readonly budget: BudgetEngine;
   readonly intents: IntentManager;
 
-  constructor(config: VaultConfig, observerRegistry: ObserverRegistry) {
+  /**
+   * @param telemetry Optional observability sink (D4-B-001), threaded into the
+   *   budget engine and intent manager. Defaults to {@link NOOP_TELEMETRY}.
+   */
+  constructor(
+    config: VaultConfig,
+    observerRegistry: ObserverRegistry,
+    telemetry: Telemetry = NOOP_TELEMETRY,
+  ) {
     this.config = config;
     this.portfolio = new PortfolioObserver(observerRegistry);
     this.budget = new BudgetEngine(
       config.ownerId,
       config.defaultCurrency,
       config.defaultDecimals,
+      telemetry,
     );
-    this.intents = new IntentManager(this.budget);
+    this.intents = new IntentManager(this.budget, telemetry);
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -215,8 +225,9 @@ export class Vault {
   restoreFromSnapshot(
     snapshot: VaultSnapshot,
     observerRegistry: ObserverRegistry,
+    telemetry: Telemetry = NOOP_TELEMETRY,
   ): Vault {
-    const vault = new Vault(snapshot.config, observerRegistry);
+    const vault = new Vault(snapshot.config, observerRegistry, telemetry);
 
     // Restore budget envelopes
     for (const env of snapshot.envelopes) {

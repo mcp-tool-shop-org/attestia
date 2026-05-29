@@ -12,6 +12,8 @@
  */
 
 import { formatAmount, parseAmount } from "@attestia/ledger";
+import { makeDiscrepancy } from "./discrepancy.js";
+import type { Discrepancy } from "./discrepancy.js";
 import type {
   IntentLedgerMatch,
   ReconcilableIntent,
@@ -53,13 +55,15 @@ export class IntentLedgerMatcher {
       if (!entries || entries.length === 0) {
         // Intent has no matching ledger entries
         if (intent.status === "executed" || intent.status === "verified") {
+          const msg = `Intent ${intent.id} is ${intent.status} but has no ledger entries`;
           results.push({
             intentId: intent.id,
             correlationId: intent.correlationId ?? intent.id,
             status: "missing-ledger",
             ...(intent.amount ? { intentAmount: intent.amount } : {}),
-            discrepancies: [
-              `Intent ${intent.id} is ${intent.status} but has no ledger entries`,
+            discrepancies: [msg],
+            structuredDiscrepancies: [
+              makeDiscrepancy("MISSING_LEDGER", "presence", msg),
             ],
           });
         }
@@ -82,19 +86,23 @@ export class IntentLedgerMatcher {
         // amount is the absence of a debit legitimately clean.
         if (intent.amount) {
           const intentRaw = parseAmount(intent.amount.amount, intent.amount.decimals);
+          const expected = formatAmount(intentRaw, intent.amount.decimals);
+          const actual = formatAmount(0n, intent.amount.decimals);
+          const msg =
+            `Amount mismatch: intent=${expected} ledger=${actual} (no debit entries)`;
           results.push({
             intentId: intent.id,
             correlationId: entries[0]!.correlationId,
             status: "amount-mismatch",
             intentAmount: intent.amount,
             ledgerAmount: {
-              amount: formatAmount(0n, intent.amount.decimals),
+              amount: actual,
               currency: intent.amount.currency,
               decimals: intent.amount.decimals,
             },
-            discrepancies: [
-              `Amount mismatch: intent=${formatAmount(intentRaw, intent.amount.decimals)} ` +
-              `ledger=${formatAmount(0n, intent.amount.decimals)} (no debit entries)`,
+            discrepancies: [msg],
+            structuredDiscrepancies: [
+              makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
             ],
           });
           continue;
@@ -105,6 +113,7 @@ export class IntentLedgerMatcher {
           correlationId: entries[0]!.correlationId,
           status: "matched",
           discrepancies: [],
+          structuredDiscrepancies: [],
         });
         continue;
       }
@@ -120,12 +129,16 @@ export class IntentLedgerMatcher {
         }
 
         const discrepancies: string[] = [];
+        const structuredDiscrepancies: Discrepancy[] = [];
         const amountMatches = intentRaw === debitTotal;
 
         if (!amountMatches) {
-          discrepancies.push(
-            `Amount mismatch: intent=${formatAmount(intentRaw, intent.amount.decimals)} ` +
-            `ledger=${formatAmount(debitTotal, intent.amount.decimals)}`,
+          const expected = formatAmount(intentRaw, intent.amount.decimals);
+          const actual = formatAmount(debitTotal, intent.amount.decimals);
+          const msg = `Amount mismatch: intent=${expected} ledger=${actual}`;
+          discrepancies.push(msg);
+          structuredDiscrepancies.push(
+            makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
           );
         }
 
@@ -140,6 +153,7 @@ export class IntentLedgerMatcher {
             decimals: intent.amount.decimals,
           },
           discrepancies,
+          structuredDiscrepancies,
         });
       } else {
         results.push({
@@ -147,6 +161,7 @@ export class IntentLedgerMatcher {
           correlationId: entries[0]!.correlationId,
           status: "matched",
           discrepancies: [],
+          structuredDiscrepancies: [],
         });
       }
     }
@@ -158,13 +173,16 @@ export class IntentLedgerMatcher {
           (r) => r.intentId === entry.intentId,
         );
         if (!alreadyReported) {
+          const msg =
+            `Ledger entry ${entry.id} references intent ${entry.intentId} but intent not found`;
           results.push({
             intentId: entry.intentId,
             correlationId: entry.correlationId,
             status: "missing-intent",
             ledgerAmount: entry.money,
-            discrepancies: [
-              `Ledger entry ${entry.id} references intent ${entry.intentId} but intent not found`,
+            discrepancies: [msg],
+            structuredDiscrepancies: [
+              makeDiscrepancy("MISSING_INTENT", "presence", msg),
             ],
           });
         }
