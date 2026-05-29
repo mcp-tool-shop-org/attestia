@@ -4,3 +4,6 @@ dist/
 .DS_Store
 coverage/
 site/.astro/
+
+# polyglot translation cache
+.polyglot-cache.json
