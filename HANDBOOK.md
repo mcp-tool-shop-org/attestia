@@ -388,7 +388,7 @@ These hold at every phase and are not negotiable:
 | Solana interaction | @solana/web3.js |
 | JSON canonicalization | json-canonicalize (RFC 8785) |
 | Property testing | fast-check |
-| CI | GitHub Actions (Node 20 + 22 matrix) |
+| CI | GitHub Actions (Node 22 + 24 matrix) |
 | Coverage | Codecov (OIDC auth) |
 | Container | Docker (node:22-slim, multi-stage) |
 | XRPL testing | Standalone rippled in Docker |
@@ -469,7 +469,7 @@ GitHub Actions runs on every push and PR to `main`:
 1. Install dependencies (pnpm)
 2. Build all packages
 3. Type-check all packages
-4. Run tests with coverage (Node 20 + 22 matrix)
+4. Run tests with coverage (Node 22 + 24 matrix)
 5. Run benchmarks (Node 22 only)
 6. Upload coverage to Codecov (OIDC)
 
@@ -535,7 +535,7 @@ attestia/
 
 Branch protection requires:
 - At least 1 approving review
-- All CI checks passing (build, typecheck, tests on Node 20 + 22)
+- All CI checks passing (build, typecheck, tests on Node 22 + 24)
 - No force pushes
 
 ---

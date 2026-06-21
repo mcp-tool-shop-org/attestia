@@ -86,7 +86,7 @@ specs/
 ```
 .github/
 ├── workflows/                      3 workflows
-│   ├── ci.yml                      CI pipeline (Node 20/22, build, typecheck, test, coverage, dep-scan, bench)
+│   ├── ci.yml                      CI pipeline (Node 22/24, build, typecheck, test, coverage, dep-scan, bench)
 │   ├── docker.yml                  Docker image publishing to GHCR (release-only)
 │   └── pages.yml                   Build + deploy landing page to GitHub Pages
 ├── ISSUE_TEMPLATE/

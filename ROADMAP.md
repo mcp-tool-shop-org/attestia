@@ -56,7 +56,7 @@ The only package with zero tests. Types are compile-time checked, but the type g
 No CI exists. Every commit should prove the system is green.
 
 - [x] GitHub Actions workflow: `pnpm install → build → test` on push + PR
-- [x] Matrix: Node 20 + Node 22
+- [x] Matrix: Node 22 + Node 24
 - [ ] Coverage reporting (aim: ≥95% on registrum, ledger; ≥90% elsewhere)
 - [ ] Lint pass (biome or eslint — pick one, enforce consistently)
 - [x] Type-check pass (`tsc --noEmit` across all packages)
