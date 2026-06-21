@@ -106,7 +106,7 @@ The demo runs the full Attestia pipeline locally: declare an intent, approve it,
 After running the demo, try the test suite to see the full scope of the project:
 
 ```bash
-# Run all 2,220 tests
+# Run all 2,564 tests
 pnpm test
 
 # Run with coverage reporting

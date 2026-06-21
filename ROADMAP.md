@@ -6,7 +6,7 @@ Last updated: February 11, 2026
 
 ## Where We Are
 
-**15 packages, 2,220 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
+**14 packages, 2,564 tests, all green. CI enforced. Coverage gated. Benchmarks baselined.**
 
 | Package | Status | Tests | Purpose |
 |---------|--------|-------|---------|

@@ -9,7 +9,7 @@ This page is the quick-reference for Attestia's 14 packages, the full documentat
 
 ## Package status
 
-14 packages, 2,220 tests, 96.80% coverage. All green.
+14 packages, 2,564 tests, 95%+ coverage. All green.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|

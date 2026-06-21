@@ -11,7 +11,7 @@
 | Packages | 14 (13 + demo) |
 | Source files (`.ts`) | ~160 |
 | Test files | ~130 |
-| Total tests | 2,220 |
+| Total tests | 2,564 |
 | Root docs | 16 markdown files |
 | Specs (RFCs) | 10 files |
 | Registrum internal docs | 30+ files |

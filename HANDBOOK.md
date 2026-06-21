@@ -1,6 +1,6 @@
 # Attestia — Project Handbook
 
-**Version:** 1.0.1
+**Version:** 2.0.0
 **Date:** May 29, 2026
 **Status:** Active development — Phases 1–12 complete
 
@@ -18,8 +18,8 @@ Attestia does not move money. It proves what happened, enforces structural rules
 |--------|-------|
 | Packages | 14 |
 | Source lines (TypeScript) | ~19,000 |
-| Tests | 2,220 |
-| Test coverage | 96.80% |
+| Tests | 2,564 |
+| Test coverage | 95%+ |
 | Runtime dependencies (core) | 0 |
 | REST API endpoints | 34 |
 | Supported chains | EVM (Ethereum, Arbitrum, Base, Optimism) + XRPL + Solana |
@@ -441,7 +441,7 @@ Phases 1 through 12 are complete. All 14 packages are built, tested, and operati
 ```bash
 pnpm install                # Install all dependencies
 pnpm build                  # Build all packages
-pnpm test                   # Run all tests (2,220)
+pnpm test                   # Run all tests (2,564)
 pnpm test:coverage          # Run with coverage reporting
 pnpm typecheck              # Type-check all packages
 pnpm bench                  # Run benchmarks
