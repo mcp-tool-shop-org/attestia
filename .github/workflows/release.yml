@@ -70,11 +70,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build all packages (incl. the bundle)
+        # Build BEFORE tests: cross-package tests import @attestia/* from each
+        # package's built dist/, so the workspace must be built first (same
+        # order as ci.yml). Running tests first fails with "Failed to resolve
+        # entry for package @attestia/types".
+        run: pnpm build
+
       - name: Run tests
         run: pnpm test
-
-      - name: Build all packages (incl. the bundle)
-        run: pnpm build
 
       - name: Strip workspace-only devDependencies from the published manifest
         working-directory: packages/attestia
