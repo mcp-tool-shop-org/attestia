@@ -47,6 +47,10 @@ import { createPublicOpenApiRoutes } from "./routes/public-openapi.js";
 import { createProofRoutes, createPublicProofRoutes } from "./routes/proofs.js";
 import { createComplianceRoutes, createPublicComplianceRoutes } from "./routes/compliance.js";
 import { createAuditLogRoutes } from "./routes/audit-log.js";
+import { createTreasuryRoutes } from "./routes/treasury.js";
+import { createVaultBudgetRoutes } from "./routes/vault-budgets.js";
+import { createGovernanceRoutes } from "./routes/governance.js";
+import { createOpenApiRoutes } from "./routes/openapi.js";
 import { AuditLog } from "./services/audit-log.js";
 import { createErrorEnvelope } from "./types/error.js";
 
@@ -292,6 +296,10 @@ export function createApp(options: CreateAppOptions): AppInstance {
   app.route("/api/v1/proofs", createProofRoutes());
   app.route("/api/v1/compliance", createComplianceRoutes());
   app.route("/api/v1/audit-logs", createAuditLogRoutes(auditLog));
+  app.route("/api/v1/treasury", createTreasuryRoutes(routeDeps));
+  app.route("/api/v1/vault", createVaultBudgetRoutes(routeDeps));
+  app.route("/api/v1/governance", createGovernanceRoutes(routeDeps));
+  app.route("/api/v1", createOpenApiRoutes());
 
   // Release every in-memory store sweeper on shutdown (B-NODE-001/002). When
   // sweepers are disabled (tests), dispose() is a harmless no-op.
