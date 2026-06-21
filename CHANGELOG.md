@@ -4,6 +4,16 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [2.0.2] - 2026-06-21
+
+npm front-door polish for `@mcptoolshop/attestia`. No library code changes.
+
+- **Logo + badges on the npm package README** — the published README now carries
+  the centered Attestia brand logo, npm/CI/license badges, and the language nav
+  (the v2.0.1 README was bare text).
+- **Translations** — the package README is now available in 7 languages
+  (`README.{ja,zh,es,fr,hi,it,pt-BR}.md`).
+
 ## [2.0.1] - 2026-06-21
 
 First npm release as a single bundled package, plus Node baseline modernization.

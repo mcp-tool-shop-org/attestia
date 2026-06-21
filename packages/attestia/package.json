@@ -1,6 +1,6 @@
 {
   "name": "@mcptoolshop/attestia",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Financial truth infrastructure for the decentralized world — the full Attestia library in one package (deterministic ledger, constitutional registrar, Merkle proofs, multi-chain observation, XRPL witness, replay verification).",
   "type": "module",
   "license": "MIT",
