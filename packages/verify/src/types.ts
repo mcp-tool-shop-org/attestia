@@ -272,7 +272,11 @@ export interface ConsensusResult {
   /** Agreement ratio (0-1) */
   readonly agreementRatio: number;
 
-  /** Whether minimum verifier threshold was met */
+  /**
+   * Whether the minimum DISTINCT-verifier threshold was met. Quorum is computed
+   * over unique `verifierId`s, so duplicate reports from one identity count as a
+   * single verifier and cannot forge a quorum (A-VERIFY-001).
+   */
   readonly quorumReached: boolean;
 
   /**
@@ -283,6 +287,15 @@ export interface ConsensusResult {
    * Always false for a FAIL verdict.
    */
   readonly singleVerifierPass: boolean;
+
+  /**
+   * True when all counted (distinct) verifiers attested to the SAME
+   * `bundleHash`. When false, the verifiers disagree on which bundle they
+   * verified, so the consensus is forced to FAIL — a verifier passing a
+   * different bundle proves nothing about the bundle under consensus
+   * (A-VERIFY-001). Vacuously true for an empty report set.
+   */
+  readonly bundleAgreement: boolean;
 
   /** Verifier IDs that dissented from the majority */
   readonly dissenters: readonly string[];

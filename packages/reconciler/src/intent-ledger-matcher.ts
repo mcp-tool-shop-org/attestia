@@ -120,37 +120,90 @@ export class IntentLedgerMatcher {
 
       // Check amount match if intent has an amount
       if (intent.amount) {
-        const intentRaw = parseAmount(intent.amount.amount, intent.amount.decimals);
-        let debitTotal = 0n;
-        for (const d of debitEntries) {
-          if (d.money.currency === intent.amount.currency) {
-            debitTotal += parseAmount(d.money.amount, d.money.decimals);
-          }
-        }
-
         const discrepancies: string[] = [];
         const structuredDiscrepancies: Discrepancy[] = [];
-        const amountMatches = intentRaw === debitTotal;
+
+        // A-REC-001: a debit linked to this intent in a DIFFERENT currency is a
+        // real second-currency outflow. Previously such debits were silently
+        // skipped from the total (and still marked matched), hiding the outflow.
+        // Flag every foreign-currency debit as CURRENCY_MISMATCH and never report
+        // the intent as cleanly matched — mirror the sibling matchers' handling.
+        const foreignDebits = debitEntries.filter(
+          (d) => d.money.currency !== intent.amount!.currency,
+        );
+        for (const fd of foreignDebits) {
+          const expected = intent.amount.currency;
+          const actual = fd.money.currency;
+          const msg =
+            `Currency mismatch: intent=${expected} ledger debit ${fd.id}=${actual}`;
+          discrepancies.push(msg);
+          structuredDiscrepancies.push(
+            makeDiscrepancy("CURRENCY_MISMATCH", "currency", msg, { expected, actual }),
+          );
+        }
+
+        // A-REC-002: same-currency debits may be recorded with a different
+        // decimal base than the intent. Normalize each debit and the intent
+        // amount to a common (max) decimal base before summing/comparing, exactly
+        // as ledger-chain-matcher does. Adding raw scaled bigints across mixed
+        // bases produces a wrong total.
+        const sameCurrencyDebits = debitEntries.filter(
+          (d) => d.money.currency === intent.amount!.currency,
+        );
+        const intentDec = intent.amount.decimals;
+        let maxDec = intentDec;
+        for (const d of sameCurrencyDebits) {
+          if (d.money.decimals > maxDec) maxDec = d.money.decimals;
+        }
+        const sawDecimalsMismatch = sameCurrencyDebits.some(
+          (d) => d.money.decimals !== intentDec,
+        );
+
+        const intentRaw = parseAmount(intent.amount.amount, intentDec);
+        const intentNorm = intentRaw * 10n ** BigInt(maxDec - intentDec);
+        let debitTotalNorm = 0n;
+        for (const d of sameCurrencyDebits) {
+          const dRaw = parseAmount(d.money.amount, d.money.decimals);
+          debitTotalNorm += dRaw * 10n ** BigInt(maxDec - d.money.decimals);
+        }
+
+        const amountMatches = intentNorm === debitTotalNorm;
 
         if (!amountMatches) {
-          const expected = formatAmount(intentRaw, intent.amount.decimals);
-          const actual = formatAmount(debitTotal, intent.amount.decimals);
+          const expected = formatAmount(intentNorm, maxDec);
+          const actual = formatAmount(debitTotalNorm, maxDec);
           const msg = `Amount mismatch: intent=${expected} ledger=${actual}`;
           discrepancies.push(msg);
           structuredDiscrepancies.push(
             makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
           );
+        } else if (sawDecimalsMismatch) {
+          // Values agree once normalized but the bases differed — surface a
+          // DECIMALS_MISMATCH so the discrepancy is visible without flipping the
+          // intent to amount-mismatch (mirrors ledger-chain-matcher semantics).
+          const normalized = formatAmount(intentNorm, maxDec);
+          const msg =
+            `Decimals mismatch: intent and ledger debit(s) agree on ${normalized} ` +
+            `but use different decimal bases`;
+          discrepancies.push(msg);
+          structuredDiscrepancies.push(
+            makeDiscrepancy("DECIMALS_MISMATCH", "decimals", msg),
+          );
         }
+
+        // The intent is cleanly matched only when amounts agree AND no
+        // foreign-currency debit is linked to it.
+        const cleanlyMatched = amountMatches && foreignDebits.length === 0;
 
         results.push({
           intentId: intent.id,
           correlationId: entries[0]!.correlationId,
-          status: amountMatches ? "matched" : "amount-mismatch",
+          status: cleanlyMatched ? "matched" : "amount-mismatch",
           intentAmount: intent.amount,
           ledgerAmount: {
-            amount: formatAmount(debitTotal, intent.amount.decimals),
+            amount: formatAmount(debitTotalNorm, maxDec),
             currency: intent.amount.currency,
-            decimals: intent.amount.decimals,
+            decimals: maxDec,
           },
           discrepancies,
           structuredDiscrepancies,

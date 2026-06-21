@@ -228,6 +228,169 @@ describe("IntentLedgerMatcher", () => {
     });
   });
 
+  describe("multi-currency debits (A-REC-001)", () => {
+    // A second-currency outflow linked to an intent must NOT be silently
+    // dropped from the debit total. Currently the debit loop sums only
+    // same-currency debits, so a 50 EUR debit linked to a 100 USDC intent is
+    // invisible and the intent is wrongly reported "matched". The fix must
+    // flag CURRENCY_MISMATCH and refuse the clean "matched" status.
+    it("flags a different-currency debit linked to an intent (CURRENCY_MISMATCH)", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-xcurr",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "debit-usdc",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("100.000000"),
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-xcurr",
+          correlationId: "corr-x",
+        },
+        {
+          id: "debit-eur",
+          accountId: "acct-2",
+          type: "debit",
+          money: { amount: "50.00", currency: "EUR", decimals: 2 },
+          timestamp: "2024-01-01T00:00:02Z",
+          intentId: "intent-xcurr",
+          correlationId: "corr-x",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      const match = results[0]!;
+      // The intent is NOT cleanly matched — a real second-currency outflow exists.
+      expect(match.status).not.toBe("matched");
+      // A structured CURRENCY_MISMATCH must be emitted.
+      const codes = match.structuredDiscrepancies.map((d) => d.code);
+      expect(codes).toContain("CURRENCY_MISMATCH");
+      const curr = match.structuredDiscrepancies.find(
+        (d) => d.code === "CURRENCY_MISMATCH",
+      )!;
+      expect(curr.dimension).toBe("currency");
+      // The mismatched currency is surfaced (intent USDC vs debit EUR).
+      expect(`${curr.expected} ${curr.actual}`).toMatch(/EUR/);
+    });
+
+    it("does not flag CURRENCY_MISMATCH when all debits share the intent currency", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-same",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "debit-a",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("60.000000"),
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-same",
+          correlationId: "corr-s",
+        },
+        {
+          id: "debit-b",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("40.000000"),
+          timestamp: "2024-01-01T00:00:02Z",
+          intentId: "intent-same",
+          correlationId: "corr-s",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.status).toBe("matched");
+      expect(
+        results[0]!.structuredDiscrepancies.map((d) => d.code),
+      ).not.toContain("CURRENCY_MISMATCH");
+    });
+  });
+
+  describe("debit decimal normalization (A-REC-002)", () => {
+    // A same-currency debit recorded with a different `decimals` than the intent
+    // must be normalized to a common base before summing. Currently raw scaled
+    // bigints are added directly, mis-totalling the debit.
+    it("matches when a same-currency debit uses a different decimal base", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-dec",
+          status: "executed",
+          kind: "transfer",
+          amount: { amount: "100.000000", currency: "USDC", decimals: 6 },
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "debit-2dec",
+          accountId: "acct-1",
+          type: "debit",
+          // Same value (100 USDC) but recorded with 2 decimals instead of 6.
+          money: { amount: "100.00", currency: "USDC", decimals: 2 },
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-dec",
+          correlationId: "corr-d",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      const match = results[0]!;
+      // Values agree after normalization → matched, with a DECIMALS_MISMATCH note.
+      expect(match.status).toBe("matched");
+      const codes = match.structuredDiscrepancies.map((d) => d.code);
+      expect(codes).toContain("DECIMALS_MISMATCH");
+    });
+
+    it("reports AMOUNT_MISMATCH when normalized values differ across decimal bases", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-dec2",
+          status: "executed",
+          kind: "transfer",
+          amount: { amount: "100.000000", currency: "USDC", decimals: 6 },
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "debit-wrong",
+          accountId: "acct-1",
+          type: "debit",
+          // 90 USDC at 2 decimals — differs from the 100 USDC intent even
+          // after normalization.
+          money: { amount: "90.00", currency: "USDC", decimals: 2 },
+          timestamp: "2024-01-01T00:00:01Z",
+          intentId: "intent-dec2",
+          correlationId: "corr-d2",
+        },
+      ];
+
+      const results = matcher.match(intents, entries);
+      expect(results).toHaveLength(1);
+      const match = results[0]!;
+      expect(match.status).toBe("amount-mismatch");
+      expect(match.structuredDiscrepancies.map((d) => d.code)).toContain(
+        "AMOUNT_MISMATCH",
+      );
+    });
+  });
+
   describe("multiple intents", () => {
     it("matches multiple intents to their respective ledger entries", () => {
       const intents: ReconcilableIntent[] = [

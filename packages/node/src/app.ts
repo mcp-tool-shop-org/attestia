@@ -7,6 +7,7 @@
  */
 
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { pino } from "pino";
 import type { Logger } from "pino";
 import type { AppEnv } from "./types/api-contract.js";
@@ -46,6 +47,7 @@ import { createProofRoutes, createPublicProofRoutes } from "./routes/proofs.js";
 import { createComplianceRoutes, createPublicComplianceRoutes } from "./routes/compliance.js";
 import { createAuditLogRoutes } from "./routes/audit-log.js";
 import { AuditLog } from "./services/audit-log.js";
+import { createErrorEnvelope } from "./types/error.js";
 
 // =============================================================================
 // App Config
@@ -82,7 +84,23 @@ export interface CreateAppOptions {
    * Default: false (fail-closed — see HealthRouteOptions, V2-002).
    */
   readonly exposeReadinessCounts?: boolean | undefined;
+  /**
+   * Maximum accepted request body size, in bytes, for /api/* and the public
+   * routes. Default: {@link DEFAULT_MAX_BODY_BYTES}. Requests exceeding this are
+   * rejected with 413 PAYLOAD_TOO_LARGE before any JSON parsing or Zod
+   * validation runs (A-NODE-005), bounding memory use from
+   * `validate.ts`/`c.req.json()` buffering.
+   */
+  readonly maxBodyBytes?: number | undefined;
 }
+
+/**
+ * Default request body-size cap (5 MiB). Sized above the largest legitimate
+ * payload — a full reconciliation request (three arrays of up to 10k entries,
+ * each entry a few hundred bytes) — while still bounding unauthenticated
+ * memory exposure.
+ */
+export const DEFAULT_MAX_BODY_BYTES = 5 * 1024 * 1024;
 
 // =============================================================================
 // Factory
@@ -147,6 +165,27 @@ export function createApp(options: CreateAppOptions): AppInstance {
   if (enableMetrics) {
     app.use("*", metricsMiddleware(metricsCollector));
   }
+
+  // ─── Body-size limit (A-NODE-005) ───────────────────────────────
+  // Reject oversized bodies with a structured 413 BEFORE c.req.json()/Zod
+  // buffers them. Scoped to the write surfaces (/api/* and /public/*); the
+  // bodyless health/metrics probes are unaffected. Honors Content-Length and
+  // also streams-and-counts chunked bodies (see hono bodyLimit).
+  const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const bodyLimitMiddleware = bodyLimit({
+    maxSize: maxBodyBytes,
+    onError: (c) =>
+      c.json(
+        createErrorEnvelope(
+          "PAYLOAD_TOO_LARGE",
+          "Request body exceeds the maximum allowed size.",
+          `Reduce the payload to at most ${maxBodyBytes} bytes and retry.`,
+        ),
+        413,
+      ),
+  });
+  app.use("/api/*", bodyLimitMiddleware);
+  app.use("/public/*", bodyLimitMiddleware);
 
   // ─── Error Handler ──────────────────────────────────────────────
   app.onError(handleError);

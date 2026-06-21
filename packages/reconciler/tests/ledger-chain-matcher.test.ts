@@ -169,6 +169,96 @@ describe("LedgerChainMatcher", () => {
     });
   });
 
+  describe("malformed chain amounts (A-REC-003)", () => {
+    // An untrusted chain event carrying a non-numeric amount must NOT throw
+    // out of the whole batch. The bad match is flagged and other entries still
+    // reconcile.
+    it("does not throw when a chain amount is malformed", () => {
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "entry-bad",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("100.000000"),
+          timestamp: "2024-01-01T00:00:00Z",
+          txHash: "0xbad",
+          correlationId: "corr-bad",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xbad",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "not-a-number", // malformed — BigInt() would throw
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:00Z",
+        },
+      ];
+
+      expect(() => matcher.match(entries, events)).not.toThrow();
+      const results = matcher.match(entries, events);
+      const bad = results.find((r) => r.txHash === "0xbad")!;
+      expect(bad).toBeDefined();
+      expect(bad.status).not.toBe("matched");
+      expect(bad.structuredDiscrepancies.length).toBeGreaterThan(0);
+    });
+
+    it("one malformed event does not abort reconciliation of good entries", () => {
+      const entries: ReconcilableLedgerEntry[] = [
+        {
+          id: "entry-good",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("100.000000"),
+          timestamp: "2024-01-01T00:00:00Z",
+          txHash: "0xgood",
+          correlationId: "corr-good",
+        },
+        {
+          id: "entry-bad2",
+          accountId: "acct-1",
+          type: "debit",
+          money: usdc("50.000000"),
+          timestamp: "2024-01-01T00:00:00Z",
+          txHash: "0xbad2",
+          correlationId: "corr-bad2",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xgood",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "100000000",
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:00Z",
+        },
+        {
+          chainId: "eth:1",
+          txHash: "0xbad2",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "12.5", // not an integer string — BigInt() would throw
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:00Z",
+        },
+      ];
+
+      const results = matcher.match(entries, events);
+      const good = results.find((r) => r.txHash === "0xgood")!;
+      expect(good.status).toBe("matched");
+      const bad = results.find((r) => r.txHash === "0xbad2")!;
+      expect(bad.status).not.toBe("matched");
+      expect(bad.structuredDiscrepancies.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("cross-decimal matching", () => {
     it("normalizes amounts across different decimal bases", () => {
       const entries: ReconcilableLedgerEntry[] = [

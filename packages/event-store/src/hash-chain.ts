@@ -64,6 +64,20 @@ export function computeEventHash(
  * `previousHash` fields (pre-chain events from older JSONL files) are
  * skipped — chain verification starts from the first hashed event.
  *
+ * Head-truncation defense (A-ES-002): once ANY hashed event exists in the
+ * sequence, the FIRST hashed event MUST anchor at {@link GENESIS_HASH}. A
+ * leading unhashed (pre-chain) line can no longer relax this — otherwise an
+ * attacker with file-write could drop the leading hashed events of a chain and
+ * prepend a single unhashed line to make the truncated tail's self-claimed
+ * `previousHash` be silently adopted as the anchor. The only chains that may
+ * legitimately lack a hashed genesis are *fully* legacy (all events unhashed);
+ * a genuine legacy→hashed transition still anchors the first hashed event at
+ * genesis, because the store has no prior hash to chain from at that point.
+ *
+ * Additionally, globalPosition contiguity is asserted across the whole
+ * sequence (no gaps), so head/middle truncation cannot hide behind a
+ * re-based prefix.
+ *
  * @param events - Events in global position order
  * @returns Integrity result with any chain breaks
  */
@@ -78,11 +92,15 @@ export function verifyHashChain(
   let lastVerifiedPosition = 0;
   let previousHash = GENESIS_HASH;
   let chainStarted = false;
-  // Track whether any pre-chain (unhashed) event preceded the first hashed
-  // event. A chain that starts fresh MUST anchor at genesis; a chain that
-  // follows legacy pre-chain events has no cryptographic predecessor to verify
-  // against, so the first hashed link is adopted as the anchor.
-  let sawPreChainEvent = false;
+  // NOTE (A-ES-002): there is intentionally no `sawPreChainEvent` relaxation
+  // anymore. A leading unhashed line MUST NOT weaken the genesis-anchor
+  // requirement — the first hashed event is enforced to anchor at genesis
+  // below, regardless of any pre-chain lines that precede it.
+
+  // globalPosition contiguity: positions must increase by exactly 1 with no
+  // gaps. A gap is evidence of a dropped (truncated) record. We check this
+  // independently of the hash chain so it also covers all-legacy files.
+  let expectedPosition: number | undefined;
 
   for (const event of events) {
     const record = event as StoredEvent & {
@@ -90,11 +108,19 @@ export function verifyHashChain(
       previousHash?: string;
     };
 
+    // Contiguity check — applies to every event regardless of hashing.
+    if (expectedPosition !== undefined && event.globalPosition !== expectedPosition) {
+      errors.push({
+        position: event.globalPosition,
+        reason: `globalPosition is not contiguous: expected ${expectedPosition}, got ${event.globalPosition} — possible truncation or reordering`,
+      });
+    }
+    expectedPosition = event.globalPosition + 1;
+
     // Skip pre-chain events (no hash field)
     if (record.hash === undefined || record.previousHash === undefined) {
       // If chain hasn't started yet, continue looking for first hashed event
       if (!chainStarted) {
-        sawPreChainEvent = true;
         continue;
       }
       // Chain was started but this event lacks hash — break
@@ -106,22 +132,22 @@ export function verifyHashChain(
     }
 
     if (!chainStarted) {
-      // First hashed event. A fully-hashed store MUST begin at genesis —
-      // otherwise head-truncation (dropping the leading events of the chain)
-      // is undetectable, because a truncated head's previousHash would simply
-      // be adopted as the anchor. Only when genuine legacy pre-chain events
-      // precede this event is a non-genesis anchor permitted (those events
-      // carry no hash, so the link cannot be verified cryptographically).
+      // First hashed event. Because a hashed event exists in this sequence,
+      // the chain MUST begin at genesis — otherwise head-truncation (dropping
+      // the leading events of the chain) is undetectable, because a truncated
+      // head's previousHash would simply be adopted as the anchor. A leading
+      // unhashed line does NOT grant an exemption (A-ES-002): a genuine
+      // legacy→hashed transition still anchors the first hashed event at
+      // genesis, since the store had no prior hash to chain from there.
       chainStarted = true;
       if (record.previousHash !== GENESIS_HASH) {
-        if (!sawPreChainEvent) {
-          errors.push({
-            position: event.globalPosition,
-            reason: `chain does not start at genesis: first hashed event at position ${event.globalPosition} has previousHash "${record.previousHash}", expected GENESIS_HASH ("${GENESIS_HASH}") — possible head truncation`,
-          });
-        }
-        // Adopt the claimed predecessor as the anchor (legacy-compat path, or
-        // to avoid cascading false positives after the genesis error above).
+        errors.push({
+          position: event.globalPosition,
+          reason: `chain does not start at genesis: first hashed event at position ${event.globalPosition} has previousHash "${record.previousHash}", expected GENESIS_HASH ("${GENESIS_HASH}") — possible head truncation`,
+        });
+        // Adopt the claimed predecessor as the anchor to avoid cascading false
+        // positives after the genesis error above; the chain is already flagged
+        // invalid by the error we just pushed.
         previousHash = record.previousHash;
       } else {
         previousHash = GENESIS_HASH;

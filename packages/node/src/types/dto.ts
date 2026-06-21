@@ -8,6 +8,51 @@
 import { z } from "zod";
 
 // =============================================================================
+// Bounded open-ended records (A-NODE-005)
+// =============================================================================
+
+/**
+ * Caps for open-ended `z.record(z.unknown())` payloads. Plain
+ * `z.record(z.unknown())` accepts unbounded key counts and arbitrarily nested
+ * values, which (combined with buffered JSON parsing) is a memory-amplification
+ * vector. These caps bound entry count and serialized size while staying well
+ * above any legitimate payload.
+ */
+export const MAX_RECORD_ENTRIES = 1000;
+export const MAX_RECORD_SERIALIZED_BYTES = 256 * 1024; // 256 KiB
+
+/**
+ * A bounded replacement for `z.record(z.unknown())`.
+ *
+ * Accepts an arbitrary object value (preserving the previous permissive shape
+ * for callers) but rejects records with too many top-level entries or whose
+ * JSON serialization exceeds {@link MAX_RECORD_SERIALIZED_BYTES}. The
+ * serialized-size check also bounds nesting depth indirectly (deeply nested or
+ * sprawling structures blow the byte budget first).
+ */
+export function boundedRecord(
+  maxEntries: number = MAX_RECORD_ENTRIES,
+  maxBytes: number = MAX_RECORD_SERIALIZED_BYTES,
+): z.ZodType<Record<string, unknown>> {
+  return z
+    .record(z.unknown())
+    .refine((rec) => Object.keys(rec).length <= maxEntries, {
+      message: `Record has too many entries (max ${maxEntries})`,
+    })
+    .refine(
+      (rec) => {
+        try {
+          return Buffer.byteLength(JSON.stringify(rec), "utf-8") <= maxBytes;
+        } catch {
+          // Non-serializable (e.g. circular) — reject.
+          return false;
+        }
+      },
+      { message: `Record exceeds maximum serialized size (${maxBytes} bytes)` },
+    ) as z.ZodType<Record<string, unknown>>;
+}
+
+// =============================================================================
 // Shared Schemas
 // =============================================================================
 
@@ -45,7 +90,7 @@ export const DeclareIntentSchema = z.object({
     toAddress: z.string().optional(),
     amount: MoneySchema.optional(),
     receiveToken: z.string().optional(),
-    extra: z.record(z.unknown()).optional(),
+    extra: boundedRecord().optional(),
   }),
   envelopeId: z.string().optional(),
 });
@@ -105,16 +150,16 @@ export type ListStreamEventsQuery = z.infer<typeof ListStreamEventsQuerySchema>;
 // =============================================================================
 
 export const ReplayVerifySchema = z.object({
-  ledgerSnapshot: z.record(z.unknown()),
-  registrumSnapshot: z.record(z.unknown()),
+  ledgerSnapshot: boundedRecord(),
+  registrumSnapshot: boundedRecord(),
   expectedHash: z.string().optional(),
 });
 
 export type ReplayVerifyDto = z.infer<typeof ReplayVerifySchema>;
 
 export const HashVerifySchema = z.object({
-  ledgerSnapshot: z.record(z.unknown()),
-  registrumSnapshot: z.record(z.unknown()),
+  ledgerSnapshot: boundedRecord(),
+  registrumSnapshot: boundedRecord(),
   expectedHash: z.string().min(1),
 });
 

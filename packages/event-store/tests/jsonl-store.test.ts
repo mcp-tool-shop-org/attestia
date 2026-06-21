@@ -514,6 +514,72 @@ describe("file locking", () => {
     const positions = all.map((e) => e.globalPosition);
     expect(new Set(positions).size).toBe(2);
   });
+
+  // A-ES-001: stale-cursor fork. A second writer caches _lastHash /
+  // _nextGlobalPosition at construction. If the on-disk file then advances
+  // (another process appended), a naive append computes chain links from the
+  // STALE cursor → duplicate globalPosition + forked chain, which verifyOnLoad
+  // later refuses to open (the store is effectively bricked).
+  //
+  // We simulate the external append in a single process by:
+  //   1. constructing the store (caches cursor at position 1),
+  //   2. appending one valid hashed line DIRECTLY to the file via a throwaway
+  //      store on the same path (this is exactly what a second process would do
+  //      — a real, chain-valid record), then
+  //   3. calling the first store's append().
+  //
+  // The fix must NOT silently fork. Acceptable outcomes:
+  //   (a) it detects the advance, reloads the tail, and continues correctly
+  //       (file stays contiguous + chain-valid), OR
+  //   (b) it throws a CONCURRENCY_CONFLICT EventStoreError.
+  it("does not silently fork when the file advanced past the cached cursor", () => {
+    const path = freshPath();
+
+    // 1. First writer caches cursor at the empty state.
+    const stale = new JsonlEventStore({ filePath: path });
+
+    // 2. External writer advances the file by one valid record. Using a fresh
+    //    store instance guarantees the on-disk line is a genuine, chain-valid
+    //    append (position 1, previousHash = genesis) — not a hand-forged line.
+    const external = new JsonlEventStore({ filePath: path });
+    external.append("stream-ext", [makeEvent("external.1")]);
+
+    const fileAfterExternal = readFileSync(path, "utf-8").trim().split("\n");
+    expect(fileAfterExternal).toHaveLength(1);
+
+    // 3. The stale store appends. It must not write a record that duplicates
+    //    the external record's globalPosition or forks the chain.
+    let conflictThrown: EventStoreError | undefined;
+    try {
+      stale.append("stream-stale", [makeEvent("stale.1")]);
+    } catch (err) {
+      if (err instanceof EventStoreError) {
+        conflictThrown = err;
+      } else {
+        throw err;
+      }
+    }
+
+    if (conflictThrown !== undefined) {
+      // Outcome (b): explicit conflict. The file must be unchanged (still the
+      // single external record) — no forked line was written.
+      expect(conflictThrown.code).toBe("CONCURRENCY_CONFLICT");
+      const lines = readFileSync(path, "utf-8").trim().split("\n");
+      expect(lines).toHaveLength(1);
+    } else {
+      // Outcome (a): reloaded-and-continued. The file now has two records with
+      // contiguous, unique global positions and a valid hash chain.
+      const lines = readFileSync(path, "utf-8").trim().split("\n");
+      expect(lines).toHaveLength(2);
+    }
+
+    // In EITHER case the on-disk log must remain openable + chain-valid: a
+    // silent fork would make this construction throw INTEGRITY_VIOLATION.
+    const reopened = new JsonlEventStore({ filePath: path });
+    const positions = reopened.readAll().map((e) => e.globalPosition);
+    expect(new Set(positions).size).toBe(positions.length); // no duplicates
+    expect(reopened.verifyIntegrity().valid).toBe(true);
+  });
 });
 
 // =============================================================================

@@ -9,7 +9,7 @@
  * On failure, returns 401 or 403.
  */
 
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../types/api-contract.js";
 import type {
@@ -173,12 +173,21 @@ export function verifyJwt(
     string,
   ];
 
-  // Verify signature
+  // Verify signature using a constant-time comparison (CWE-208). A naive
+  // `expectedSig !== signatureB64` short-circuits on the first differing byte,
+  // leaking signature bytes via timing. Length is non-secret, so an early
+  // length-mismatch reject is safe; equal-length buffers go through
+  // timingSafeEqual.
   const expectedSig = createHmac("sha256", secret)
     .update(`${headerB64}.${payloadB64}`)
     .digest("base64url");
 
-  if (expectedSig !== signatureB64) {
+  const expectedBuf = Buffer.from(expectedSig, "utf-8");
+  const providedBuf = Buffer.from(signatureB64, "utf-8");
+  if (
+    expectedBuf.length !== providedBuf.length ||
+    !timingSafeEqual(expectedBuf, providedBuf)
+  ) {
     return undefined;
   }
 

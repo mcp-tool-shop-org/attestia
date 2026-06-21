@@ -13,6 +13,8 @@
  * - Composable: run individual checks or all at once
  */
 
+import { parseAmount } from "@attestia/ledger";
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -30,8 +32,23 @@ export interface InvariantEvent {
   /** Event type (transfer, settlement, bridge, etc.) */
   readonly eventType: string;
 
-  /** Amount (as string for precision) */
+  /**
+   * Amount as a canonical decimal numeral string for precision (e.g.,
+   * "100.50", "1000000"). This is NOT a raw integer-minor-units string — it is
+   * interpreted together with {@link decimals}. Feeding it directly to BigInt is
+   * incorrect: a decimal point throws and an empty string silently yields zero.
+   * Asset-conservation normalization scales by `10 ** decimals` via the
+   * canonical `parseAmount` money helper before summing.
+   */
   readonly amount: string;
+
+  /**
+   * Number of decimal places for {@link amount} (the Money scale).
+   * XRP/USDC = 6, ETH = 18, integer-minor-units = 0. Optional for backward
+   * compatibility: when omitted, defaults to 0 (amount is treated as integer
+   * minor units and must contain no fractional digits).
+   */
+  readonly decimals?: number;
 
   /** Symbol (e.g., "ETH", "SOL", "XRP") */
   readonly symbol: string;
@@ -96,23 +113,39 @@ export function checkAssetConservation(
 ): InvariantCheckResult {
   const violations: string[] = [];
 
-  // Group bridge events by symbol
-  const bySymbol = new Map<string, { outflows: bigint; inflows: bigint }>();
+  // Group bridge events by symbol. `decimals` records the scale agreed for the
+  // symbol so that mixed scales (which cannot be summed safely) are detected.
+  const bySymbol = new Map<
+    string,
+    { outflows: bigint; inflows: bigint; decimals: number }
+  >();
 
   for (const event of events) {
     if (event.eventType !== "bridge_out" && event.eventType !== "bridge_in") {
       continue;
     }
 
-    const existing = bySymbol.get(event.symbol) ?? { outflows: 0n, inflows: 0n };
+    const decimals = event.decimals ?? 0;
 
+    // Reject mixed decimal scales for the same symbol — summing minor units
+    // across different scales would silently corrupt the conservation check.
+    const existing = bySymbol.get(event.symbol);
+    if (existing && existing.decimals !== decimals) {
+      violations.push(
+        `Mixed decimal scales for ${event.symbol}: event ${event.eventId} ` +
+        `declares decimals=${String(decimals)}, but ${String(existing.decimals)} ` +
+        `was already recorded for this symbol`,
+      );
+      continue;
+    }
+
+    // Normalize the decimal-string amount to integer minor units via the
+    // canonical money parser. It validates the format fail-closed: empty or
+    // non-canonical amounts throw rather than coercing to zero, and a decimal
+    // amount (e.g. "100.50") is scaled correctly instead of throwing.
+    let amount: bigint;
     try {
-      const amount = BigInt(event.amount);
-      if (event.eventType === "bridge_out") {
-        existing.outflows += amount;
-      } else {
-        existing.inflows += amount;
-      }
+      amount = parseAmount(event.amount, decimals);
     } catch {
       violations.push(
         `Invalid amount "${event.amount}" for event ${event.eventId}`,
@@ -120,7 +153,14 @@ export function checkAssetConservation(
       continue;
     }
 
-    bySymbol.set(event.symbol, existing);
+    const bucket = existing ?? { outflows: 0n, inflows: 0n, decimals };
+    if (event.eventType === "bridge_out") {
+      bucket.outflows += amount;
+    } else {
+      bucket.inflows += amount;
+    }
+
+    bySymbol.set(event.symbol, bucket);
   }
 
   for (const [symbol, { outflows, inflows }] of bySymbol) {

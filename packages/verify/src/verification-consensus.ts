@@ -40,10 +40,24 @@ export function isConsensusReached(
 /**
  * Aggregate multiple verifier reports into a consensus result.
  *
- * Rules:
- * - If >50% of verifiers report PASS, consensus is PASS
+ * Sybil resistance (A-VERIFY-001): quorum and pass/fail tallies are computed
+ * over DISTINCT `verifierId`s, never the raw report count. One actor submitting
+ * N PASS reports under the same identity therefore counts as a single vote and
+ * cannot forge a quorum. Multiple reports from the same identity are collapsed:
+ * - if they all agree, the single agreed verdict is that verifier's vote;
+ * - if they CONFLICT (e.g. one PASS, one FAIL), the verifier is counted as a
+ *   FAIL vote (reject-on-conflict) — a self-contradicting verifier must not be
+ *   able to swing consensus toward PASS.
+ *
+ * Bundle agreement (A-VERIFY-001): all counted reports must concern the SAME
+ * `bundleHash`. A verifier that passed a different bundle proves nothing about
+ * the bundle under consensus, so any disagreement on bundleHash among the
+ * counted verifiers makes the consensus FAIL.
+ *
+ * Other rules:
+ * - If >50% of distinct verifiers report PASS, consensus is PASS
  * - If exactly 50/50, consensus is FAIL (conservative)
- * - Verifiers who disagree with the majority are listed as dissenters
+ * - Verifiers who disagree with the majority verdict are listed as dissenters
  * - If no reports are provided, verdict is FAIL with 0 agreement
  *
  * The default `minimumVerifiers` of 1 is permissive: a caller that omits the
@@ -53,20 +67,18 @@ export function isConsensusReached(
  * can refuse it and demand an explicit threshold of >= 2.
  *
  * @param reports - All submitted verifier reports
- * @param minimumVerifiers - Minimum verifiers before consensus is valid (default: 1, permissive — see above)
+ * @param minimumVerifiers - Minimum DISTINCT verifiers before consensus is valid (default: 1, permissive — see above)
  * @returns ConsensusResult with verdict, counts, dissenters, and the weak-quorum flag
  */
 export function aggregateVerifierReports(
   reports: readonly VerifierReport[],
   minimumVerifiers: number = 1,
 ): ConsensusResult {
-  const total = reports.length;
-
   // A PASS is "single-verifier" (weak) when the applied quorum threshold is
-  // <= 1, i.e. one verifier would have sufficed. Computed per-verdict below.
+  // <= 1, i.e. one verifier would have sufficed.
   const weakThreshold = minimumVerifiers <= 1;
 
-  if (total === 0) {
+  if (reports.length === 0) {
     return {
       verdict: "FAIL",
       totalVerifiers: 0,
@@ -75,28 +87,65 @@ export function aggregateVerifierReports(
       agreementRatio: 0,
       quorumReached: false,
       singleVerifierPass: false,
+      bundleAgreement: true,
       dissenters: [],
       consensusAt: new Date().toISOString(),
     };
   }
 
-  const passCount = reports.filter((r) => r.verdict === "PASS").length;
+  // ── Collapse reports to one vote per DISTINCT verifierId ──────────────────
+  // Insertion order is preserved so dissenter ordering stays deterministic.
+  interface Vote {
+    verdict: VerificationVerdict;
+    bundleHash: string;
+    conflicted: boolean;
+  }
+  const byVerifier = new Map<string, Vote>();
+  for (const r of reports) {
+    const prior = byVerifier.get(r.verifierId);
+    if (!prior) {
+      byVerifier.set(r.verifierId, {
+        verdict: r.verdict,
+        bundleHash: r.bundleHash,
+        conflicted: false,
+      });
+      continue;
+    }
+    // Reject-on-conflict: a verifier that submits disagreeing verdicts (or
+    // verdicts against different bundles) is no longer trustworthy → FAIL vote.
+    if (prior.verdict !== r.verdict || prior.bundleHash !== r.bundleHash) {
+      prior.conflicted = true;
+      prior.verdict = "FAIL";
+    }
+  }
+
+  const votes = [...byVerifier.values()];
+  const total = votes.length;
+
+  // ── Bundle agreement: all counted verifiers must concern one bundleHash ───
+  // (Conflicted verifiers are already FAIL; among the rest, a split on
+  // bundleHash means the verifiers are not attesting to the same artifact.)
+  const distinctBundles = new Set(votes.map((v) => v.bundleHash));
+  const bundleAgreement = distinctBundles.size <= 1;
+
+  const passCount = votes.filter((v) => v.verdict === "PASS").length;
   const failCount = total - passCount;
 
   const quorumReached = total >= minimumVerifiers;
 
-  // Majority rule: strictly more than 50% must PASS for consensus PASS.
-  // If quorum is not reached, verdict is always FAIL — a compromised single
-  // verifier cannot approve anything when minimumVerifiers requires more.
+  // Majority rule: strictly more than 50% of DISTINCT verifiers must PASS.
+  // Quorum must be met AND all counted verifiers must agree on the bundleHash,
+  // otherwise the verdict is FAIL — a compromised single verifier, a forged
+  // quorum, or an off-bundle PASS cannot approve anything.
   const verdict: VerificationVerdict =
-    quorumReached && passCount > total / 2 ? "PASS" : "FAIL";
+    quorumReached && bundleAgreement && passCount > total / 2 ? "PASS" : "FAIL";
 
-  // Dissenters are those who disagree with the majority verdict
-  const dissenters = reports
-    .filter((r) => r.verdict !== verdict)
-    .map((r) => r.verifierId);
+  // Dissenters are distinct verifiers whose vote disagrees with the verdict.
+  const dissenters = [...byVerifier.entries()]
+    .filter(([, v]) => v.verdict !== verdict)
+    .map(([verifierId]) => verifierId);
 
-  // Agreement ratio: proportion of verifiers who agree with the verdict
+  // Agreement ratio: proportion of distinct verifiers who agree with the verdict
   const majorityCount = verdict === "PASS" ? passCount : failCount;
   const agreementRatio = majorityCount / total;
 
@@ -109,6 +158,7 @@ export function aggregateVerifierReports(
     quorumReached,
     // Flag a PASS that only required a lone verifier (weak quorum threshold).
     singleVerifierPass: verdict === "PASS" && weakThreshold,
+    bundleAgreement,
     dissenters,
     consensusAt: new Date().toISOString(),
   };

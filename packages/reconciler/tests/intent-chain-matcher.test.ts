@@ -284,6 +284,93 @@ describe("IntentChainMatcher", () => {
     });
   });
 
+  describe("malformed chain amounts (A-REC-003)", () => {
+    // An untrusted chain event with a non-numeric amount must NOT throw out of
+    // the whole reconciliation batch. The bad match is flagged; the batch
+    // continues.
+    it("does not throw when a matched chain amount is malformed", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-bad",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          txHash: "0xbad",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xbad",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "0xdeadbeef", // malformed — BigInt() would throw
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+      ];
+
+      expect(() => matcher.match(intents, events)).not.toThrow();
+      const results = matcher.match(intents, events);
+      const bad = results.find((r) => r.txHash === "0xbad")!;
+      expect(bad).toBeDefined();
+      expect(bad.status).not.toBe("matched");
+      expect(bad.structuredDiscrepancies.length).toBeGreaterThan(0);
+    });
+
+    it("one malformed event does not abort reconciliation of good intents", () => {
+      const intents: ReconcilableIntent[] = [
+        {
+          id: "intent-good",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("100.000000"),
+          txHash: "0xgood",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+        {
+          id: "intent-bad2",
+          status: "executed",
+          kind: "transfer",
+          amount: usdc("50.000000"),
+          txHash: "0xbad2",
+          declaredAt: "2024-01-01T00:00:00Z",
+        },
+      ];
+      const events: ReconcilableChainEvent[] = [
+        {
+          chainId: "eth:1",
+          txHash: "0xgood",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "100000000",
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+        {
+          chainId: "eth:1",
+          txHash: "0xbad2",
+          from: "0xsender",
+          to: "0xreceiver",
+          amount: "50.0", // not an integer string — BigInt() would throw
+          decimals: 6,
+          symbol: "USDC",
+          timestamp: "2024-01-01T00:00:01Z",
+        },
+      ];
+
+      const results = matcher.match(intents, events);
+      const good = results.find((r) => r.txHash === "0xgood")!;
+      expect(good.status).toBe("matched");
+      const bad = results.find((r) => r.txHash === "0xbad2")!;
+      expect(bad.status).not.toBe("matched");
+      expect(bad.structuredDiscrepancies.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("cross-decimal matching", () => {
     it("handles different decimal bases correctly", () => {
       const intents: ReconcilableIntent[] = [

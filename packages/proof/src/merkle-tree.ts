@@ -14,7 +14,12 @@
  * - Caller-supplied leaves stay UNTAGGED in MerkleProof.leafHash; the tag
  *   is applied internally at build + verify time. This keeps the proof
  *   leafHash equal to the value the caller hashed (e.g. an attestation hash).
- * - Odd leaf count: duplicate the last leaf to make even
+ * - Odd node count: the last unpaired node is PROMOTED (carried up to the
+ *   next level unchanged), per RFC 6962. It is never hashed with itself.
+ *   This makes the tree shape unambiguous and defeats the odd-leaf
+ *   duplication forgery (CVE-2012-2459): self-duplication would let
+ *   build([a,b,c]) and build([a,b,c,c]) share a root, minting a valid
+ *   inclusion proof for a phantom duplicated leaf.
  * - Empty tree: null root
  * - Single leaf: root is H(0x00 || leaf) — NOT the raw leaf (so it cannot
  *   be confused with an internal node)
@@ -104,10 +109,16 @@ function buildTree(leaves: readonly string[]): MerkleNode | null {
     for (let i = 0; i < currentLevel.length; i += 2) {
       const left = currentLevel[i]!;
 
-      // If odd number of nodes, duplicate the last one
-      const right =
-        i + 1 < currentLevel.length ? currentLevel[i + 1]! : left;
+      // RFC 6962 odd-node PROMOTION (defeats CVE-2012-2459): if this is the
+      // last node with no right sibling, carry it UP to the next level
+      // unchanged rather than hashing it with itself. Self-duplication would
+      // make build([a,b,c]) and build([a,b,c,c]) collide on the same root.
+      if (i + 1 >= currentLevel.length) {
+        nextLevel.push(left);
+        continue;
+      }
 
+      const right = currentLevel[i + 1]!;
       const parentHash = hashPair(left.hash, right.hash);
       nextLevel.push({
         hash: parentHash,
@@ -214,32 +225,33 @@ export class MerkleTree {
     // Reconstruct levels to find siblings at each level. The bottom level is
     // the TAGGED leaf digests (matching buildTree); every sibling we emit is
     // therefore a tagged-leaf or internal digest, exactly what verifyProof
-    // folds together.
+    // folds together. Odd nodes are PROMOTED (RFC 6962), matching buildTree.
     let currentLevel = this.leaves.map(hashLeaf);
 
     while (currentLevel.length > 1) {
       const nextLevel: string[] = [];
 
       for (let i = 0; i < currentLevel.length; i += 2) {
-        const left = currentLevel[i]!;
-        const right = i + 1 < currentLevel.length ? currentLevel[i + 1]! : left;
-        nextLevel.push(hashPair(left, right));
+        // RFC 6962 promotion: the last unpaired node moves up unchanged.
+        if (i + 1 >= currentLevel.length) {
+          nextLevel.push(currentLevel[i]!);
+          continue;
+        }
+        nextLevel.push(hashPair(currentLevel[i]!, currentLevel[i + 1]!));
       }
 
-      // Determine sibling for currentIndex
       const isLeft = currentIndex % 2 === 0;
       const siblingIndex = isLeft ? currentIndex + 1 : currentIndex - 1;
 
-      // Handle odd count: if we're the last element with no sibling, use self
-      const sibling =
-        siblingIndex < currentLevel.length
-          ? currentLevel[siblingIndex]!
-          : currentLevel[currentIndex]!;
-
-      siblings.push({
-        hash: sibling,
-        direction: isLeft ? "right" : "left",
-      });
+      // A node at the end of an odd level has NO sibling — it is promoted
+      // unchanged, so no proof step is emitted for this level. Its index in
+      // the parent level is currentIndex / 2 (it became position i/2 there).
+      if (siblingIndex < currentLevel.length) {
+        siblings.push({
+          hash: currentLevel[siblingIndex]!,
+          direction: isLeft ? "right" : "left",
+        });
+      }
 
       // Move to parent index
       currentIndex = Math.floor(currentIndex / 2);

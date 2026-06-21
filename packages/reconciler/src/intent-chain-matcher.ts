@@ -98,6 +98,35 @@ export class IntentChainMatcher {
           continue;
         }
 
+        // A-REC-003: chain amounts are untrusted strings. A malformed value would
+        // make BigInt() throw a SyntaxError that, uncaught, aborts the WHOLE
+        // reconciliation batch. Validate before converting; on failure flag this
+        // single match and continue so one bad event cannot poison the batch.
+        if (!/^-?\d+$/.test(matchingEvent.amount)) {
+          const expected = formatAmount(
+            parseAmount(intent.amount.amount, intent.amount.decimals),
+            intent.amount.decimals,
+          );
+          const actual = matchingEvent.amount;
+          const msg =
+            `Invalid chain amount: intent=${expected} ` +
+            `chain="${actual}" (not an integer string)`;
+          results.push({
+            intentId: intent.id,
+            txHash: intent.txHash,
+            chainId: matchingEvent.chainId,
+            status: "amount-mismatch",
+            intentAmount: intent.amount,
+            chainAmount: matchingEvent.amount,
+            chainDecimals: matchingEvent.decimals,
+            discrepancies: [msg],
+            structuredDiscrepancies: [
+              makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
+            ],
+          });
+          continue;
+        }
+
         const intentRaw = parseAmount(intent.amount.amount, intent.amount.decimals);
         const chainRaw = BigInt(matchingEvent.amount);
 

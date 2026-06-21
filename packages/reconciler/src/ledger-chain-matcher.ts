@@ -95,6 +95,35 @@ export class LedgerChainMatcher {
         continue;
       }
 
+      // A-REC-003: chain amounts are untrusted strings. A malformed value would
+      // make BigInt() throw a SyntaxError that, uncaught, aborts the WHOLE
+      // reconciliation batch. Validate before converting; on failure flag this
+      // single match and continue so one bad event cannot poison the batch.
+      if (!/^-?\d+$/.test(matchingEvent.amount)) {
+        const expected = formatAmount(
+          parseAmount(entry.money.amount, entry.money.decimals),
+          entry.money.decimals,
+        );
+        const actual = matchingEvent.amount;
+        const msg =
+          `Invalid chain amount: ledger=${expected} ` +
+          `chain="${actual}" (not an integer string)`;
+        results.push({
+          correlationId: entry.correlationId,
+          txHash: entry.txHash,
+          chainId: matchingEvent.chainId,
+          status: "amount-mismatch",
+          ledgerAmount: entry.money,
+          chainAmount: matchingEvent.amount,
+          chainDecimals: matchingEvent.decimals,
+          discrepancies: [msg],
+          structuredDiscrepancies: [
+            makeDiscrepancy("AMOUNT_MISMATCH", "amount", msg, { expected, actual }),
+          ],
+        });
+        continue;
+      }
+
       // Compare amounts
       const ledgerRaw = parseAmount(entry.money.amount, entry.money.decimals);
       // Chain amount is already in smallest unit (wei/drops)

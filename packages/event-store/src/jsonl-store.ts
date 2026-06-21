@@ -37,6 +37,7 @@ import {
   mkdirSync,
   unlinkSync,
   writeFileSync,
+  statSync,
 } from "node:fs";
 import { constants } from "node:fs";
 import { basename, dirname } from "node:path";
@@ -138,6 +139,15 @@ export class JsonlEventStore implements EventStore {
 
   /** Hash of the last event in the chain (for linking new appends) */
   private _lastHash: string = GENESIS_HASH;
+
+  /**
+   * Byte size of the JSONL file as last observed by THIS store instance
+   * (after load and after each successful append). Used under the append lock
+   * to detect whether another writer advanced the file past our cached cursor
+   * — see {@link _detectExternalAdvanceUnderLock}. `undefined` means the file
+   * did not exist at construction (no baseline yet).
+   */
+  private _knownFileSize: number | undefined;
 
   /** Path to the lockfile for concurrent append protection */
   private readonly _lockPath: string;
@@ -269,6 +279,14 @@ export class JsonlEventStore implements EventStore {
     // Acquire file lock to prevent concurrent append races
     this._acquireLock();
     try {
+      // A-ES-001: the lock serializes the write syscall, but our chain cursor
+      // (_lastHash / _nextGlobalPosition) was cached at construction and is NOT
+      // re-derived under the lock. If another writer advanced the file since we
+      // loaded, appending from the stale cursor would duplicate a
+      // globalPosition and fork the chain. Detect the advance and fail closed
+      // BEFORE computing any chain links.
+      this._detectExternalAdvanceUnderLock();
+
       // Build stored events with hash chain.
       //
       // CRITICAL (fail-closed durability): compute positions and chain hashes
@@ -316,12 +334,16 @@ export class JsonlEventStore implements EventStore {
 
       // Write to file atomically (all lines in one write + fsync).
       // If this throws, no instance state has been mutated above.
-      this._writeAndSync(lines);
+      const bytesWritten = this._writeAndSync(lines);
 
       // Write succeeded — NOW commit in-memory state. From here on there are no
       // throwing operations, so partial commits are impossible.
       this._nextGlobalPosition = nextGlobalPosition;
       this._lastHash = lastHash;
+      // Advance our file-size baseline to include the bytes we just wrote, so
+      // the NEXT append's external-advance check (A-ES-001) compares against
+      // the post-write size rather than re-flagging our own write.
+      this._knownFileSize = (this._knownFileSize ?? 0) + bytesWritten;
       for (const stored of storedEvents) {
         stream.push(stored);
         this._globalLog.push(stored);
@@ -525,10 +547,15 @@ export class JsonlEventStore implements EventStore {
     let skippedLines = 0;
 
     if (!existsSync(this._filePath)) {
+      this._knownFileSize = undefined;
       return { eventsLoaded, skippedLines };
     }
 
     const content = readFileSync(this._filePath, "utf-8");
+    // Record the byte size we just read so a later append can detect whether
+    // the file advanced underneath us (A-ES-001). Using Buffer.byteLength keeps
+    // this correct for multi-byte UTF-8 content rather than .length (code units).
+    this._knownFileSize = Buffer.byteLength(content, "utf-8");
     const lines = content.split("\n");
 
     for (const line of lines) {
@@ -608,6 +635,27 @@ export class JsonlEventStore implements EventStore {
    * already exists, another process holds the lock.
    *
    * Retries with a short spin-wait for up to 5 seconds before giving up.
+   *
+   * Guarantees and limits:
+   * - GUARANTEED: only one holder of the lock performs the write syscall at a
+   *   time, so two processes never interleave bytes in the JSONL file.
+   * - NOT guaranteed by the lock alone: that this instance's cached chain
+   *   cursor (`_lastHash` / `_nextGlobalPosition`) reflects writes made by
+   *   OTHER processes while this instance held nothing. The cursor is cached at
+   *   load and only advanced by this instance's own appends. `append()` closes
+   *   that gap by calling {@link _detectExternalAdvanceUnderLock} under the
+   *   lock and failing closed with CONCURRENCY_CONFLICT if the file grew (see
+   *   A-ES-001) — the lock plus that check together prevent forked chains.
+   *
+   * TODO (stale-lock robustness): a writer that crashes between acquire and
+   * release leaves the lockfile behind, and every subsequent append then times
+   * out with LOCK_TIMEOUT forever. The holder's PID is already written into the
+   * lockfile (see below); a future enhancement could read it and break a lock
+   * whose PID is no longer alive (e.g. `process.kill(pid, 0)` throwing ESRCH).
+   * Left as a TODO rather than implemented here because PID-liveness checks are
+   * racy across PID reuse and hard to test deterministically without a second
+   * real process; breaking a live writer's lock would be far worse than the
+   * current fail-closed timeout. Do not add this without a safe, isolated test.
    */
   private _acquireLock(): void {
     const maxWaitMs = 5_000;
@@ -673,9 +721,71 @@ export class JsonlEventStore implements EventStore {
   }
 
   /**
-   * Write data to the JSONL file and fsync for durability.
+   * Detect, under the held append lock, whether another writer advanced the
+   * on-disk file past the state THIS instance has cached.
+   *
+   * The lockfile serializes the write syscall, but `_lastHash` /
+   * `_nextGlobalPosition` are cached at construction (or after our own last
+   * append) and are NOT re-derived from disk under the lock. If a second
+   * process appended in between, computing chain links from our stale cursor
+   * would write a record that duplicates a globalPosition and forks the chain
+   * (A-ES-001). We therefore compare the current file size to the size we last
+   * observed: any growth means the file advanced externally.
+   *
+   * On detection we fail closed with CONCURRENCY_CONFLICT rather than writing a
+   * forked record. This instance's in-memory view is stale; the caller should
+   * discard it and re-open the store (a fresh load re-derives the cursor from
+   * the now-current file). We deliberately do NOT attempt an in-place tail
+   * reload here — reconciling externally-authored events into the per-stream /
+   * global in-memory indexes mid-append is error-prone, and failing closed is
+   * the safe, auditable behavior for a tamper-evident log.
+   *
+   * @throws EventStoreError("CONCURRENCY_CONFLICT") if the file advanced.
    */
-  private _writeAndSync(data: string): void {
+  private _detectExternalAdvanceUnderLock(): void {
+    let currentSize: number | undefined;
+    try {
+      currentSize = statSync(this._filePath).size;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        // File does not exist on disk. If we believed it did (we have a cached
+        // size), it was removed/truncated underneath us — treat as an external
+        // change rather than silently recreating a divergent file.
+        if (this._knownFileSize !== undefined) {
+          throw new EventStoreError(
+            "CONCURRENCY_CONFLICT",
+            `Event log "${basename(this._filePath)}" disappeared since this store was opened — another process may have removed or replaced it. Re-open the store to continue.`,
+          );
+        }
+        return;
+      }
+      throw err;
+    }
+
+    const baseline = this._knownFileSize ?? 0;
+    if (currentSize > baseline) {
+      this._emit({
+        op: "append",
+        level: "error",
+        outcome: "failed",
+        attributes: { code: "CONCURRENCY_CONFLICT", baseline, currentSize },
+        message: `external append detected on ${basename(this._filePath)}: file grew from ${baseline} to ${currentSize} bytes since this store loaded`,
+      });
+      throw new EventStoreError(
+        "CONCURRENCY_CONFLICT",
+        `Event log "${basename(this._filePath)}" was modified by another writer since this store was opened (file grew from ${baseline} to ${currentSize} bytes). Refusing to append from a stale chain cursor, which would fork the hash chain. Re-open the store to continue.`,
+      );
+    }
+  }
+
+  /**
+   * Write data to the JSONL file and fsync for durability.
+   *
+   * @returns the number of bytes appended, so the caller can advance the
+   *   cached {@link _knownFileSize} cursor without a follow-up stat.
+   */
+  private _writeAndSync(data: string): number {
+    const byteLength = Buffer.byteLength(data, "utf-8");
     const fd = openSync(this._filePath, "a");
     try {
       appendFileSync(fd, data, "utf-8");
@@ -683,6 +793,7 @@ export class JsonlEventStore implements EventStore {
     } finally {
       closeSync(fd);
     }
+    return byteLength;
   }
 
   private _dispatch(streamId: string, events: readonly StoredEvent[]): void {
