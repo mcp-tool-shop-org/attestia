@@ -17,7 +17,8 @@
  */
 
 // Top-level vault
-export { Vault } from "./vault.js";
+export { Vault, VaultError, CURRENT_VAULT_SNAPSHOT_VERSION } from "./vault.js";
+export type { VaultErrorCode } from "./vault.js";
 
 // Subsystems
 export { BudgetEngine, BudgetError } from "./budget.js";
@@ -30,6 +31,7 @@ export { PortfolioObserver } from "./portfolio.js";
 export type {
   TokenPosition,
   Portfolio,
+  ObservationError,
   CurrencyTotal,
   Envelope,
   AllocationRequest,

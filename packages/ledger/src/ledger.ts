@@ -46,6 +46,14 @@ import { LedgerError } from "./types.js";
 import { parseAmount } from "./money-math.js";
 
 /**
+ * The single snapshot schema version this build can produce and restore.
+ * {@link Ledger.snapshot} stamps it and {@link Ledger.fromSnapshot} asserts it,
+ * so a future schema bump becomes a deliberate, versioned migration rather than
+ * a silent reinterpretation of an incompatible snapshot (B-LES-003).
+ */
+export const SUPPORTED_SNAPSHOT_VERSION = 1 as const;
+
+/**
  * Append-only double-entry ledger.
  *
  * Every append must be a balanced set of entries where total debits
@@ -369,7 +377,7 @@ export class Ledger {
    */
   snapshot(): LedgerSnapshot {
     return {
-      version: 1,
+      version: SUPPORTED_SNAPSHOT_VERSION,
       accounts: this._accounts.getAll(),
       entries: [...this._entries],
       createdAt: new Date().toISOString(),
@@ -379,8 +387,25 @@ export class Ledger {
   /**
    * Restore a ledger from a snapshot.
    * Replays all accounts and entries, preserving full validation.
+   *
+   * Fail-closed on snapshot schema version (B-LES-003): a snapshot produced by a
+   * future, incompatible schema (different entry shape, new required field,
+   * changed semantics) must NOT be silently replayed under current assumptions —
+   * that is exactly the schema-drift corruption this package exists to prevent.
+   * We assert the version up front, so the upgrade path is a deliberate code
+   * change (add a migration) rather than a silent misinterpretation.
+   *
+   * @throws LedgerError("UNSUPPORTED_SNAPSHOT_VERSION") if the snapshot's
+   *   `version` is not the supported version.
    */
   static fromSnapshot(snapshot: LedgerSnapshot): Ledger {
+    if (snapshot.version !== SUPPORTED_SNAPSHOT_VERSION) {
+      throw new LedgerError(
+        "UNSUPPORTED_SNAPSHOT_VERSION",
+        `Cannot restore ledger snapshot version ${String(snapshot.version)}: this build supports snapshot version ${SUPPORTED_SNAPSHOT_VERSION} only. Restoring a snapshot from a different schema would risk silently misreading entries. Use a build that supports version ${String(snapshot.version)}, or run an explicit migration to version ${SUPPORTED_SNAPSHOT_VERSION} first.`,
+      );
+    }
+
     const ledger = new Ledger();
 
     // Restore accounts

@@ -42,9 +42,12 @@ export {
 // Retry
 export {
   withRetry,
+  withTimeout,
   DEFAULT_RETRY_CONFIG,
+  DEFAULT_SUBMIT_TIMEOUT_MS,
   isRetryableXrplError,
   RetryExhaustedError,
+  AttemptTimeoutError,
 } from "./retry.js";
 export type { RetryConfig } from "./retry.js";
 
@@ -76,6 +79,7 @@ export {
   isPolicyRotatedEvent,
   MultiSigSubmitter,
   MultiSigWitness,
+  DEFAULT_MAX_RECORDS,
   normalizeTimestamp,
   validateAuthority,
   replayGovernanceHistory,

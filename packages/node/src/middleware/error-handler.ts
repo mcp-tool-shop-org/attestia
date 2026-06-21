@@ -20,7 +20,12 @@
  */
 
 import type { Context } from "hono";
+import type { Logger } from "pino";
 import { createErrorEnvelope } from "../types/error.js";
+import type { MetricsCollector } from "./metrics.js";
+
+/** Metric name for the server-side 5xx counter (B-NODE-005). */
+export const SERVER_ERROR_COUNTER = "attestia_server_errors_total";
 
 // =============================================================================
 // Domain Error → HTTP Status Mapping
@@ -78,6 +83,14 @@ const STATUS_MAP: Record<string, number> = {
   ENVELOPE_NOT_FOUND: 404,
   INSUFFICIENT_BUDGET: 422,
   CURRENCY_MISMATCH: 400,
+
+  // Governance errors (SEAM-2): the GovernanceStore throws plain Errors which
+  // the service delegators translate to these coded conflicts so they surface as
+  // 4xx rather than a generic 500.
+  SIGNER_EXISTS: 409,
+  SIGNER_NOT_FOUND: 404,
+  INVALID_QUORUM: 400,
+  GOVERNANCE_CONFLICT: 409,
 };
 
 // =============================================================================
@@ -287,6 +300,24 @@ const CODE_MESSAGES: Record<string, HumanError> = {
     message: "The requester of an action cannot also approve it.",
     hint: "A different authorized approver must approve this request (separation of duties).",
   },
+
+  // ── Governance domain codes (SEAM-2) ─────────────────────────────────────
+  SIGNER_EXISTS: {
+    message: "A signer with that address already exists in the governance policy.",
+    hint: "Use a different signer address, or update the existing signer.",
+  },
+  SIGNER_NOT_FOUND: {
+    message: "The requested signer was not found in the governance policy.",
+    hint: "Verify the signer address; it may already have been removed.",
+  },
+  INVALID_QUORUM: {
+    message: "The requested governance change is invalid.",
+    hint: "The quorum, weight, or key is out of range — check it against the current signer set and retry.",
+  },
+  GOVERNANCE_CONFLICT: {
+    message: "The governance change conflicts with the current policy state.",
+    hint: "Re-fetch the current policy to see its state, then retry.",
+  },
 };
 
 /**
@@ -323,29 +354,75 @@ function getErrorCode(error: DomainError): string {
 // =============================================================================
 
 /**
- * Global error handler. Registered as Hono's onError handler.
+ * Dependencies for {@link createErrorHandler}. Both optional so the handler
+ * works in tests/dev with no observability wired.
  */
-export function handleError(err: Error, c: Context): Response {
-  const domainError = err as unknown as DomainError;
-  const status = getStatusCode(domainError);
-  const code = getErrorCode(domainError);
-
-  // 5xx: never reveal internals — a single generic message, no hint.
-  if (status >= 500) {
-    return c.json(
-      createErrorEnvelope(code, "Internal server error"),
-      status as 400,
-    );
-  }
-
-  // 4xx: a curated, safe human message + hint. Prefer the per-code copy; fall
-  // back to a status-class generic. Never the bare code, never the raw message.
-  const curated = CODE_MESSAGES[code];
-  const message =
-    curated?.message ??
-    STATUS_CLASS_FALLBACK[status] ??
-    "The request could not be processed.";
-  const hint = curated?.hint;
-
-  return c.json(createErrorEnvelope(code, message, hint), status as 400);
+export interface ErrorHandlerDeps {
+  /** Logger used to record the full 5xx fault server-side (B-NODE-005). */
+  readonly logger?: Pick<Logger, "error"> | undefined;
+  /** Metrics collector incremented on each 5xx (B-NODE-005). */
+  readonly metrics?: Pick<MetricsCollector, "incrementCounter"> | undefined;
 }
+
+/**
+ * Build the global error handler with optional observability wiring.
+ *
+ * For 5xx faults, the full error (message, stack, code) is logged server-side
+ * with the request id BEFORE the generic envelope is returned (B-NODE-005), so
+ * an internal fault is diagnosable from the logs instead of being a bare `500`.
+ * The same request id is echoed in the client envelope so a caller can quote it
+ * in a support request, tying the two records together. The client still never
+ * sees internal detail.
+ */
+export function createErrorHandler(
+  deps: ErrorHandlerDeps = {},
+): (err: Error, c: Context) => Response {
+  return (err: Error, c: Context): Response => {
+    const domainError = err as unknown as DomainError;
+    const status = getStatusCode(domainError);
+    const code = getErrorCode(domainError);
+
+    // 5xx: never reveal internals to the client — but record the real cause
+    // server-side so operators are not blind (B-NODE-005).
+    if (status >= 500) {
+      const requestId = c.get("requestId");
+      deps.logger?.error(
+        {
+          err,
+          code,
+          requestId,
+          method: c.req.method,
+          path: c.req.path,
+        },
+        "Unhandled server error",
+      );
+      deps.metrics?.incrementCounter(SERVER_ERROR_COUNTER, { code });
+
+      // Echo the request id (as details) so a caller can quote it; it is not
+      // sensitive and links the client-side and server-side records.
+      const details = requestId !== undefined ? { requestId } : undefined;
+      return c.json(
+        createErrorEnvelope(code, "Internal server error", undefined, details),
+        status as 400,
+      );
+    }
+
+    // 4xx: a curated, safe human message + hint. Prefer the per-code copy; fall
+    // back to a status-class generic. Never the bare code, never the raw message.
+    const curated = CODE_MESSAGES[code];
+    const message =
+      curated?.message ??
+      STATUS_CLASS_FALLBACK[status] ??
+      "The request could not be processed.";
+    const hint = curated?.hint;
+
+    return c.json(createErrorEnvelope(code, message, hint), status as 400);
+  };
+}
+
+/**
+ * Global error handler with no observability wiring. Registered as Hono's
+ * onError handler in tests/dev; `createApp` uses {@link createErrorHandler} with
+ * the real logger + metrics. Kept for backward compatibility.
+ */
+export const handleError = createErrorHandler();

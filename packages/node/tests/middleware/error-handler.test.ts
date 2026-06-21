@@ -5,10 +5,15 @@
  * and the error envelope format.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../src/types/api-contract.js";
-import { handleError } from "../../src/middleware/error-handler.js";
+import {
+  handleError,
+  createErrorHandler,
+  SERVER_ERROR_COUNTER,
+} from "../../src/middleware/error-handler.js";
+import { requestIdMiddleware } from "../../src/middleware/request-id.js";
 import { createTestApp, jsonRequest } from "../setup.js";
 
 describe("error handler", () => {
@@ -215,5 +220,89 @@ describe("curated 4xx messages + hints (D6-B-002)", () => {
     expect(body.error.code).toBe("INVALID_AMOUNT");
     expect(body.error.message).not.toBe("INVALID_AMOUNT");
     expect(body.error.message).not.toContain("tableX");
+  });
+});
+
+// =============================================================================
+// B-NODE-005 [observability]: 5xx faults are logged server-side (full error +
+// requestId) and counted, and the (non-sensitive) requestId is echoed to the
+// client so the two records can be correlated. The client still sees nothing
+// internal.
+// =============================================================================
+
+describe("5xx server-side observability (B-NODE-005)", () => {
+  function makeApp(deps: Parameters<typeof createErrorHandler>[0]) {
+    const app = new Hono<AppEnv>();
+    app.use("*", requestIdMiddleware());
+    app.onError(createErrorHandler(deps));
+    app.get("/throw", () => {
+      throw new Error("Connection to postgres://admin:password@db refused");
+    });
+    return app;
+  }
+
+  it("logs the full error with the requestId at error level", async () => {
+    const errorLog = vi.fn();
+    const app = makeApp({ logger: { error: errorLog } });
+
+    const res = await app.request("/throw", {
+      headers: { "X-Request-Id": "req-abc-123" },
+    });
+    expect(res.status).toBe(500);
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    const [fields] = errorLog.mock.calls[0]!;
+    // The real error (with its sensitive message) is captured server-side.
+    expect(fields.err).toBeInstanceOf(Error);
+    expect((fields.err as Error).message).toContain("postgres");
+    expect(fields.requestId).toBe("req-abc-123");
+    expect(fields.code).toBe("INTERNAL_ERROR");
+  });
+
+  it("increments the 5xx counter", async () => {
+    const incrementCounter = vi.fn();
+    const app = makeApp({ metrics: { incrementCounter } });
+
+    await app.request("/throw");
+
+    expect(incrementCounter).toHaveBeenCalledWith(
+      SERVER_ERROR_COUNTER,
+      expect.objectContaining({ code: "INTERNAL_ERROR" }),
+    );
+  });
+
+  it("echoes the requestId to the client but no internal detail", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/throw", {
+      headers: { "X-Request-Id": "req-xyz-789" },
+    });
+    const body = (await res.json()) as {
+      error: { message: string; details?: { requestId?: string } };
+    };
+
+    // Generic client message — no leak.
+    expect(body.error.message).toBe("Internal server error");
+    expect(JSON.stringify(body)).not.toContain("postgres");
+    // …but the requestId is present so the caller can quote it for support.
+    expect(body.error.details?.requestId).toBe("req-xyz-789");
+  });
+
+  it("does not log or count for 4xx client errors", async () => {
+    const errorLog = vi.fn();
+    const incrementCounter = vi.fn();
+    const app = new Hono<AppEnv>();
+    app.use("*", requestIdMiddleware());
+    app.onError(createErrorHandler({ logger: { error: errorLog }, metrics: { incrementCounter } }));
+    app.get("/throw", () => {
+      const err = new Error("boom") as Error & { code: string };
+      err.code = "INTENT_NOT_FOUND";
+      throw err;
+    });
+
+    const res = await app.request("/throw");
+    expect(res.status).toBe(404);
+    expect(errorLog).not.toHaveBeenCalled();
+    expect(incrementCounter).not.toHaveBeenCalled();
   });
 });

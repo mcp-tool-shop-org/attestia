@@ -113,8 +113,23 @@ export type DistributionStatus = "draft" | "approved" | "executed" | "failed";
 /** A recipient in a distribution. */
 export interface DistributionRecipient {
   readonly payeeId: string;
-  /** For proportional: basis points (1/10000th). For fixed: the amount. */
-  readonly share: number;
+  /**
+   * For proportional/milestone: basis points (1/10000th), bounded ≤ 10000.
+   * For fixed: a fallback numeric amount, kept for backward compatibility.
+   *
+   * For the "fixed" strategy, prefer {@link amount} — a decimal-string Money
+   * value that never round-trips through a JS number. A JS number loses
+   * integer precision above 2^53 (`String(9007199254740993)` yields
+   * `"9007199254740992"`), so a fixed `share` above `Number.MAX_SAFE_INTEGER`
+   * is rejected with INVALID_SHARES rather than silently paying the wrong sum.
+   */
+  readonly share?: number;
+  /**
+   * For the "fixed" strategy: the exact payout amount as a decimal-string
+   * Money value. Preferred over {@link share} — preserves precision for large
+   * amounts. Ignored by proportional/milestone strategies.
+   */
+  readonly amount?: Money;
   /** For milestone: whether the milestone was met. */
   readonly milestoneMet?: boolean;
   /** The resolved payout amount (set during execution). */

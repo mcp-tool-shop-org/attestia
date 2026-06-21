@@ -12,14 +12,17 @@
  * - Compatible with existing XrplSubmitter memo format
  */
 
-import { Client as XrplClient, Wallet, multisign, decode } from "xrpl";
+import { Client as XrplClient, Wallet, multisign, decode, hashes } from "xrpl";
 import type { Payment, Transaction } from "xrpl";
 import { encodeMemo } from "../memo-encoder.js";
 import type { AttestationPayload, WitnessRecord, XrplMemo, SecretProvider } from "../types.js";
 import { WitnessSubmitError, resolveSecret } from "../types.js";
 import {
   withRetry,
+  withTimeout,
+  AttemptTimeoutError,
   DEFAULT_RETRY_CONFIG,
+  DEFAULT_SUBMIT_TIMEOUT_MS,
   isRetryableXrplError,
   type RetryConfig,
 } from "../retry.js";
@@ -75,6 +78,16 @@ export interface MultiSigConfig {
   /** Optional connection timeout */
   readonly timeoutMs?: number;
 
+  /**
+   * Optional per-attempt `submitAndWait` deadline (ms) (PB-WCO-002). Bounds how
+   * long a single submission attempt waits for ledger validation so a hung /
+   * half-open WebSocket cannot stall the retry loop. On expiry the attempt is
+   * treated as a possibly-applied transient and retried; the fixed-hash
+   * idempotency check recovers a lost-but-applied tx. Defaults to
+   * {@link DEFAULT_SUBMIT_TIMEOUT_MS}; `<= 0` disables.
+   */
+  readonly submitTimeoutMs?: number;
+
   /** Optional retry configuration */
   readonly retry?: RetryConfig;
 
@@ -119,11 +132,13 @@ export class MultiSigSubmitter {
   private wallets: Map<string, Wallet> = new Map();
   private readonly config: MultiSigConfig;
   private readonly retryConfig: RetryConfig;
+  private readonly submitTimeoutMs: number;
   private readonly telemetry: SubmitTelemetry;
 
   constructor(config: MultiSigConfig) {
     this.config = config;
     this.retryConfig = config.retry ?? DEFAULT_RETRY_CONFIG;
+    this.submitTimeoutMs = config.submitTimeoutMs ?? DEFAULT_SUBMIT_TIMEOUT_MS;
     this.telemetry = new SubmitTelemetry(config.telemetry);
   }
 
@@ -240,7 +255,7 @@ export class MultiSigSubmitter {
           if (invocation > 1) {
             this.telemetry.retry(invocation - 1);
           }
-          return this._submitSigned(payload, client, multiSignResult);
+          return this._submitSigned(payload, client, multiSignResult, invocation);
         },
         this.retryConfig,
         isRetryableXrplError,
@@ -332,13 +347,29 @@ export class MultiSigSubmitter {
     // Combine all signed blobs into a single multi-signed transaction
     const combinedBlob = multisign([...signedBlobs]);
 
+    // A-WIT-001: the transaction that actually lands on-chain is the COMBINED
+    // multi-signed blob, whose serialization (and therefore its tx id) differs
+    // from any single signer's `wallet.sign(prepared, /*multisign*/ true).hash`
+    // (`expectedHash`, the per-signer signing hash). The idempotency / replay
+    // guard (`_checkExistingTx`) queries the on-chain tx by hash, so it MUST use
+    // the combined-blob hash — querying the per-signer hash would never find the
+    // applied tx, defeating the lost-but-applied recovery (false negative →
+    // duplicate fund-affecting submission). Derive the on-chain tx id from the
+    // combined blob via xrpl's `hashes.hashSignedTx`.
+    //
+    // `expectedHash` (the per-signer hash, asserted identical across signers
+    // above) is retained only as a tamper guard: a signer producing a different
+    // per-signer hash signed different transaction content and is rejected before
+    // we reach here. It is NOT the on-chain hash.
+    const onChainTxHash = hashes.hashSignedTx(combinedBlob);
+
     return {
       signedBlobs,
       signerSignatures,
       combinedBlob,
-      // expectedHash is the prepared-tx hash, identical across signers (asserted
-      // above) and stable for the fixed autofilled transaction.
-      txHash: expectedHash ?? "",
+      // The on-chain transaction id for the combined multi-signed blob — the
+      // hash the replay/idempotency check must query (A-WIT-001).
+      txHash: onChainTxHash,
     };
   }
 
@@ -391,6 +422,32 @@ export class MultiSigSubmitter {
   }
 
   /**
+   * Ensure the XRPL client is connected before a submit attempt (PB-WCO-003).
+   * On a mid-run drop, attempt a single best-effort reconnect and emit a
+   * distinct telemetry signal; on reconnect failure surface a clear, actionable
+   * error rather than the bare "not connected" the in-flight call would throw.
+   *
+   * @param client The connected XRPL client.
+   * @param attempt 1-based attempt number (for telemetry).
+   */
+  private async _ensureConnected(client: XrplClient, attempt: number): Promise<void> {
+    if (client.isConnected()) {
+      return;
+    }
+    try {
+      await client.connect();
+      this.telemetry.connectionLost("reconnected", attempt);
+    } catch (err) {
+      this.telemetry.connectionLost("failed", attempt);
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `MultiSigSubmitter: connection lost mid-submit and reconnect failed (${detail}). ` +
+        `Call connect() to recover before submitting again.`,
+      );
+    }
+  }
+
+  /**
    * Submit the pre-built, combined multi-signed transaction (one retry attempt).
    *
    * The combined blob and its expected hash are FIXED across retries (autofill +
@@ -403,8 +460,15 @@ export class MultiSigSubmitter {
     payload: AttestationPayload,
     client: XrplClient,
     multiSignResult: MultiSignResult,
+    attempt: number,
   ): Promise<WitnessRecord> {
+    // PB-WCO-003: detect a connection dropped mid-run and attempt a single
+    // best-effort reconnect before proceeding (the combined blob/hash are
+    // unchanged, so determinism + fixed-hash idempotency are preserved).
+    await this._ensureConnected(client, attempt);
+
     // Pre-submit replay/idempotency guard: is this exact tx already on-chain?
+    // Also the recovery path for a prior attempt that timed out (PB-WCO-002).
     const existing = await this._checkExistingTx(client, multiSignResult.txHash);
     if (existing) {
       // D3-B-001: lost-but-applied multi-sig tx recovered via the fixed-hash
@@ -423,8 +487,23 @@ export class MultiSigSubmitter {
       };
     }
 
-    // Submit the combined multi-signed transaction
-    const result = await client.submitAndWait(multiSignResult.combinedBlob);
+    // Submit the combined multi-signed transaction, bounded by a per-attempt
+    // deadline (PB-WCO-002): a hung submitAndWait becomes a retryable
+    // AttemptTimeoutError, and the idempotency check above recovers a possibly-
+    // applied tx on the next attempt rather than resubmitting within this one.
+    let result;
+    try {
+      result = await withTimeout(
+        () => client.submitAndWait(multiSignResult.combinedBlob),
+        this.submitTimeoutMs,
+        "submitAndWait",
+      );
+    } catch (err) {
+      if (err instanceof AttemptTimeoutError) {
+        this.telemetry.submitTimeout(err.timeoutMs, attempt);
+      }
+      throw err;
+    }
 
     const meta = result.result.meta;
     const ledgerIndex =

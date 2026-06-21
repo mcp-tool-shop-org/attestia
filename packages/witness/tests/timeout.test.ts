@@ -8,6 +8,8 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   withRetry,
+  withTimeout,
+  AttemptTimeoutError,
   RetryExhaustedError,
   isRetryableXrplError,
 } from "../src/retry.js";
@@ -63,5 +65,60 @@ describe("witness timeout scenarios", () => {
         new Error("WebSocket was closed before the connection was established"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("withTimeout (PB-WCO-002)", () => {
+  // Deterministic timer: trigger the deadline synchronously when armed.
+  function immediateTimer(cb: () => void, _ms: number) {
+    cb();
+    return { clear: () => {} };
+  }
+  // A timer that never fires (the operation should win).
+  function neverTimer(_cb: () => void, _ms: number) {
+    return { clear: () => {} };
+  }
+
+  it("resolves with the operation's value when it settles in time", async () => {
+    const result = await withTimeout(
+      () => Promise.resolve("done"),
+      1000,
+      "submitAndWait",
+      neverTimer,
+    );
+    expect(result).toBe("done");
+  });
+
+  it("rejects with AttemptTimeoutError when the deadline elapses", async () => {
+    const hung = new Promise<string>(() => {}); // never settles
+    await expect(
+      withTimeout(() => hung, 5000, "submitAndWait", immediateTimer),
+    ).rejects.toBeInstanceOf(AttemptTimeoutError);
+  });
+
+  it("AttemptTimeoutError carries the deadline + operation and is RETRYABLE", async () => {
+    const hung = new Promise<string>(() => {});
+    let caught: unknown;
+    try {
+      await withTimeout(() => hung, 1234, "submitAndWait", immediateTimer);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(AttemptTimeoutError);
+    expect((caught as AttemptTimeoutError).timeoutMs).toBe(1234);
+    expect((caught as AttemptTimeoutError).operation).toBe("submitAndWait");
+    // Crucial: a timed-out attempt must be retried (the idempotency check then
+    // recovers a possibly-applied tx), so it classifies as retryable.
+    expect(isRetryableXrplError(caught)).toBe(true);
+  });
+
+  it("timeoutMs <= 0 disables the deadline (awaits the operation directly)", async () => {
+    const result = await withTimeout(
+      () => Promise.resolve("unbounded"),
+      0,
+      "submitAndWait",
+      immediateTimer, // would fire if armed; it must NOT be armed when disabled
+    );
+    expect(result).toBe("unbounded");
   });
 });

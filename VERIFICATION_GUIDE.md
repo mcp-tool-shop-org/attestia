@@ -147,7 +147,7 @@ For each attestation with a `witnessRecord`:
 Run the full test suite to verify all invariants programmatically:
 
 ```bash
-pnpm test        # 2,220 tests
+pnpm test        # 2,564 tests
 pnpm bench       # Performance within baselines
 ```
 

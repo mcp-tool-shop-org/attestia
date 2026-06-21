@@ -44,11 +44,74 @@ export interface ObserverConfig {
    * When omitted, observers emit nothing (default {@link NOOP_TELEMETRY}),
    * keeping the package dependency-free and silent. When provided, observers
    * emit a `rpc` event (outcome `"failed"`, low-cardinality attributes
-   * `{ chainId, code }`) when a classified RPC failure occurs, so hosts can
-   * meter failure rates by chain and error class. `record` MUST NOT throw.
+   * `{ chainId, code }`) when a classified RPC failure occurs, and an
+   * `rpc.retry` event (outcome `"degraded"`, attributes `{ chainId, code }`)
+   * on each transient-failure retry, so hosts can meter failure AND retry rates
+   * by chain and error class. `record` MUST NOT throw.
    */
   readonly telemetry?: Telemetry;
+
+  /**
+   * Optional RPC retry tuning, applied uniformly across EVM, XRPL, and Solana
+   * observers (PB-WCO-001). Transient classified failures (RATE_LIMITED,
+   * RPC_TIMEOUT, RPC_UNREACHABLE) are retried with exponential backoff; all
+   * other classes fail closed immediately. Omit to use {@link DEFAULT_RPC_RETRY}.
+   */
+  readonly retry?: RpcRetryConfig;
+
+  /**
+   * Optional EVM chain descriptor for chains NOT in the observer's built-in
+   * viem map (PB-WCO-006). Supplying this lets an operator observe any
+   * EVM-JSON-RPC-compatible chain (a new L2/sidechain) by CONFIGURATION rather
+   * than a source edit + release. Only `chainId` + the config's `rpcUrl` are
+   * strictly needed for read calls; `name`/`nativeCurrency` improve labeling.
+   *
+   * Ignored by non-EVM observers. When omitted and the chain is not built-in,
+   * the EVM observer synthesizes a minimal chain from the eip155 chain id and
+   * rpcUrl, so an unknown-but-valid EVM chain degrades to "works with defaults"
+   * instead of hard-failing with UNSUPPORTED_CHAIN.
+   */
+  readonly evmChain?: EvmChainDescriptor;
 }
+
+/**
+ * Minimal description of an EVM chain, used to observe chains not in the
+ * built-in viem map (PB-WCO-006). Structural (not viem-typed) so the core
+ * observer interface stays free of a viem dependency.
+ */
+export interface EvmChainDescriptor {
+  /** Numeric EVM chain id (e.g. 8217 for Klaytn). */
+  readonly id: number;
+  /** Human-readable name (defaults to "EVM Chain <id>"). */
+  readonly name?: string;
+  /** Native currency metadata (defaults to ETH / 18). */
+  readonly nativeCurrency?: {
+    readonly name: string;
+    readonly symbol: string;
+    readonly decimals: number;
+  };
+}
+
+/**
+ * Per-observer RPC retry tuning. The same shape is honored by every chain
+ * family so operators get parity (and can tune per endpoint tier).
+ */
+export interface RpcRetryConfig {
+  /** Maximum retry attempts after the first try (0 disables retries). */
+  readonly maxRetries: number;
+  /** Base backoff delay in ms; the Nth retry waits delayMs * 2^(N-1). */
+  readonly delayMs: number;
+}
+
+/**
+ * Default RPC retry policy — 3 retries, 1s base delay (1s, 2s, 4s backoff).
+ * Mirrors the prior Solana-only default so behavior is unchanged where it
+ * already existed and now applies to EVM + XRPL too.
+ */
+export const DEFAULT_RPC_RETRY: RpcRetryConfig = {
+  maxRetries: 3,
+  delayMs: 1_000,
+};
 
 // =============================================================================
 // Connection
@@ -221,6 +284,18 @@ export interface TransferEvent {
   readonly token?: string;
   readonly timestamp: string;
   readonly observedAt: string;
+
+  /**
+   * Whether `symbol`/`decimals` were RESOLVED from on-chain metadata (`true`)
+   * or are a GUESSED default because the metadata query failed (`false`)
+   * (PB-WCO-005). In a financial-truth system a guessed `decimals` silently
+   * misstates `amount`'s magnitude for any non-18-decimal token (USDC=6,
+   * WBTC=8), so consumers MUST be able to distinguish ground truth from a
+   * fallback. Omitted (undefined) when metadata resolution does not apply
+   * (e.g. native transfers whose decimals are chain-fixed). When `false`,
+   * `symbol` is `"UNKNOWN"` rather than a confident-looking placeholder.
+   */
+  readonly metaResolved?: boolean;
 }
 
 // =============================================================================

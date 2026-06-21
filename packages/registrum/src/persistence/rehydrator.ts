@@ -16,10 +16,51 @@ import type { StateID, Invariant } from "../types.js";
 import type { RegistrarSnapshotV1 } from "./snapshot.js";
 import {
   validateSnapshot,
+  migrateToLatest,
   computeLegacyRegistryHash,
   computeRegistryHash,
 } from "./snapshot.js";
 import type { CompiledInvariantRegistry } from "../registry/loader.js";
+import {
+  type Telemetry,
+  type ObservabilityEvent,
+  NOOP_TELEMETRY,
+} from "@attestia/types";
+
+// =============================================================================
+// Telemetry helpers
+// =============================================================================
+
+/**
+ * Emit a telemetry event, guarding against a misbehaving sink.
+ *
+ * Mirrors StructuralRegistrar.emit: the {@link Telemetry} contract says
+ * `record` MUST NOT throw, but a buggy host sink might. Observability must
+ * never break the operation it observes, so a sink error is swallowed here — a
+ * rehydration verdict (restore or fail-closed) is never lost to telemetry.
+ */
+function emit(telemetry: Telemetry, event: ObservabilityEvent): void {
+  try {
+    telemetry.record(event);
+  } catch {
+    /* a misbehaving sink must never affect a verdict — intentionally ignored */
+  }
+}
+
+/**
+ * Extract a LOW-CARDINALITY error identifier for a telemetry attribute: the
+ * stable `code` if the error carries one, otherwise the class name. Never the
+ * message (which is unbounded and belongs in `message`).
+ */
+function rehydrationErrorCode(e: unknown): string {
+  if (typeof e === "object" && e !== null) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+    const name = (e as { name?: unknown }).name;
+    if (typeof name === "string") return name;
+  }
+  return "UNKNOWN";
+}
 
 // =============================================================================
 // Rehydration Errors
@@ -61,8 +102,16 @@ export class RegistryMismatchError extends RehydrationError {
     public readonly expectedHash: string,
     public readonly actualHash: string
   ) {
+    // Drift is the moment an operator most needs guidance: a hash mismatch
+    // almost always means "you are restoring under a different constitution
+    // than the snapshot was written under." State WHAT is wrong AND WHAT TO DO
+    // so a failed restore during an incident does not turn into a guess.
     super(
-      `Registry hash mismatch: snapshot expects '${expectedHash}' but got '${actualHash}'`
+      `Registry hash mismatch: snapshot expects '${expectedHash}' but got ` +
+        `'${actualHash}'. Hint: the registry has changed since this snapshot ` +
+        `was written. Rehydrate against the registry whose content hash ` +
+        `matches the snapshot, or replay the transition log under the new ` +
+        `constitution — do NOT restore against a mismatched registry.`
     );
     this.name = "RegistryMismatchError";
   }
@@ -79,7 +128,10 @@ export class ModeMismatchError extends RehydrationError {
     public readonly rehydrateMode: string
   ) {
     super(
-      `Mode mismatch: snapshot is '${snapshotMode}' but rehydrating as '${rehydrateMode}'`
+      `Mode mismatch: snapshot is '${snapshotMode}' but rehydrating as ` +
+        `'${rehydrateMode}'. Hint: pass options.mode = '${snapshotMode}' to ` +
+        `match the snapshot (a snapshot can only be restored under the mode it ` +
+        `was written in).`
     );
     this.name = "ModeMismatchError";
   }
@@ -117,6 +169,21 @@ export interface RehydrationOptions {
    * Compiled registry (required for registry mode and dual mode).
    */
   readonly compiledRegistry?: CompiledInvariantRegistry;
+
+  /**
+   * Optional observability sink. The load/restore boundary is one of the most
+   * operationally-critical events the system has — "this snapshot was produced
+   * under a different constitution" (REGISTRY_DRIFT) and "this snapshot is
+   * structurally corrupt" (SNAPSHOT_INVALID) are exactly the failures an
+   * operator needs to alert on. register()/validate() are instrumented; this
+   * threads the same injectable sink through the restore path so a rehydration
+   * outcome is a first-class metric series.
+   *
+   * Defaults to {@link NOOP_TELEMETRY}, so observability stays opt-in and a
+   * caller that passes nothing gets the previous silent behavior. Emission is
+   * guarded so a misbehaving sink can never affect the fail-closed verdict.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /**
@@ -168,25 +235,62 @@ export function rehydrate(
   raw: unknown,
   options: RehydrationOptions
 ): RehydratedState {
-  // Step 1: Validate snapshot schema
-  validateSnapshot(raw);
-  const snapshot = raw as RegistrarSnapshotV1;
+  const telemetry = options.telemetry ?? NOOP_TELEMETRY;
+  try {
+    // Step 1: Validate snapshot schema
+    validateSnapshot(raw);
 
-  // Step 2: Verify mode compatibility
-  if (snapshot.mode !== options.mode) {
-    throw new ModeMismatchError(snapshot.mode, options.mode);
+    // Step 2: Migrate any supported-but-older schema version up to latest. This
+    // is the identity for the current version; the seam exists so a future
+    // schema change is additive rather than a breaking rejection (RT-B-002).
+    const snapshot = migrateToLatest(raw as RegistrarSnapshotV1);
+
+    // Step 3: Verify mode compatibility
+    if (snapshot.mode !== options.mode) {
+      throw new ModeMismatchError(snapshot.mode, options.mode);
+    }
+
+    // Step 4: Compute expected registry hash
+    const expectedHash = computeExpectedHash(options);
+
+    // Step 5: Verify registry hash
+    if (snapshot.registry_hash !== expectedHash) {
+      throw new RegistryMismatchError(snapshot.registry_hash, expectedHash);
+    }
+
+    // Step 6: Reconstruct internal state
+    const restored = reconstructState(snapshot);
+
+    // A completed restore is the operationally-critical "ok" event: record it
+    // with a low-cardinality state_count so an operator has a metric series for
+    // "registrar rehydrated" (size + mode), pairing with the snapshot event.
+    emit(telemetry, {
+      package: "@attestia/registrum",
+      op: "rehydrate",
+      level: "info",
+      outcome: "ok",
+      attributes: { mode: options.mode, stateCount: restored.registry.size },
+    });
+
+    return restored;
+  } catch (e) {
+    // Every terminal failure of the restore path — constitutional drift
+    // (REGISTRY_DRIFT), a corrupt snapshot (SNAPSHOT_INVALID), a mode mismatch,
+    // or a generic REHYDRATION_FAILED — emits a structured `failed` event with
+    // the stable error code as a low-cardinality attribute, so "registrar
+    // refused to rehydrate" is alertable. The full human detail (which carries
+    // the actionable hint) rides in `message`, never in attributes. `record`
+    // never throws, so this cannot mask the original error.
+    emit(telemetry, {
+      package: "@attestia/registrum",
+      op: "rehydrate",
+      level: "error",
+      outcome: "failed",
+      attributes: { mode: options.mode, error: rehydrationErrorCode(e) },
+      message: e instanceof Error ? e.message : String(e),
+    });
+    throw e;
   }
-
-  // Step 3: Compute expected registry hash
-  const expectedHash = computeExpectedHash(options);
-
-  // Step 4: Verify registry hash
-  if (snapshot.registry_hash !== expectedHash) {
-    throw new RegistryMismatchError(snapshot.registry_hash, expectedHash);
-  }
-
-  // Step 5: Reconstruct internal state
-  return reconstructState(snapshot);
 }
 
 /**

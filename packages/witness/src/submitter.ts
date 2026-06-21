@@ -22,7 +22,10 @@ import type { AttestationPayload, WitnessConfig, WitnessRecord, XrplMemo } from 
 import { WitnessSubmitError, resolveSecret } from "./types.js";
 import {
   withRetry,
+  withTimeout,
+  AttemptTimeoutError,
   DEFAULT_RETRY_CONFIG,
+  DEFAULT_SUBMIT_TIMEOUT_MS,
   isRetryableXrplError,
   type RetryConfig,
 } from "./retry.js";
@@ -33,11 +36,13 @@ export class XrplSubmitter {
   private wallet: Wallet | null = null;
   private readonly config: WitnessConfig;
   private readonly retryConfig: RetryConfig;
+  private readonly submitTimeoutMs: number;
   private readonly telemetry: SubmitTelemetry;
 
   constructor(config: WitnessConfig) {
     this.config = config;
     this.retryConfig = config.retry ?? DEFAULT_RETRY_CONFIG;
+    this.submitTimeoutMs = config.submitTimeoutMs ?? DEFAULT_SUBMIT_TIMEOUT_MS;
     this.telemetry = new SubmitTelemetry(config.telemetry);
   }
 
@@ -135,7 +140,7 @@ export class XrplSubmitter {
           if (invocation > 1) {
             this.telemetry.retry(invocation - 1);
           }
-          return this._submitSigned(payload, client, signed.tx_blob, signed.hash);
+          return this._submitSigned(payload, client, signed.tx_blob, signed.hash, invocation);
         },
         this.retryConfig,
         isRetryableXrplError,
@@ -209,6 +214,42 @@ export class XrplSubmitter {
   }
 
   /**
+   * Ensure the XRPL client is connected before a submit attempt (PB-WCO-003).
+   *
+   * If the WebSocket has dropped mid-run (`isConnected() === false`), attempt a
+   * single best-effort reconnect and emit a distinct telemetry signal for the
+   * drop and the reconnect outcome. The signed blob/hash are untouched, so
+   * determinism and the fixed-hash idempotency guarantee are preserved. On a
+   * failed reconnect we surface a clear, actionable error (instead of the bare
+   * "not connected" the in-flight call would otherwise throw) so the host knows
+   * to call connect().
+   *
+   * @param attempt 1-based attempt number (for telemetry).
+   */
+  private async _ensureConnected(attempt: number): Promise<void> {
+    if (this.client?.isConnected() === true) {
+      return;
+    }
+    if (!this.client) {
+      // No client at all — surface the same actionable guidance.
+      throw new Error(
+        "XrplSubmitter: connection lost mid-submit and no client is present. Call connect() to recover.",
+      );
+    }
+    try {
+      await this.client.connect();
+      this.telemetry.connectionLost("reconnected", attempt);
+    } catch (err) {
+      this.telemetry.connectionLost("failed", attempt);
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `XrplSubmitter: connection lost mid-submit and reconnect failed (${detail}). ` +
+        `Call connect() to recover before submitting again.`,
+      );
+    }
+  }
+
+  /**
    * Submit a single, already-signed transaction blob (one retry attempt).
    *
    * The blob and its hash are FIXED across retries (autofill + sign happen once
@@ -220,16 +261,29 @@ export class XrplSubmitter {
    * @param client Connected XRPL client
    * @param txBlob The signed transaction blob (constant across retries)
    * @param txHash The signed transaction hash (constant across retries)
+   * @param attempt 1-based attempt number (for per-attempt-timeout telemetry)
    */
   private async _submitSigned(
     payload: AttestationPayload,
     client: XrplClient,
     txBlob: string,
     txHash: string,
+    attempt: number,
   ): Promise<WitnessRecord> {
+    // PB-WCO-003: detect a connection dropped mid-run and attempt a single
+    // best-effort reconnect BEFORE proceeding, rather than letting the attempt
+    // throw a non-retryable "not connected" that silently bricks the submitter.
+    // The signed blob + hash are unchanged (determinism preserved), and the
+    // idempotency check below still runs after reconnect so a tx that applied
+    // before the drop is recovered, never double-submitted.
+    await this._ensureConnected(attempt);
+
     // Idempotency check: if the tx is already confirmed on-chain, return
     // the existing result instead of resubmitting (prevents duplicate
     // attestations when a retry fires after a successful-but-lost response).
+    // This is ALSO the recovery path for a prior attempt that timed out
+    // (PB-WCO-002): if the timed-out submit actually applied, we recognize the
+    // fixed-hash tx here on the next attempt instead of double-submitting.
     const existing = await this._checkExistingTx(client, txHash);
     if (existing) {
       // D3-B-001: a lost-but-applied tx recovered via the fixed-hash check — a
@@ -247,8 +301,24 @@ export class XrplSubmitter {
       };
     }
 
-    // Submit and wait for validation
-    const result = await client.submitAndWait(txBlob);
+    // Submit and wait for validation, bounded by a per-attempt deadline
+    // (PB-WCO-002). A hung submitAndWait (e.g. half-open WebSocket polling
+    // forever) becomes an AttemptTimeoutError — classified retryable — so the
+    // retry loop fires and the idempotency check above recovers a possibly-
+    // applied tx on the next attempt. We do NOT resubmit within this attempt.
+    let result;
+    try {
+      result = await withTimeout(
+        () => client.submitAndWait(txBlob),
+        this.submitTimeoutMs,
+        "submitAndWait",
+      );
+    } catch (err) {
+      if (err instanceof AttemptTimeoutError) {
+        this.telemetry.submitTimeout(err.timeoutMs, attempt);
+      }
+      throw err;
+    }
 
     const meta = result.result.meta;
     const ledgerIndex = typeof meta === "object" && meta !== null && "ledger_index" in meta

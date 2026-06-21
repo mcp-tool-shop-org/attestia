@@ -15,6 +15,7 @@
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
 import { deriveAddress } from "xrpl";
+import { canonicalPolicyShape } from "./signing.js";
 import type {
   SignerEntry,
   GovernancePolicy,
@@ -210,12 +211,18 @@ export class GovernanceStore {
    */
   getCurrentPolicy(): GovernancePolicy {
     const signers = [...this.signers.values()];
-    const policyData = canonicalize({
-      version: this.version,
-      signers: signers.map((s) => s.address).sort(),
-      quorum: this.quorum,
-    });
-    const id = createHash("sha256").update(policyData).digest("hex").slice(0, 16);
+    // A-WIT-002: the policyId must bind the FULL quorum-relevant policy, not just
+    // the signer addresses. Binding only {version, addresses, quorum} let two
+    // policies with the same addresses + quorum + version but DIFFERENT weight
+    // distributions (or different registered public keys) share an identical
+    // policyId — enabling a silent quorum downgrade (re-weight signers so a
+    // smaller genuine-signature subset meets quorum, with no change to the bound
+    // identity). Bind per-signer {address, weight, publicKey}, sorted by address,
+    // so any weight/key change alters the policyId.
+    const id = createHash("sha256")
+      .update(canonicalize(canonicalPolicyShape(this.version, signers, this.quorum)))
+      .digest("hex")
+      .slice(0, 16);
 
     return {
       id,

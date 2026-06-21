@@ -52,9 +52,34 @@ const SubmitReportSchema = z.object({
 // Types
 // =============================================================================
 
+/**
+ * Maximum number of verifier reports retained in the in-memory store.
+ *
+ * The /submit-report endpoint is unauthenticated, so an attacker could
+ * otherwise grow this array without bound and exhaust memory (A-NODE-004).
+ * Once the cap is reached, the oldest report is evicted FIFO to make room for a
+ * new one.
+ */
+export const MAX_REPORTS = 1000;
+
 export interface PublicVerifyDeps {
   /** Override public rate limit config */
   readonly rateLimitConfig?: { rpm: number; burst: number };
+
+  /**
+   * Trust the `X-Forwarded-For` header when deriving the rate-limit client IP.
+   *
+   * Default: false. Only enable when the service runs behind a trusted reverse
+   * proxy. When false, the socket remote address is used so a direct client
+   * cannot spoof the header to evade the per-IP public rate limit (A-NODE-004).
+   */
+  readonly trustProxy?: boolean;
+
+  /**
+   * Maximum verifier reports to retain in memory. Default: {@link MAX_REPORTS}.
+   * When the cap is reached, the oldest report is evicted (FIFO).
+   */
+  readonly maxReports?: number;
 
   /** Callback to generate a state bundle on demand */
   readonly getBundleFn?: () => unknown;
@@ -80,9 +105,24 @@ export interface PublicVerifyDeps {
 // Route Factory
 // =============================================================================
 
+/** What {@link createPublicVerifyRoutes} returns: the Hono sub-app plus the
+ * per-IP rate-limit store, so the host can dispose its sweeper on shutdown
+ * (B-NODE-001). */
+export interface PublicVerifyRoutes {
+  readonly routes: Hono<AppEnv>;
+  /** The unauthenticated per-IP rate-limit store; dispose() stops its sweeper. */
+  readonly rateLimitStore: TokenBucketStore;
+}
+
 export function createPublicVerifyRoutes(
   deps?: PublicVerifyDeps,
-): Hono<AppEnv> {
+  /**
+   * Sweep interval (ms) for the per-IP rate-limit store. 0 disables the timer
+   * (cap-only eviction) — the default for tests; `main.ts` enables it via
+   * createApp's `enableStoreSweepers`.
+   */
+  sweepIntervalMs?: number,
+): PublicVerifyRoutes {
   const routes = new Hono<AppEnv>();
 
   // ─── CORS ──────────────────────────────────────────────────────
@@ -102,10 +142,16 @@ export function createPublicVerifyRoutes(
   );
 
   // ─── Public Rate Limit ────────────────────────────────────────
-  const rateLimitStore = new TokenBucketStore(
-    deps?.rateLimitConfig ?? PUBLIC_RATE_LIMIT_DEFAULT,
+  const rateLimitStore = new TokenBucketStore({
+    ...(deps?.rateLimitConfig ?? PUBLIC_RATE_LIMIT_DEFAULT),
+    sweepIntervalMs: sweepIntervalMs ?? 0,
+  });
+  routes.use(
+    "*",
+    publicRateLimitMiddleware(rateLimitStore, {
+      trustProxy: deps?.trustProxy ?? false,
+    }),
   );
-  routes.use("*", publicRateLimitMiddleware(rateLimitStore));
 
   // ─── GET /health ──────────────────────────────────────────────
   routes.get("/health", (c) => {
@@ -136,13 +182,16 @@ export function createPublicVerifyRoutes(
   });
 
   // ─── In-Memory Report Store ──────────────────────────────────
+  // Bounded FIFO store. Unauthenticated writes must not grow without limit
+  // (A-NODE-004).
   const reports: VerifierReport[] = [];
+  const maxReports = deps?.maxReports ?? MAX_REPORTS;
 
   // ─── POST /submit-report ───────────────────────────────────────
   routes.post("/submit-report", validateBody(SubmitReportSchema), (c) => {
     const body = c.get("validatedBody") as VerifierReport;
 
-    // Check for duplicate report ID
+    // Check for duplicate report ID (idempotency / replay).
     if (reports.some((r) => r.reportId === body.reportId)) {
       return c.json(
         createErrorEnvelope(
@@ -153,13 +202,45 @@ export function createPublicVerifyRoutes(
       );
     }
 
-    reports.push(body);
+    // A-VERIFY-001: all counted reports must describe the SAME bundle. The
+    // first report establishes the bundle hash for this verification round;
+    // any later report whose bundleHash disagrees is rejected so a report
+    // against a different (possibly forged) bundle cannot pollute consensus.
+    const established = reports[0]?.bundleHash;
+    if (established !== undefined && body.bundleHash !== established) {
+      return c.json(
+        createErrorEnvelope(
+          "CONFLICT",
+          "Report bundleHash disagrees with the established bundle for this verification",
+          "Submit a report for the current bundle hash, or wait for a new verification round.",
+        ),
+        409,
+      );
+    }
+
+    // A-VERIFY-001: consensus counts DISTINCT verifierIds. A single verifier
+    // must not be able to contribute multiple PASS reports toward quorum, so
+    // replace any existing report from the same verifierId rather than
+    // appending a second one.
+    const existingIdx = reports.findIndex((r) => r.verifierId === body.verifierId);
+    let replaced = false;
+    if (existingIdx >= 0) {
+      reports[existingIdx] = body;
+      replaced = true;
+    } else {
+      reports.push(body);
+      // FIFO eviction once the cap is exceeded.
+      while (reports.length > maxReports) {
+        reports.shift();
+      }
+    }
 
     return c.json(
       {
         data: {
           reportId: body.reportId,
           accepted: true,
+          replaced,
           totalReports: reports.length,
         },
       },
@@ -213,5 +294,5 @@ export function createPublicVerifyRoutes(
     return c.json({ data: result });
   });
 
-  return routes;
+  return { routes, rateLimitStore };
 }

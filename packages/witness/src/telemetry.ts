@@ -71,6 +71,53 @@ export class SubmitTelemetry {
   }
 
   /**
+   * Record that a single `submitAndWait` attempt hit its per-attempt deadline
+   * (PB-WCO-002) (level warn, outcome degraded). The attempt is treated as a
+   * possibly-applied transient: the retry loop will fire and the next attempt's
+   * fixed-hash idempotency check recovers a lost-but-applied tx. A rising rate
+   * of this event signals a degrading / half-open XRPL connection.
+   *
+   * @param timeoutMs The deadline that elapsed.
+   * @param attempt 1-based attempt number that timed out.
+   */
+  submitTimeout(timeoutMs: number, attempt: number): void {
+    this.emit({
+      op: "submit.timeout",
+      level: "warn",
+      outcome: "degraded",
+      attributes: { attempt },
+      message:
+        `submitAndWait exceeded the per-attempt deadline of ${timeoutMs}ms on attempt ${attempt}; ` +
+        `treating as possibly-applied transient — retrying with the same fixed-hash blob, ` +
+        `the idempotency check will recover it if it landed`,
+    });
+  }
+
+  /**
+   * Record that the XRPL connection was found dropped mid-submit and a
+   * best-effort reconnect was attempted (PB-WCO-003) (level warn, outcome
+   * degraded). Previously a mid-run drop bricked the submitter silently — every
+   * subsequent submit failed fast with "not connected" and no recovery. This
+   * surfaces the drop AND whether the in-loop reconnect succeeded.
+   *
+   * @param outcome `"reconnected"` if the reconnect succeeded, `"failed"` if not.
+   * @param attempt 1-based attempt number on which the drop was detected.
+   */
+  connectionLost(outcome: "reconnected" | "failed", attempt: number): void {
+    this.emit({
+      op: "submit.connection_lost",
+      level: outcome === "reconnected" ? "warn" : "error",
+      outcome: "degraded",
+      attributes: { attempt, reconnected: outcome === "reconnected" },
+      message:
+        outcome === "reconnected"
+          ? `XRPL connection was dropped mid-submit (attempt ${attempt}); reconnected and continuing with the same fixed-hash blob`
+          : `XRPL connection was dropped mid-submit (attempt ${attempt}) and reconnect FAILED; ` +
+            `host must call connect() to recover — submissions will fail until then`,
+    });
+  }
+
+  /**
    * Record the final outcome of a submission (level info on ok, error on fail).
    *
    * @param outcome `"ok"` when the tx is witnessed, `"failed"` when exhausted.

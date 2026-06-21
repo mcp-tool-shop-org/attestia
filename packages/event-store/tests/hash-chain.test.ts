@@ -187,6 +187,100 @@ describe("verifyHashChain", () => {
     expect(result.valid).toBe(true);
     expect(result.lastVerifiedPosition).toBe(3);
   });
+
+  // A-ES-002: the genesis-anchor defense must NOT be relaxable by prepending a
+  // single unhashed line in front of a head-truncated hashed chain. Once any
+  // hashed event exists, the first hashed link MUST anchor at genesis — an
+  // unhashed leading line cannot grant a truncated tail a free pass.
+  it("detects head truncation hidden behind a prepended unhashed line", () => {
+    const store = new InMemoryEventStore();
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+    const events = [...store.readAll()] as Array<StoredEvent & { hash: string; previousHash: string }>;
+
+    // Drop the genesis head (events 1), keeping the truncated hashed tail.
+    const truncatedTail = events.slice(1);
+    expect(truncatedTail[0]!.previousHash).not.toBe(GENESIS_HASH);
+
+    // Prepend ONE unhashed (pre-chain) line. Under the old logic this set
+    // sawPreChainEvent=true and the genesis check was skipped, silently
+    // adopting the truncated head's previousHash as the anchor → "valid".
+    const unhashedDecoy: StoredEvent = {
+      event: { type: "decoy", metadata: { timestamp: "t", correlationId: "c" }, payload: {} },
+      streamId: "s",
+      version: 1,
+      globalPosition: 1,
+      appendedAt: "2025-01-01T00:00:00Z",
+    };
+
+    const forged = [unhashedDecoy, ...truncatedTail];
+    const result = verifyHashChain(forged);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => /genesis/i.test(e.reason))).toBe(true);
+  });
+
+  // A-ES-002: globalPosition contiguity. A head-truncated chain that re-bases
+  // its surviving events onto a prepended legacy line still leaves a gap in
+  // globalPosition; that gap must be flagged so truncation cannot hide.
+  it("detects a globalPosition gap (non-contiguous chain)", () => {
+    const store = new InMemoryEventStore();
+    store.append("s", [makeEvent("a"), makeEvent("b"), makeEvent("c")]);
+    const events = [...store.readAll()] as Array<StoredEvent & { hash: string; previousHash: string }>;
+
+    // Drop the middle event → positions become 1, 3 (gap at 2).
+    const gapped = [events[0]!, events[2]!];
+
+    const result = verifyHashChain(gapped);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => /contiguous|gap|position/i.test(e.reason))).toBe(true);
+  });
+
+  it("still loads a genuinely legacy all-unhashed chain as valid", () => {
+    const events: StoredEvent[] = [
+      {
+        event: { type: "old", metadata: { timestamp: "t", correlationId: "c" }, payload: {} },
+        streamId: "s",
+        version: 1,
+        globalPosition: 1,
+        appendedAt: "2025-01-01T00:00:00Z",
+      },
+      {
+        event: { type: "old2", metadata: { timestamp: "t", correlationId: "c" }, payload: {} },
+        streamId: "s",
+        version: 2,
+        globalPosition: 2,
+        appendedAt: "2025-01-01T00:00:00Z",
+      },
+    ];
+    const result = verifyHashChain(events);
+    expect(result.valid).toBe(true);
+  });
+
+  it("still allows a genuine legacy→hashed transition (pre-chain prefix, hashed suffix appended in order)", () => {
+    // Simulate an older file: one legacy event at position 1, then real hashed
+    // appends continue the log. computeEventHash for the first hashed event
+    // uses GENESIS_HASH as previousHash (the store has no prior hash to chain
+    // from), so the genesis anchor still holds and positions stay contiguous.
+    const legacy: StoredEvent = {
+      event: { type: "old", metadata: { timestamp: "t", correlationId: "c" }, payload: {} },
+      streamId: "s",
+      version: 1,
+      globalPosition: 1,
+      appendedAt: "2025-01-01T00:00:00Z",
+    };
+    const hashedBase: StoredEvent = {
+      event: { type: "new", metadata: { timestamp: "t", correlationId: "c" }, payload: {} },
+      streamId: "s",
+      version: 2,
+      globalPosition: 2,
+      appendedAt: "2025-01-01T00:00:00Z",
+    };
+    const hash = computeEventHash(hashedBase, GENESIS_HASH);
+    const hashed = Object.assign({ ...hashedBase }, { hash, previousHash: GENESIS_HASH }) as StoredEvent;
+
+    const result = verifyHashChain([legacy, hashed]);
+    expect(result.valid).toBe(true);
+  });
 });
 
 // =============================================================================

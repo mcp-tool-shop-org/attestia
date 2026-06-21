@@ -38,7 +38,12 @@ export { computeEventHash, verifyHashChain, GENESIS_HASH } from "./hash-chain.js
 export { InMemoryEventStore } from "./in-memory-store.js";
 export type { InMemoryEventStoreOptions } from "./in-memory-store.js";
 export { JsonlEventStore } from "./jsonl-store.js";
-export type { JsonlEventStoreOptions } from "./jsonl-store.js";
+export type {
+  JsonlEventStoreOptions,
+  LoadDiagnostics,
+  LoadSkip,
+  LoadSkipReason,
+} from "./jsonl-store.js";
 
 // Catalog & schema versioning
 export type { EventSchema, EventMigration, CatalogErrorCode } from "./catalog.js";
@@ -76,6 +81,10 @@ export type {
   StoredSnapshot,
   SaveSnapshotOptions,
   SnapshotStore,
+  SnapshotStoreOptions,
+  FileSnapshotStoreOptions,
+  PruneOptions,
+  PruneResult,
 } from "./snapshot-store.js";
 export {
   InMemorySnapshotStore,

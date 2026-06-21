@@ -91,6 +91,54 @@ export interface AggregatedSignature {
 }
 
 // =============================================================================
+// Canonical Quorum-Relevant Policy Shape (A-WIT-002)
+// =============================================================================
+
+/**
+ * The canonical, deterministic projection of the quorum-relevant parts of a
+ * governance policy: per-signer {address, weight, publicKey} sorted by address,
+ * plus version and quorum.
+ *
+ * A-WIT-002: binding only signer addresses (excluding weight + publicKey) let two
+ * policies with the same addresses + quorum + version but different weight
+ * distributions or registered keys share an identical bound hash, enabling a
+ * silent quorum downgrade. Including the full per-signer entry means any
+ * weight/key change alters every hash derived from this shape — both the
+ * policyId and the canonical signing payload.
+ *
+ * This is the SINGLE source of truth used by both {@link buildCanonicalSigningPayload}
+ * (the signed hash) and the GovernanceStore policyId, so the two can never drift
+ * apart in what they bind.
+ *
+ * @param signers The policy's signer entries (any order; sorted here)
+ * @param quorum The required quorum weight
+ * @param version The policy version
+ */
+export function canonicalPolicyShape(
+  version: number,
+  signers: readonly SignerEntry[],
+  quorum: number,
+): {
+  version: number;
+  quorum: number;
+  signers: { address: string; weight: number; publicKey: string | null }[];
+} {
+  return {
+    version,
+    quorum,
+    signers: [...signers]
+      .sort((a, b) => a.address.localeCompare(b.address))
+      .map((s) => ({
+        address: s.address,
+        weight: s.weight,
+        // Normalize absent publicKey to null so "no key" and "key X" produce
+        // distinct, deterministic canonical bytes.
+        publicKey: s.publicKey ?? null,
+      })),
+  };
+}
+
+// =============================================================================
 // Canonical Signing Payload
 // =============================================================================
 
@@ -99,6 +147,12 @@ export interface AggregatedSignature {
  *
  * The payload is deterministic: same attestation + same policy → same bytes.
  * Uses RFC 8785 (JCS) for canonical JSON, then SHA-256 for the hash.
+ *
+ * A-WIT-002: the policy projection binds the FULL quorum-relevant policy
+ * (per-signer {address, weight, publicKey} + quorum + version) via
+ * {@link canonicalPolicyShape}, not just signer addresses. Re-weighting signers
+ * or swapping a registered key therefore changes the signed hash, so signatures
+ * over the original policy cannot be replayed against a downgraded one.
  *
  * @param attestation The attestation payload to sign
  * @param policy The governance policy at the time of signing
@@ -112,9 +166,7 @@ export function buildCanonicalSigningPayload(
     attestationHash: attestation.hash,
     attestationTimestamp: attestation.timestamp,
     policyId: policy.id,
-    policyVersion: policy.version,
-    quorum: policy.quorum,
-    signers: policy.signers.map((s) => s.address).sort(),
+    policy: canonicalPolicyShape(policy.version, policy.signers, policy.quorum),
   };
 
   const canonical = canonicalize(payload);

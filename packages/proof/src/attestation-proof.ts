@@ -14,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
+import { NOOP_TELEMETRY, type Telemetry } from "@attestia/types";
 import { MerkleTree } from "./merkle-tree.js";
 import type { AttestationProofPackage, MerkleProof } from "./types.js";
 
@@ -75,31 +76,80 @@ function computePackageHash(
 // =============================================================================
 
 /**
- * Package an attestation with a Merkle inclusion proof.
+ * Stable reason code for why {@link packageAttestationProofResult} could not
+ * mint a package. Each names a DISTINCT, operator-actionable precondition the
+ * caller violated — previously all three collapsed into a bare `null`
+ * (B-RVP-008), making a batch failure undiagnosable.
+ */
+export type PackageFailureReason =
+  /** The Merkle tree is empty — `tree.getRoot()` is null. */
+  | "empty-tree"
+  /** `attestationIndex` is out of range / unprovable — `tree.getProof()` is null. */
+  | "index-out-of-range"
+  /** The index exists in the tree but not in the provided `eventHashes`. */
+  | "index-not-in-event-hashes";
+
+/**
+ * The structured outcome of {@link packageAttestationProofResult}: either the
+ * minted package, or a named reason the precondition failed.
+ */
+export type PackageAttestationResult =
+  | { readonly ok: true; readonly package: AttestationProofPackage }
+  | {
+      readonly ok: false;
+      /** Stable, low-cardinality reason code (safe to branch/alert on). */
+      readonly reason: PackageFailureReason;
+      /** Human-readable detail naming the offending index and lengths. */
+      readonly detail: string;
+    };
+
+/**
+ * Package an attestation with a Merkle inclusion proof, returning a STRUCTURED
+ * result instead of a bare null (B-RVP-008).
  *
- * Creates a self-contained proof package that a third party can
- * independently verify without access to the full event store.
+ * {@link packageAttestationProof} returns `null` for three operationally
+ * distinct failures, so a batch job that drops some packages cannot tell
+ * whether the tree was empty, the index was wrong, or `eventHashes` was the
+ * wrong length. This variant names the precondition that failed — turning a
+ * debugging session into a one-line config fix — while the security-critical
+ * leaf-binding mismatch (a forgery indicator) is STILL a thrown Error, exactly
+ * as before.
  *
  * @param attestation - The attestation data to prove
  * @param eventHashes - All event hashes in the system (ordered)
  * @param tree - Pre-built Merkle tree over eventHashes
  * @param attestationIndex - Index of this attestation's hash in eventHashes
- * @returns AttestationProofPackage or null if proof generation fails
+ * @returns `{ ok: true, package }` or `{ ok: false, reason, detail }`
+ * @throws Error when the proven leaf is not the attestation's own hash
+ *   (leaf-binding / forgery boundary — never a soft failure)
  */
-export function packageAttestationProof(
+export function packageAttestationProofResult(
   attestation: unknown,
   eventHashes: readonly string[],
   tree: MerkleTree,
   attestationIndex: number,
-): AttestationProofPackage | null {
+): PackageAttestationResult {
   const root = tree.getRoot();
   if (root === null) {
-    return null;
+    return {
+      ok: false,
+      reason: "empty-tree",
+      detail:
+        `cannot package attestation at index ${attestationIndex}: the Merkle tree is empty ` +
+        `(no root). Build the tree over a non-empty eventHashes set first ` +
+        `(received ${eventHashes.length} event hash(es)).`,
+    };
   }
 
   const inclusionProof = tree.getProof(attestationIndex);
   if (inclusionProof === null) {
-    return null;
+    return {
+      ok: false,
+      reason: "index-out-of-range",
+      detail:
+        `cannot package attestation: index ${attestationIndex} is out of range for the tree ` +
+        `(${eventHashes.length} event hash(es)). Pass an index in [0, ${eventHashes.length - 1}].`,
+    };
   }
 
   // Hash the attestation data using canonical JSON (single source of truth)
@@ -111,9 +161,18 @@ export function packageAttestationProof(
   // attestation — a forgeable shape. Refuse to mint such a package.
   const expectedHash = eventHashes[attestationIndex];
   if (expectedHash === undefined) {
-    return null;
+    return {
+      ok: false,
+      reason: "index-not-in-event-hashes",
+      detail:
+        `cannot package attestation: index ${attestationIndex} is provable in the tree but ` +
+        `absent from eventHashes (length ${eventHashes.length}). The tree and eventHashes ` +
+        `are out of sync — rebuild the tree from the same eventHashes you pass here.`,
+    };
   }
   if (expectedHash !== attestationHash) {
+    // Security boundary, NOT a soft failure: a mismatch here would mint a proof
+    // for a leaf that is not this attestation (a forgery shape). Throw loudly.
     throw new Error(
       `packageAttestationProof: eventHashes[${attestationIndex}] does not match the attestation's hash — ` +
         `the proven leaf must be the attestation's own hash`,
@@ -139,14 +198,50 @@ export function packageAttestationProof(
   );
 
   return {
-    version: 1,
-    attestation,
-    attestationHash,
-    merkleRoot: root,
-    inclusionProof,
-    packagedAt,
-    packageHash,
+    ok: true,
+    package: {
+      version: 1,
+      attestation,
+      attestationHash,
+      merkleRoot: root,
+      inclusionProof,
+      packagedAt,
+      packageHash,
+    },
   };
+}
+
+/**
+ * Package an attestation with a Merkle inclusion proof.
+ *
+ * Creates a self-contained proof package that a third party can
+ * independently verify without access to the full event store.
+ *
+ * Thin boolean-shaped wrapper over {@link packageAttestationProofResult}:
+ * returns the package on success and `null` on any soft precondition failure,
+ * preserving the original contract. Use {@link packageAttestationProofResult}
+ * when you need to know WHICH precondition failed (e.g. batch packaging).
+ *
+ * @param attestation - The attestation data to prove
+ * @param eventHashes - All event hashes in the system (ordered)
+ * @param tree - Pre-built Merkle tree over eventHashes
+ * @param attestationIndex - Index of this attestation's hash in eventHashes
+ * @returns AttestationProofPackage or null if proof generation fails
+ * @throws Error on the leaf-binding / forgery boundary (see the Result variant)
+ */
+export function packageAttestationProof(
+  attestation: unknown,
+  eventHashes: readonly string[],
+  tree: MerkleTree,
+  attestationIndex: number,
+): AttestationProofPackage | null {
+  const result = packageAttestationProofResult(
+    attestation,
+    eventHashes,
+    tree,
+    attestationIndex,
+  );
+  return result.ok ? result.package : null;
 }
 
 /**
@@ -197,10 +292,17 @@ export interface AttestationVerificationResult {
  * package reports every check that failed, not just the first.
  *
  * @param pkg - The proof package to verify
+ * @param telemetry - Optional sink (B-RVP-001). When provided, one
+ *   `"proof.verify"` event is emitted carrying low-cardinality
+ *   `{ valid, firstFailedCheck }` attributes — so a forged/failed proof
+ *   (a forgery indicator) is alertable at the moment of divergence. Side-channel
+ *   only: never changes the result; a throwing sink is swallowed. Defaults to a
+ *   silent no-op sink.
  * @returns `{ valid, checks }` — `valid` is true iff all checks pass
  */
 export function verifyAttestationProofDetailed(
   pkg: AttestationProofPackage,
+  telemetry: Telemetry = NOOP_TELEMETRY,
 ): AttestationVerificationResult {
   const checks: AttestationCheck[] = [];
 
@@ -275,8 +377,32 @@ export function verifyAttestationProofDetailed(
       : `packageHash mismatch: package claims ${pkg.packageHash}, recomputed ${recomputedPackageHash}`,
   });
 
+  const valid = checks.every((c) => c.passed);
+  // The first failed check is the most useful low-cardinality label — the check
+  // names are a small fixed set (the five named checks). "none" when valid.
+  const firstFailedCheck = checks.find((c) => !c.passed)?.name ?? "none";
+
+  // Observability (B-RVP-001): one structured event per verification. A forged
+  // or failed proof is the exact moment financial-truth infra must alert.
+  // Defensively guarded so a throwing sink can never alter or abort the result.
+  try {
+    telemetry.record({
+      package: "@attestia/proof",
+      op: "proof.verify",
+      level: valid ? "info" : "warn",
+      outcome: valid ? "ok" : "failed",
+      attributes: { valid, firstFailedCheck },
+      message: valid
+        ? "attestation proof package verified: all 5 checks passed"
+        : `attestation proof package FAILED at check "${firstFailedCheck}" ` +
+          `(${checks.filter((c) => !c.passed).length}/5 checks failed) — possible forgery or tampering`,
+    });
+  } catch {
+    /* a sink must not break verification — see NOOP_TELEMETRY contract */
+  }
+
   return {
-    valid: checks.every((c) => c.passed),
+    valid,
     checks,
   };
 }
@@ -289,10 +415,13 @@ export function verifyAttestationProofDetailed(
  * when you need to know WHICH check failed.
  *
  * @param pkg - The proof package to verify
+ * @param telemetry - Optional sink, forwarded to
+ *   {@link verifyAttestationProofDetailed}. Defaults to a silent no-op sink.
  * @returns true if all checks pass
  */
 export function verifyAttestationProof(
   pkg: AttestationProofPackage,
+  telemetry: Telemetry = NOOP_TELEMETRY,
 ): boolean {
-  return verifyAttestationProofDetailed(pkg).valid;
+  return verifyAttestationProofDetailed(pkg, telemetry).valid;
 }

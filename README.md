@@ -121,23 +121,23 @@ No step is optional. No step is automated away.
 
 ## Status
 
-14 packages, 2,220 tests, 96.80% coverage, all green. Building in public.
+14 packages, 2,564 tests, 95%+ coverage, all green. Building in public.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|
-| `@attestia/types` | 72 | Shared domain types (zero deps) |
-| `@attestia/registrum` | 341 | Constitutional governance — 11 invariants, dual-witness |
-| `@attestia/ledger` | 154 | Append-only double-entry engine |
-| `@attestia/chain-observer` | 278 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
-| `@attestia/vault` | 75 | Personal vault — portfolios, budgets, intents |
-| `@attestia/treasury` | 92 | Org treasury — payroll, distributions, funding gates |
-| `@attestia/reconciler` | 81 | 3D cross-system matching + Registrum attestation |
-| `@attestia/witness` | 278 | XRPL on-chain attestation, multi-sig governance, retry |
-| `@attestia/verify` | 242 | Replay verification, compliance evidence, SLA enforcement |
-| `@attestia/event-store` | 226 | Append-only event persistence, JSONL, hash chain, 34 event types |
-| `@attestia/proof` | 75 | Merkle trees, inclusion proofs, attestation proof packaging |
-| `@attestia/sdk` | 79 | Typed HTTP client SDK for external consumers |
-| `@attestia/node` | 227 | Hono REST API — 34 endpoints, auth, multi-tenancy, public API, compliance |
+| `@attestia/types` | 75 | Shared domain types (zero deps) |
+| `@attestia/registrum` | 368 | Constitutional governance — 11 invariants, dual-witness |
+| `@attestia/ledger` | 156 | Append-only double-entry engine |
+| `@attestia/chain-observer` | 295 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
+| `@attestia/vault` | 91 | Personal vault — portfolios, budgets, intents |
+| `@attestia/treasury` | 109 | Org treasury — payroll, distributions, funding gates |
+| `@attestia/reconciler` | 98 | 3D cross-system matching + Registrum attestation |
+| `@attestia/witness` | 295 | XRPL on-chain attestation, multi-sig governance, retry |
+| `@attestia/verify` | 273 | Replay verification, compliance evidence, SLA enforcement |
+| `@attestia/event-store` | 253 | Append-only event persistence, JSONL, hash chain, 34 event types |
+| `@attestia/proof` | 94 | Merkle trees (RFC 6962), inclusion proofs, attestation proof packaging |
+| `@attestia/sdk` | 115 | Typed HTTP client SDK for external consumers |
+| `@attestia/node` | 342 | Hono REST API — durable persistence, auth, multi-tenancy, treasury/vault/governance, OpenAPI |
 | `@attestia/demo` | — | Interactive CLI demo — walk through the full Attestia pipeline (private, no tests) |
 
 ### Development
@@ -145,7 +145,7 @@ No step is optional. No step is automated away.
 ```bash
 pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (2,220)
+pnpm test             # Run all tests (2,564)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages
 pnpm bench            # Run benchmarks

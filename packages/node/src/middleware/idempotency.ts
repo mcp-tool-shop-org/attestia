@@ -46,12 +46,74 @@ export interface IdempotencyStore {
 // In-Memory Store
 // =============================================================================
 
+/** Default cap on retained idempotency entries (B-NODE-002). */
+export const DEFAULT_MAX_ENTRIES = 50_000;
+
+/** Default background sweep interval (5 minutes) for expired-entry eviction. */
+export const DEFAULT_SWEEP_INTERVAL_MS = 5 * 60_000;
+
+export interface InMemoryIdempotencyStoreOptions {
+  /**
+   * Maximum number of entries to retain. Once exceeded, the least-recently-set
+   * entry is evicted (FIFO/LRU), bounding memory even when keys are written once
+   * and never re-read (the common success case, B-NODE-002). Default:
+   * {@link DEFAULT_MAX_ENTRIES}.
+   */
+  readonly maxEntries?: number | undefined;
+  /**
+   * How often (ms) the background sweeper drops entries past their TTL. Without
+   * it, a key that is never re-read is never evicted (its lazy eviction in
+   * `get()` never fires). Default: 0 — no background timer (cap-only eviction),
+   * so a bare `new InMemoryIdempotencyStore(...)` never leaks a timer. The real
+   * server opts in by passing {@link DEFAULT_SWEEP_INTERVAL_MS} (see createApp's
+   * `enableStoreSweepers`).
+   */
+  readonly sweepIntervalMs?: number | undefined;
+  /**
+   * Maximum cached body size (bytes). Responses with a larger body are not
+   * cached, so one large response cannot dominate memory (B-NODE-002). A skipped
+   * cache simply means a retry re-executes — safe for idempotent mutations.
+   * Default: {@link DEFAULT_MAX_BODY_BYTES}.
+   */
+  readonly maxBodyBytes?: number | undefined;
+  /** Timer factory, for testing. Default: unref'd `setInterval`. */
+  readonly setIntervalFn?: ((handler: () => void, ms: number) => NodeJS.Timeout) | undefined;
+  /** Clear-timer function. Default: `clearInterval`. */
+  readonly clearIntervalFn?: ((handle: NodeJS.Timeout) => void) | undefined;
+}
+
+/** Default cap on a single cached response body (1 MiB). */
+export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+
 export class InMemoryIdempotencyStore implements IdempotencyStore {
   private readonly _cache = new Map<string, CachedResponse>();
   private readonly _ttlMs: number;
+  private readonly _maxEntries: number;
+  private readonly _maxBodyBytes: number;
+  private readonly _clearIntervalFn: (handle: NodeJS.Timeout) => void;
+  private _sweepTimer: NodeJS.Timeout | undefined;
 
-  constructor(ttlMs: number = 86400000) {
+  constructor(
+    ttlMs: number = 86400000,
+    options: InMemoryIdempotencyStoreOptions = {},
+  ) {
     this._ttlMs = ttlMs;
+    this._maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+    this._maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+    this._clearIntervalFn = options.clearIntervalFn ?? clearInterval;
+
+    // Default off (0): a bare store never spins up a timer. The app turns it on.
+    const sweepIntervalMs = options.sweepIntervalMs ?? 0;
+    if (sweepIntervalMs > 0) {
+      const setIntervalFn =
+        options.setIntervalFn ??
+        ((handler, ms) => {
+          const t = setInterval(handler, ms);
+          t.unref?.();
+          return t;
+        });
+      this._sweepTimer = setIntervalFn(() => this.sweep(), sweepIntervalMs);
+    }
   }
 
   get(key: string): CachedResponse | undefined {
@@ -69,7 +131,41 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 
   set(key: string, response: CachedResponse): void {
+    // Bound a single cached body so one oversized response cannot dominate
+    // memory. Skipping the cache is safe: the next identical retry re-executes
+    // the (idempotent) mutation rather than replaying.
+    if (response.body.length > this._maxBodyBytes) {
+      return;
+    }
+    // Re-insert to keep most-recent at the tail of the Map's iteration order.
+    this._cache.delete(key);
     this._cache.set(key, response);
+    this._evictIfOverCap();
+  }
+
+  /**
+   * Drop every entry past its TTL. Without this, an entry written once and
+   * never re-read would live until process exit (B-NODE-002). Returns the
+   * number evicted.
+   */
+  sweep(now: number = Date.now()): number {
+    let evicted = 0;
+    for (const [key, entry] of this._cache) {
+      if (now - entry.cachedAt > this._ttlMs) {
+        this._cache.delete(key);
+        evicted++;
+      }
+    }
+    return evicted;
+  }
+
+  /** Evict least-recently-set entries until at or under the cap. */
+  private _evictIfOverCap(): void {
+    while (this._cache.size > this._maxEntries) {
+      const oldest = this._cache.keys().next().value;
+      if (oldest === undefined) break;
+      this._cache.delete(oldest);
+    }
   }
 
   get size(): number {
@@ -78,6 +174,18 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
 
   clear(): void {
     this._cache.clear();
+  }
+
+  /**
+   * Stop the background sweeper and release its timer. Idempotent. Call on
+   * graceful shutdown (B-NODE-003) so the process exits cleanly and tests do
+   * not leak a timer.
+   */
+  dispose(): void {
+    if (this._sweepTimer !== undefined) {
+      this._clearIntervalFn(this._sweepTimer);
+      this._sweepTimer = undefined;
+    }
   }
 }
 

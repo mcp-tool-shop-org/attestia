@@ -167,7 +167,9 @@ describe("JsonlEventStore telemetry (D2-B-001)", () => {
     telemetry.reset();
 
     // Pre-create the lockfile so the next append cannot acquire it and times out.
-    writeFileSync(testFile + ".lock", "99999", "utf-8");
+    // Use the CURRENT (live) PID so the stale-lock recovery (B-LES-001) correctly
+    // refuses to break it — a held lock by a live writer must still fail closed.
+    writeFileSync(testFile + ".lock", String(process.pid), "utf-8");
 
     expect(() => store.append("stream-a", [makeEvent("a.1")])).toThrow(
       EventStoreError,

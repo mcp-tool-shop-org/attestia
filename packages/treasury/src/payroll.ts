@@ -18,6 +18,8 @@ import {
   addMoney,
   subtractMoney,
   zeroMoney,
+  isPositive,
+  validateMoney,
   Ledger,
 } from "@attestia/ledger";
 import type { Money, Currency, LedgerEntry, Telemetry } from "@attestia/types";
@@ -54,7 +56,9 @@ export type PayrollErrorCode =
   | "RUN_NOT_FOUND"
   | "INVALID_TRANSITION"
   | "NO_COMPONENTS"
-  | "INVALID_AMOUNT";
+  | "INVALID_AMOUNT"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Payroll Engine
@@ -186,10 +190,21 @@ export class PayrollEngine {
     let totalDeductions = this.zero();
     let totalNet = this.zero();
 
+    // Track silent omissions: a payee with a schedule who is dropped because
+    // they are not 'active'. Surfacing this (below) means a short run — one
+    // that pays fewer people than expected — is visible BEFORE approval,
+    // instead of only surfacing when someone reports they weren't paid.
+    let skippedInactive = 0;
+
     // Process each active payee that has a schedule
     for (const [payeeId, schedule] of this.schedules) {
       const payee = this.payees.get(payeeId);
-      if (!payee || payee.status !== "active") continue;
+      if (!payee || payee.status !== "active") {
+        // A schedule exists, so this payee was meant to be paid; an
+        // inactive/suspended status (or a dangling schedule) drops them.
+        skippedInactive += 1;
+        continue;
+      }
 
       const entry = this.computeEntry(payeeId, schedule.components);
       entries.push(entry);
@@ -211,6 +226,18 @@ export class PayrollEngine {
     };
 
     this.runs.set(id, run);
+
+    // Emit creation telemetry so an approver can see a short run before signing
+    // off. included/skipped counts are low-cardinality; ids stay in `message`.
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "payroll.run.created",
+      level: skippedInactive > 0 ? "warn" : "info",
+      outcome: skippedInactive > 0 ? "degraded" : "ok",
+      attributes: { included: entries.length, skippedInactive },
+      message: `payroll run '${id}' (${period.label}) created: ${entries.length} payee(s) included${skippedInactive > 0 ? `, ${skippedInactive} scheduled payee(s) skipped (inactive/suspended)` : ""}`,
+    });
+
     return run;
   }
 
@@ -259,6 +286,31 @@ export class PayrollEngine {
       );
     }
 
+    // Atomic execution (A-TREAS-003): computeEntry's netPay = gross -
+    // deductions has no floor, so an entry whose deductions meet or exceed
+    // gross yields a zero/negative netPay. The ledger rejects non-positive
+    // amounts (Rule 6), so appending per-entry used to throw mid-loop after
+    // earlier payees were already committed — wedging the run (still
+    // 'approved') and colliding on corrId on retry. Pre-validate EVERY entry's
+    // netPay (well-formed and strictly positive) BEFORE any ledger write, then
+    // commit the whole run as one balanced batch.
+    for (const entry of run.entries) {
+      try {
+        validateMoney(entry.netPay);
+      } catch {
+        throw new PayrollError(
+          "INVALID_AMOUNT",
+          `Payee '${entry.payeeId}' has a malformed net pay '${String(entry.netPay.amount)}'`,
+        );
+      }
+      if (!isPositive(entry.netPay)) {
+        throw new PayrollError(
+          "INVALID_AMOUNT",
+          `Payee '${entry.payeeId}' has net pay '${entry.netPay.amount}' ${entry.netPay.currency}, which is not strictly positive — refusing to execute run '${run.id}'`,
+        );
+      }
+    }
+
     // Ensure accounts exist
     const expenseAccountId = `payroll:expense:${run.period.label}`;
     if (!ledger.hasAccount(expenseAccountId)) {
@@ -268,6 +320,13 @@ export class PayrollEngine {
         name: `Payroll Expense: ${run.period.label}`,
       });
     }
+
+    // One correlationId for the whole run: the ledger requires every entry in
+    // a batch to share it (Rule 2), and it makes the run a single recoverable
+    // transaction. Per-payee entry IDs stay unique.
+    const corrId = `payroll:${run.id}`;
+    const now = new Date().toISOString();
+    const entries: LedgerEntry[] = [];
 
     for (const entry of run.entries) {
       const payeeAccountId = `payroll:payee:${entry.payeeId}`;
@@ -279,13 +338,10 @@ export class PayrollEngine {
         });
       }
 
-      const now = new Date().toISOString();
-      const corrId = `payroll:${run.id}:${entry.payeeId}`;
-
       // Double-entry: debit expense, credit payee liability
-      const entries: LedgerEntry[] = [
+      entries.push(
         {
-          id: `${corrId}:debit`,
+          id: `${corrId}:${entry.payeeId}:debit`,
           accountId: expenseAccountId,
           type: "debit",
           money: entry.netPay,
@@ -293,16 +349,20 @@ export class PayrollEngine {
           correlationId: corrId,
         },
         {
-          id: `${corrId}:credit`,
+          id: `${corrId}:${entry.payeeId}:credit`,
           accountId: payeeAccountId,
           type: "credit",
           money: entry.netPay,
           timestamp: now,
           correlationId: corrId,
         },
-      ];
+      );
+    }
+
+    // Append the entire balanced batch atomically (skip a no-op empty run).
+    if (entries.length > 0) {
       ledger.append(entries, {
-        description: `Payroll: ${run.period.label} - ${entry.payeeId}`,
+        description: `Payroll: ${run.period.label}`,
       });
     }
 
@@ -336,13 +396,46 @@ export class PayrollEngine {
   }
 
   importPayees(payees: readonly Payee[]): void {
+    // Restore is into a FRESH engine: importing over existing state would
+    // silently overwrite live records by id. Fail closed (caller bug).
+    if (this.payees.size > 0) {
+      throw new PayrollError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import payees into a non-empty engine (${this.payees.size} already present) — restore into a fresh PayrollEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const p of payees) {
+      // A duplicate id within the incoming batch would silently keep only the
+      // last record — reject it so a corrupt/merged snapshot is caught here,
+      // not as a missing payee at run time.
+      if (seen.has(p.id)) {
+        throw new PayrollError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate payee id '${p.id}' in imported snapshot`,
+        );
+      }
+      seen.add(p.id);
       this.payees.set(p.id, p);
     }
   }
 
   importRuns(runs: readonly PayrollRun[]): void {
+    if (this.runs.size > 0) {
+      throw new PayrollError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import runs into a non-empty engine (${this.runs.size} already present) — restore into a fresh PayrollEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const r of runs) {
+      if (seen.has(r.id)) {
+        throw new PayrollError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate payroll run id '${r.id}' in imported snapshot`,
+        );
+      }
+      seen.add(r.id);
       this.runs.set(r.id, r);
     }
   }

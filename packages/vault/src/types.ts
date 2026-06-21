@@ -41,6 +41,23 @@ export interface TokenPosition {
 }
 
 /**
+ * A single per-address/per-chain failure encountered while observing.
+ *
+ * Surfacing these (rather than silently dropping them) is what makes
+ * {@link Portfolio.partial} actionable: the caller learns WHICH chain/address
+ * is missing and WHY, instead of seeing an authoritative-looking total that
+ * silently omits unreachable chains.
+ */
+export interface ObservationError {
+  /** Chain the failure occurred on (e.g. "eip155:1"). */
+  readonly chainId: ChainId;
+  /** Address being observed when the failure occurred (omitted for chain-level failures). */
+  readonly address?: string;
+  /** Reason the observation failed (no-observer, RPC error, etc.). */
+  readonly reason: string;
+}
+
+/**
  * An aggregated portfolio view across all observed chains.
  */
 export interface Portfolio {
@@ -58,6 +75,20 @@ export interface Portfolio {
 
   /** Total value per currency (aggregated across chains) */
   readonly totals: readonly CurrencyTotal[];
+
+  /**
+   * Per-address/per-chain failures collected during observation. Empty when
+   * every watched address was reached. When non-empty the totals are computed
+   * from a SUBSET of chains — see {@link partial}.
+   */
+  readonly errors: readonly ObservationError[];
+
+  /**
+   * True when one or more watched addresses could not be observed, so `totals`
+   * reflect only the chains that responded. A caller MUST treat a partial
+   * portfolio as incomplete (fail-soft but visible) rather than authoritative.
+   */
+  readonly partial: boolean;
 }
 
 /**

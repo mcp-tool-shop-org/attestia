@@ -18,9 +18,11 @@ import {
   subtractMoney,
   zeroMoney,
   isNegative,
+  isPositive,
   Ledger,
   parseAmount,
   formatAmount,
+  validateMoney,
 } from "@attestia/ledger";
 import type { Money, Currency, LedgerEntry, Telemetry } from "@attestia/types";
 import { NOOP_TELEMETRY } from "@attestia/types";
@@ -53,7 +55,10 @@ export type DistributionErrorCode =
   | "INVALID_SHARES"
   | "DUPLICATE_RECIPIENT"
   | "POOL_EXCEEDED"
-  | "NO_RECIPIENTS";
+  | "NO_RECIPIENTS"
+  | "UNKNOWN_STRATEGY"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Distribution Engine
@@ -120,10 +125,54 @@ export class DistributionEngine {
     // bigint arithmetic during resolution. A fractional value throws an opaque
     // RangeError in BigInt(); a negative mints a negative payout; NaN/Infinity
     // corrupt the math. For proportional/milestone, share is basis points and
-    // must also be ≤ 10000. For fixed, share is an absolute amount (unbounded).
+    // must also be ≤ 10000.
+    //
+    // For "fixed", the payout is money, which must NEVER round-trip through a
+    // JS number: numbers lose integer precision above 2^53, so
+    // `String(9007199254740993)` silently yields "9007199254740992" while
+    // Number.isInteger still passes. Callers should supply the decimal-string
+    // `amount` (validated via @attestia/ledger). A legacy numeric `share` is
+    // still accepted for small amounts, but is rejected above
+    // Number.MAX_SAFE_INTEGER so silent precision loss is impossible.
     const boundShares = strategy === "proportional" || strategy === "milestone";
     for (const r of recipients) {
-      if (!Number.isInteger(r.share) || r.share < 0) {
+      if (strategy === "fixed") {
+        // Prefer the exact decimal-string amount when present.
+        if (r.amount !== undefined) {
+          try {
+            validateMoney(r.amount);
+          } catch {
+            throw new DistributionError(
+              "INVALID_SHARES",
+              `Recipient '${r.payeeId}' has an invalid fixed amount '${String(r.amount.amount)}'`,
+            );
+          }
+          if (isNegative(r.amount)) {
+            throw new DistributionError(
+              "INVALID_SHARES",
+              `Recipient '${r.payeeId}' has a negative fixed amount '${r.amount.amount}'`,
+            );
+          }
+          continue; // amount governs; numeric share (if any) is ignored
+        }
+        // Fall back to the legacy numeric share — must be a safe integer.
+        if (r.share === undefined || !Number.isInteger(r.share) || r.share < 0) {
+          throw new DistributionError(
+            "INVALID_SHARES",
+            `Recipient '${r.payeeId}' has invalid share ${String(r.share)}: must be a non-negative integer (or supply a decimal-string amount)`,
+          );
+        }
+        if (r.share > Number.MAX_SAFE_INTEGER) {
+          throw new DistributionError(
+            "INVALID_SHARES",
+            `Recipient '${r.payeeId}' fixed share ${String(r.share)} exceeds Number.MAX_SAFE_INTEGER and would lose precision: supply a decimal-string 'amount' instead`,
+          );
+        }
+        continue;
+      }
+
+      // proportional / milestone: share is required basis points.
+      if (r.share === undefined || !Number.isInteger(r.share) || r.share < 0) {
         throw new DistributionError(
           "INVALID_SHARES",
           `Recipient '${r.payeeId}' has invalid share ${String(r.share)}: must be a non-negative integer`,
@@ -139,7 +188,7 @@ export class DistributionEngine {
 
     // Validate proportional shares
     if (strategy === "proportional") {
-      const totalShares = recipients.reduce((sum, r) => sum + r.share, 0);
+      const totalShares = recipients.reduce((sum, r) => sum + (r.share ?? 0), 0);
       if (totalShares > 10000) {
         throw new DistributionError(
           "INVALID_SHARES",
@@ -152,12 +201,7 @@ export class DistributionEngine {
     if (strategy === "fixed") {
       let totalFixed = this.zero();
       for (const r of recipients) {
-        const amount: Money = {
-          amount: String(r.share),
-          currency: this.currency,
-          decimals: this.decimals,
-        };
-        totalFixed = addMoney(totalFixed, amount);
+        totalFixed = addMoney(totalFixed, this.fixedAmountOf(r));
       }
       const check = subtractMoney(pool, totalFixed);
       if (isNegative(check)) {
@@ -235,7 +279,29 @@ export class DistributionEngine {
 
     const result = this.resolvePayouts(plan);
 
-    // Record ledger entries
+    // Atomic execution (A-TREAS-002): the ledger rejects non-positive amounts
+    // (Rule 6), so a zero/negative payout mid-loop used to throw after earlier
+    // payouts were already committed — an unrecoverable partial distribution
+    // that left the plan 'approved' and wedged retries on DUPLICATE_ENTRY_ID.
+    //
+    // Instead: drop zero payouts (a zero distribution is a no-op, not a ledger
+    // write), reject any malformed/negative payout BEFORE touching the ledger,
+    // then commit every debit/credit across all payouts in ONE balanced batch.
+    // ledger.append validates and commits the whole batch atomically.
+    const writable = result.payouts.filter((p) => !this.isZeroAmount(p.amount));
+    for (const payout of writable) {
+      validateMoney(payout.amount); // well-formed Money
+      if (!isPositive(payout.amount)) {
+        // Defence in depth — filter above removed zeros; a negative here is a
+        // resolution bug. Fail closed before any write.
+        throw new DistributionError(
+          "INVALID_SHARES",
+          `Payout for '${payout.payeeId}' is not strictly positive: '${payout.amount.amount}'`,
+        );
+      }
+    }
+
+    // Ensure the pool account exists (idempotent).
     const poolAccountId = `distribution:pool:${plan.id}`;
     if (!ledger.hasAccount(poolAccountId)) {
       ledger.registerAccount({
@@ -245,7 +311,14 @@ export class DistributionEngine {
       });
     }
 
-    for (const payout of result.payouts) {
+    // One correlationId for the whole distribution: the ledger requires every
+    // entry in a batch to share it (Rule 2), and it makes the distribution a
+    // single recoverable transaction. Per-payee entry IDs stay unique.
+    const corrId = `distribution:${plan.id}`;
+    const now = new Date().toISOString();
+    const entries: LedgerEntry[] = [];
+
+    for (const payout of writable) {
       const recipientAccountId = `distribution:recipient:${payout.payeeId}`;
       if (!ledger.hasAccount(recipientAccountId)) {
         ledger.registerAccount({
@@ -255,12 +328,9 @@ export class DistributionEngine {
         });
       }
 
-      const now = new Date().toISOString();
-      const corrId = `distribution:${plan.id}:${payout.payeeId}`;
-
-      const entries: LedgerEntry[] = [
+      entries.push(
         {
-          id: `${corrId}:debit`,
+          id: `${corrId}:${payout.payeeId}:debit`,
           accountId: poolAccountId,
           type: "debit",
           money: payout.amount,
@@ -268,16 +338,20 @@ export class DistributionEngine {
           correlationId: corrId,
         },
         {
-          id: `${corrId}:credit`,
+          id: `${corrId}:${payout.payeeId}:credit`,
           accountId: recipientAccountId,
           type: "credit",
           money: payout.amount,
           timestamp: now,
           correlationId: corrId,
         },
-      ];
+      );
+    }
+
+    // Append the entire balanced batch atomically (skip a no-op empty append).
+    if (entries.length > 0) {
       ledger.append(entries, {
-        description: `Distribution: ${plan.name} - ${payout.payeeId}`,
+        description: `Distribution: ${plan.name}`,
       });
     }
 
@@ -288,16 +362,28 @@ export class DistributionEngine {
     };
     this.plans.set(id, executed);
 
+    // The result reflects what was actually written: zero payouts are dropped.
+    const writtenResult: DistributionResult = {
+      ...result,
+      payouts: writable,
+    };
+
+    // Integer division drops fractional 'dust' into `remainder` (the leftover
+    // that stays in the pool). Surface whether dust was trapped — otherwise it
+    // accrues silently and forces manual ledger reconciliation to explain a
+    // pool balance that doesn't match expectations. `remainderNonZero` is a
+    // low-cardinality boolean; the exact dust amount goes in `message`.
+    const remainderNonZero = !this.isZeroAmount(result.remainder);
     this.telemetry.record({
       package: "@attestia/treasury",
       op: "distribution.execute",
       level: "info",
       outcome: "ok",
-      attributes: { recipientCount: result.payouts.length },
-      message: `distribution '${plan.id}' (${plan.strategy}) executed: ${result.totalDistributed.amount} ${result.totalDistributed.currency} to ${result.payouts.length} recipient(s)`,
+      attributes: { recipientCount: writable.length, remainderNonZero },
+      message: `distribution '${plan.id}' (${plan.strategy}) executed: ${result.totalDistributed.amount} ${result.totalDistributed.currency} to ${writable.length} recipient(s); remainder (dust) ${result.remainder.amount} ${result.remainder.currency}`,
     });
 
-    return result;
+    return writtenResult;
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -309,7 +395,23 @@ export class DistributionEngine {
   }
 
   importPlans(plans: readonly DistributionPlan[]): void {
+    // Restore is into a FRESH engine: importing over existing state would
+    // silently overwrite live plans by id. Fail closed (caller bug).
+    if (this.plans.size > 0) {
+      throw new DistributionError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import plans into a non-empty engine (${this.plans.size} already present) — restore into a fresh DistributionEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const p of plans) {
+      if (seen.has(p.id)) {
+        throw new DistributionError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate plan id '${p.id}' in imported snapshot`,
+        );
+      }
+      seen.add(p.id);
       this.plans.set(p.id, p);
     }
   }
@@ -326,6 +428,17 @@ export class DistributionEngine {
         return this.resolveFixed(plan);
       case "milestone":
         return this.resolveMilestone(plan);
+      default: {
+        // Exhaustiveness guard: adding a fourth DistributionStrategy to the
+        // union now fails at COMPILE time (the `never` assignment errors) and,
+        // if that is ever bypassed, fails cleanly at runtime here instead of
+        // returning undefined and crashing on `result.payouts` downstream.
+        const _exhaustive: never = plan.strategy;
+        throw new DistributionError(
+          "UNKNOWN_STRATEGY",
+          `Unknown distribution strategy '${String(_exhaustive)}' on plan '${plan.id}'`,
+        );
+      }
     }
   }
 
@@ -336,7 +449,7 @@ export class DistributionEngine {
 
     for (const recipient of plan.recipients) {
       // share is in basis points (1/10000th)
-      const payoutAmount = (poolAmount * BigInt(recipient.share)) / 10000n;
+      const payoutAmount = (poolAmount * BigInt(recipient.share ?? 0)) / 10000n;
       const amount: Money = {
         amount: formatAmount(payoutAmount, this.decimals),
         currency: this.currency,
@@ -357,14 +470,9 @@ export class DistributionEngine {
     let totalDistributed = this.zero();
 
     for (const recipient of plan.recipients) {
-      // share represents the fixed amount for "fixed" strategy
-      const raw: Money = {
-        amount: String(recipient.share),
-        currency: this.currency,
-        decimals: this.decimals,
-      };
-      // Normalize through addMoney so amount gets formatted consistently
-      const amount = addMoney(this.zero(), raw);
+      // Prefer the exact decimal-string amount; fall back to the numeric share.
+      // Normalize through addMoney so amount gets formatted consistently.
+      const amount = addMoney(this.zero(), this.fixedAmountOf(recipient));
 
       payouts.push({ payeeId: recipient.payeeId, amount });
       totalDistributed = addMoney(totalDistributed, amount);
@@ -382,12 +490,12 @@ export class DistributionEngine {
 
     // Only pay recipients who met their milestone
     const eligible = plan.recipients.filter((r) => r.milestoneMet === true);
-    const totalShares = eligible.reduce((sum, r) => sum + r.share, 0);
+    const totalShares = eligible.reduce((sum, r) => sum + (r.share ?? 0), 0);
 
     for (const recipient of eligible) {
       // Proportional among milestone-met recipients
       const payoutAmount = totalShares > 0
-        ? (poolAmount * BigInt(recipient.share)) / BigInt(totalShares)
+        ? (poolAmount * BigInt(recipient.share ?? 0)) / BigInt(totalShares)
         : 0n;
       const amount: Money = {
         amount: formatAmount(payoutAmount, this.decimals),
@@ -402,6 +510,33 @@ export class DistributionEngine {
     const remainder = subtractMoney(plan.pool, totalDistributed);
 
     return { planId: plan.id, payouts, totalDistributed, remainder };
+  }
+
+  /**
+   * Resolve the fixed payout amount for a recipient. Prefers the exact
+   * decimal-string {@link DistributionRecipient.amount} (precision-safe for
+   * large amounts); falls back to the legacy numeric `share` for small,
+   * already-validated values. Validation in {@link createPlan} guarantees one
+   * of the two is present and well-formed.
+   */
+  private fixedAmountOf(recipient: DistributionRecipient): Money {
+    if (recipient.amount !== undefined) {
+      return {
+        amount: recipient.amount.amount,
+        currency: this.currency,
+        decimals: this.decimals,
+      };
+    }
+    return {
+      amount: String(recipient.share ?? 0),
+      currency: this.currency,
+      decimals: this.decimals,
+    };
+  }
+
+  /** True when a Money value parses to exactly zero. */
+  private isZeroAmount(money: Money): boolean {
+    return parseAmount(money.amount, money.decimals) === 0n;
   }
 
   private zero(): Money {

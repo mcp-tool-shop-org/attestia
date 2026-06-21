@@ -7,3 +7,7 @@ site/.astro/
 
 # polyglot translation cache
 .polyglot-cache.json
+
+# dogfood swarm working artifacts (local-only, never committed)
+swarms/
+.swarm-*.log

@@ -39,6 +39,9 @@ function createConfig(): ObserverConfig {
     chain: CHAINS.SOLANA_MAINNET,
     rpcUrl: "https://mock-solana-rpc.example.com",
     timeoutMs: 5000,
+    // Keep retry backoff tiny so transient-error tests stay fast and
+    // deterministic (the shared retry helper now governs Solana too).
+    retry: { maxRetries: 3, delayMs: 1 },
   };
 }
 

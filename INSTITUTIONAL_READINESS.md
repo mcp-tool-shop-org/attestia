@@ -30,7 +30,7 @@ Commission an external security audit before deploying with real financial data.
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Unit test coverage ≥95% (core packages) | Done | 2,220 tests across 14 packages |
+| Unit test coverage ≥95% (core packages) | Done | 2,564 tests across 14 packages |
 | Property-based tests for hash chain | Done | fast-check in event-store |
 | End-to-end lifecycle test | Done | Pilot use case covers declare→attest |
 | Edge case coverage | Done | 33 dedicated edge case tests |

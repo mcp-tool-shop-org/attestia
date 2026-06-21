@@ -14,7 +14,12 @@ export { FundingGateManager, FundingError } from "./funding.js";
 export type { FundingErrorCode } from "./funding.js";
 
 // Coordinator
-export { Treasury } from "./treasury.js";
+export {
+  Treasury,
+  TreasuryError,
+  CURRENT_TREASURY_SNAPSHOT_VERSION,
+} from "./treasury.js";
+export type { TreasuryErrorCode } from "./treasury.js";
 
 // Types
 export type {

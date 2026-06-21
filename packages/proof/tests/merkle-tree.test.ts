@@ -86,20 +86,22 @@ describe("MerkleTree construction", () => {
     expect(tree.getLeafCount()).toBe(2);
   });
 
-  it("three leaves — odd count handled by duplication", () => {
+  it("three leaves — odd count handled by RFC 6962 promotion (CVE-2012-2459)", () => {
     const leaves = makeLeaves(3);
     const tree = MerkleTree.build(leaves);
 
     expect(tree.getRoot()).toBeTruthy();
     expect(tree.getLeafCount()).toBe(3);
 
-    // Manually compute over TAGGED leaves: H(H(l0,l1), H(l2,l2))
+    // RFC 6962 promotion (NOT self-duplication): the lone third leaf l2 has no
+    // sibling at the bottom level, so it is carried UP unchanged and paired
+    // with the level-1 parent h01 → H(H(l0,l1), l2). Self-duplication would
+    // give H(H(l0,l1), H(l2,l2)) and collide with build([l0,l1,l2,l2]).
     const l0 = hashLeaf(leaves[0]!);
     const l1 = hashLeaf(leaves[1]!);
     const l2 = hashLeaf(leaves[2]!);
     const h01 = hashPair(l0, l1);
-    const h22 = hashPair(l2, l2);
-    const expectedRoot = hashPair(h01, h22);
+    const expectedRoot = hashPair(h01, l2);
     expect(tree.getRoot()).toBe(expectedRoot);
   });
 
@@ -443,7 +445,8 @@ describe("MerkleTree edge cases", () => {
     const leaves = makeLeaves(5);
     const tree = MerkleTree.build(leaves);
 
-    // Last leaf (index 4) is the odd one out — paired with itself
+    // Last leaf (index 4) is the odd one out — promoted (RFC 6962), not
+    // paired with itself; its proof must still fold back to the root.
     const proof = tree.getProof(4)!;
     expect(proof.leafHash).toBe(leaves[4]);
     expect(MerkleTree.verifyProof(proof)).toBe(true);

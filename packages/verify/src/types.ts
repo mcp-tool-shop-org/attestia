@@ -272,7 +272,11 @@ export interface ConsensusResult {
   /** Agreement ratio (0-1) */
   readonly agreementRatio: number;
 
-  /** Whether minimum verifier threshold was met */
+  /**
+   * Whether the minimum DISTINCT-verifier threshold was met. Quorum is computed
+   * over unique `verifierId`s, so duplicate reports from one identity count as a
+   * single verifier and cannot forge a quorum (A-VERIFY-001).
+   */
   readonly quorumReached: boolean;
 
   /**
@@ -284,8 +288,26 @@ export interface ConsensusResult {
    */
   readonly singleVerifierPass: boolean;
 
+  /**
+   * True when all counted (distinct) verifiers attested to the SAME
+   * `bundleHash`. When false, the verifiers disagree on which bundle they
+   * verified, so the consensus is forced to FAIL — a verifier passing a
+   * different bundle proves nothing about the bundle under consensus
+   * (A-VERIFY-001). Vacuously true for an empty report set.
+   */
+  readonly bundleAgreement: boolean;
+
   /** Verifier IDs that dissented from the majority */
   readonly dissenters: readonly string[];
+
+  /**
+   * Human-readable explanation of the verdict, mirroring the SLA /
+   * tenant-governance convention (B-RVP-009). For a PASS it states the margin;
+   * for a FAIL it names the SPECIFIC cause — no reports, quorum not reached,
+   * bundle disagreement, or majority-not-PASS — so an on-call engineer gets an
+   * actionable next step without decoding the numeric fields. Always present.
+   */
+  readonly reason: string;
 
   /** ISO 8601 timestamp */
   readonly consensusAt: string;

@@ -30,6 +30,37 @@ import type {
 } from "./types.js";
 
 // =============================================================================
+// Snapshot versioning
+// =============================================================================
+
+/**
+ * The snapshot schema version this build writes and can restore. A snapshot
+ * carrying any other `version` is rejected at restore time (see
+ * {@link Vault.restoreFromSnapshot}) rather than silently mis-restored into a
+ * structurally-valid but semantically-wrong vault.
+ */
+export const CURRENT_VAULT_SNAPSHOT_VERSION = 1 as const;
+
+// =============================================================================
+// Error
+// =============================================================================
+
+export class VaultError extends Error {
+  public readonly code: VaultErrorCode;
+  public readonly hint: string;
+  constructor(code: VaultErrorCode, message: string, hint: string) {
+    super(message);
+    this.name = "VaultError";
+    this.code = code;
+    this.hint = hint;
+  }
+}
+
+export type VaultErrorCode =
+  | "UNSUPPORTED_SNAPSHOT_VERSION"
+  | "RESTORE_INVALID";
+
+// =============================================================================
 // Vault
 // =============================================================================
 
@@ -49,7 +80,7 @@ export class Vault {
     telemetry: Telemetry = NOOP_TELEMETRY,
   ) {
     this.config = config;
-    this.portfolio = new PortfolioObserver(observerRegistry);
+    this.portfolio = new PortfolioObserver(observerRegistry, telemetry);
     this.budget = new BudgetEngine(
       config.ownerId,
       config.defaultCurrency,
@@ -211,7 +242,7 @@ export class Vault {
    */
   snapshot(): VaultSnapshot {
     return {
-      version: 1,
+      version: CURRENT_VAULT_SNAPSHOT_VERSION,
       config: this.config,
       envelopes: this.budget.listEnvelopes(),
       intents: this.intents.exportIntents(),
@@ -221,36 +252,67 @@ export class Vault {
 
   /**
    * Restore vault state from a snapshot.
+   *
+   * Restore is robust: each envelope's committed `allocated`/`spent` state is
+   * set DIRECTLY (via {@link BudgetEngine.restoreEnvelope}) rather than replayed
+   * through allocate()/spend(). Replaying spend() against the live guard could
+   * abort a VALID snapshot with INSUFFICIENT_BUDGET (ordering/flooring edge
+   * cases) and leave a half-built vault. Direct restore means any consistent
+   * snapshot always restores, while a genuinely corrupt envelope (negative or
+   * spent>allocated) still fails closed before any state is mutated — the
+   * returned vault is always either the full snapshot or an exception, never a
+   * partial.
+   *
+   * The snapshot `version` is checked first: an unrecognised version is
+   * rejected with a clear, actionable error rather than silently mis-restored.
    */
   restoreFromSnapshot(
     snapshot: VaultSnapshot,
     observerRegistry: ObserverRegistry,
     telemetry: Telemetry = NOOP_TELEMETRY,
   ): Vault {
+    if (snapshot.version !== CURRENT_VAULT_SNAPSHOT_VERSION) {
+      throw new VaultError(
+        "UNSUPPORTED_SNAPSHOT_VERSION",
+        `Cannot restore vault snapshot version ${String(snapshot.version)}: this build restores version ${CURRENT_VAULT_SNAPSHOT_VERSION}`,
+        `Migrate the snapshot to version ${CURRENT_VAULT_SNAPSHOT_VERSION} before restoring, or restore with a build that supports version ${String(snapshot.version)}.`,
+      );
+    }
+
     const vault = new Vault(snapshot.config, observerRegistry, telemetry);
 
-    // Restore budget envelopes
-    for (const env of snapshot.envelopes) {
-      vault.budget.createEnvelope(env.id, env.name, env.category);
-      // Replay allocation/spending
-      if (env.allocated !== "0") {
-        vault.budget.allocate(env.id, {
-          amount: env.allocated,
-          currency: env.currency,
-          decimals: env.decimals,
-        });
+    // Restore budget envelopes by setting committed state directly. A corrupt
+    // envelope throws INVALID_ENVELOPE_STATE here, before any intents are
+    // imported — fail closed, never half-built.
+    try {
+      for (const env of snapshot.envelopes) {
+        vault.budget.restoreEnvelope(env);
       }
-      if (env.spent !== "0") {
-        vault.budget.spend(env.id, {
-          amount: env.spent,
-          currency: env.currency,
-          decimals: env.decimals,
-        });
-      }
+    } catch (err) {
+      throw new VaultError(
+        "RESTORE_INVALID",
+        `Vault snapshot is inconsistent and cannot be restored: ${err instanceof Error ? err.message : String(err)}`,
+        "Inspect the snapshot's envelopes — each must have allocated >= spent and non-negative amounts. This usually indicates corruption or a failed migration.",
+      );
     }
 
     // Restore intents
     vault.intents.importIntents(snapshot.intents);
+
+    // Restore is an operationally significant event — surface it. Counts are
+    // low-cardinality; the version goes in attributes as a small bounded enum.
+    telemetry.record({
+      package: "@attestia/vault",
+      op: "vault.restore",
+      level: "info",
+      outcome: "ok",
+      attributes: {
+        envelopeCount: snapshot.envelopes.length,
+        intentCount: snapshot.intents.length,
+        snapshotVersion: snapshot.version,
+      },
+      message: `vault '${snapshot.config.ownerId}' restored from snapshot (${snapshot.envelopes.length} envelope(s), ${snapshot.intents.length} intent(s))`,
+    });
 
     return vault;
   }

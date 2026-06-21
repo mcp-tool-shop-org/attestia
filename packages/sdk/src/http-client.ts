@@ -41,6 +41,40 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Upper bound on a single Retry-After honoured sleep (ms), so a hostile or
+ * mis-set header cannot park the client for minutes. The deadline budget caps
+ * it further. */
+const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * Parse an HTTP `Retry-After` header value into milliseconds.
+ *
+ * Supports both forms from RFC 9110: a delta-seconds integer ("120") and an
+ * HTTP-date ("Wed, 21 Oct 2025 07:28:00 GMT"). Returns `undefined` when the
+ * header is absent or unparseable, so the caller falls back to exponential
+ * backoff.
+ */
+function parseRetryAfterMs(value: string | null | undefined): number | undefined {
+  if (value === null || value === undefined || value.trim() === "") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+
+  // delta-seconds form
+  if (/^\d+$/.test(trimmed)) {
+    return Number(trimmed) * 1000;
+  }
+
+  // HTTP-date form
+  const dateMs = Date.parse(trimmed);
+  if (!Number.isNaN(dateMs)) {
+    const deltaMs = dateMs - Date.now();
+    return deltaMs > 0 ? deltaMs : 0;
+  }
+
+  return undefined;
+}
+
 /**
  * Parse a response body as JSON, handling empty responses.
  */
@@ -280,6 +314,28 @@ export class HttpClient {
           };
         }
 
+        // 429 → the server explicitly told us to back off via Retry-After
+        // (B-SDK-001). Honour it and retry within the deadline budget rather
+        // than failing immediately like an ordinary 4xx — a 429 is transient
+        // and recoverable, and retrying is safe even for mutations because the
+        // request never reached the handler. GET is always retried; mutations
+        // retry only when the caller opted in (they carry a stable
+        // Idempotency-Key, so a dedupe-on-server is guaranteed).
+        if (response.status === 429 && canRetry && attempt < this.maxRetries) {
+          const retryAfterMs = parseRetryAfterMs(responseHeaders["retry-after"]);
+          const waitMs = this.boundedRetryWait(retryAfterMs, attempt, deadline);
+          if (waitMs !== undefined) {
+            lastError = new AttestiaError(
+              "RATE_LIMITED",
+              `HTTP 429 (rate limited)`,
+              429,
+            );
+            await sleep(waitMs);
+            continue;
+          }
+          // No budget left to honour the backoff → fall through and surface 429.
+        }
+
         // 4xx → don't retry (client errors)
         if (response.status >= 400 && response.status < 500) {
           const errorBody = responseBody as {
@@ -294,10 +350,17 @@ export class HttpClient {
           );
         }
 
-        // 5xx → retry with backoff (only when this method is retryable)
+        // 5xx → retry with backoff (only when this method is retryable).
+        // Honour a server-provided Retry-After (e.g. on 503) over the default
+        // exponential backoff so the client recovers exactly when the server
+        // says it can (B-SDK-001).
         if (response.status >= 500 && canRetry && attempt < this.maxRetries) {
+          const retryAfterMs = parseRetryAfterMs(responseHeaders["retry-after"]);
           const backoffMs = Math.min(1000 * Math.pow(2, attempt), 10000);
-          await sleep(backoffMs);
+          // Prefer Retry-After when present and within budget; else exponential.
+          const waitMs =
+            this.boundedRetryWait(retryAfterMs, attempt, deadline) ?? backoffMs;
+          await sleep(waitMs);
           lastError = new AttestiaError(
             "SERVER_ERROR",
             `HTTP ${response.status}`,
@@ -342,6 +405,33 @@ export class HttpClient {
       lastError?.message ?? "Request failed after all retries",
       0,
     );
+  }
+
+  /**
+   * Compute how long to wait before the next retry when honouring a
+   * server-provided Retry-After, bounded by both {@link MAX_RETRY_AFTER_MS} and
+   * the remaining request deadline (B-SDK-001).
+   *
+   * Returns `undefined` when there is no Retry-After to honour, or when even a
+   * zero-length wait would not leave time to make another attempt before the
+   * deadline — letting the caller fall back to its default behaviour (surface
+   * the 429, or use exponential backoff for 5xx).
+   */
+  private boundedRetryWait(
+    retryAfterMs: number | undefined,
+    _attempt: number,
+    deadline: number,
+  ): number | undefined {
+    if (retryAfterMs === undefined) {
+      return undefined;
+    }
+    const capped = Math.min(Math.max(retryAfterMs, 0), MAX_RETRY_AFTER_MS);
+    const remaining = deadline - Date.now();
+    // No point sleeping past the deadline — another attempt could never run.
+    if (capped >= remaining) {
+      return undefined;
+    }
+    return capped;
   }
 
   /**

@@ -34,6 +34,7 @@
   "author": "mcp-tool-shop-org",
   "license": "MIT",
   "dependencies": {
+    "@attestia/types": "workspace:*",
     "json-canonicalize": "^1.0.6"
   },
   "devDependencies": {

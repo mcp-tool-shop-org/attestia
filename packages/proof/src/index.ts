@@ -23,6 +23,7 @@ export { MerkleTree } from "./merkle-tree.js";
 export {
   hashAttestation,
   packageAttestationProof,
+  packageAttestationProofResult,
   verifyAttestationProof,
   verifyAttestationProofDetailed,
 } from "./attestation-proof.js";
@@ -30,4 +31,6 @@ export {
 export type {
   AttestationCheck,
   AttestationVerificationResult,
+  PackageFailureReason,
+  PackageAttestationResult,
 } from "./attestation-proof.js";

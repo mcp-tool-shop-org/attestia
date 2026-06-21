@@ -43,12 +43,13 @@ import type {
   ConnectionStatus,
 } from "../observer.js";
 import type { ChainProfile } from "../finality.js";
+import type { RpcRetryConfig } from "../observer.js";
 import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
 import {
   DEFAULT_SOLANA_RPC_CONFIG,
   type SolanaRpcConfig,
 } from "./rpc-config.js";
-import { withRetry } from "./with-retry.js";
+import { withRetry } from "../retry.js";
 
 // =============================================================================
 // Solana Observer
@@ -61,6 +62,7 @@ export class SolanaObserver implements ChainObserver {
   private readonly profile: ChainProfile | undefined;
   private readonly rpcConfig: SolanaRpcConfig;
   private readonly telemetry: Telemetry;
+  private readonly retryConfig: RpcRetryConfig;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("solana:")) {
@@ -80,6 +82,15 @@ export class SolanaObserver implements ChainObserver {
       ...DEFAULT_SOLANA_RPC_CONFIG,
       commitment,
       timeoutMs: config.timeoutMs ?? DEFAULT_SOLANA_RPC_CONFIG.timeoutMs,
+    };
+
+    // PB-WCO-001: route Solana through the SAME shared retry discipline as EVM
+    // and XRPL. An explicit ObserverConfig.retry wins; otherwise honor the
+    // existing Solana RPC config (which itself defaults to 3 retries / 1s delay),
+    // so behavior is unchanged where no override is supplied.
+    this.retryConfig = config.retry ?? {
+      maxRetries: this.rpcConfig.maxRetries,
+      delayMs: this.rpcConfig.retryDelayMs,
     };
   }
 
@@ -163,8 +174,8 @@ export class SolanaObserver implements ChainObserver {
 
     const [balance, slot] = await this.runRpc("getBalance", () =>
       Promise.all([
-        withRetry(() => connection.getBalance(pubkey, commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
-        withRetry(() => connection.getSlot(commitment), this.rpcConfig.maxRetries, this.rpcConfig.retryDelayMs),
+        connection.getBalance(pubkey, commitment),
+        connection.getSlot(commitment),
       ]),
     );
 
@@ -186,11 +197,7 @@ export class SolanaObserver implements ChainObserver {
 
     // Find token accounts for this owner + mint combination
     const response = await this.runRpc("getTokenBalance", () =>
-      withRetry(
-        () => connection.getParsedTokenAccountsByOwner(ownerPubkey, { mint: mintPubkey }),
-        this.rpcConfig.maxRetries,
-        this.rpcConfig.retryDelayMs,
-      ),
+      connection.getParsedTokenAccountsByOwner(ownerPubkey, { mint: mintPubkey }),
     );
 
     if (response.value.length === 0) {
@@ -239,11 +246,7 @@ export class SolanaObserver implements ChainObserver {
 
     // Get recent transaction signatures for this address
     const signatures = await this.runRpc("getTransfers", () =>
-      withRetry(
-        () => connection.getSignaturesForAddress(pubkey, { limit: query.limit ?? 100 }, finality),
-        this.rpcConfig.maxRetries,
-        this.rpcConfig.retryDelayMs,
-      ),
+      connection.getSignaturesForAddress(pubkey, { limit: query.limit ?? 100 }, finality),
     );
 
     if (signatures.length === 0) {
@@ -253,11 +256,7 @@ export class SolanaObserver implements ChainObserver {
     // Fetch full parsed transactions
     const txHashes = signatures.map((s) => s.signature);
     const transactions = await this.runRpc("getTransfers", () =>
-      withRetry(
-        () => connection.getParsedTransactions(txHashes, { commitment: finality, maxSupportedTransactionVersion: 0 }),
-        this.rpcConfig.maxRetries,
-        this.rpcConfig.retryDelayMs,
-      ),
+      connection.getParsedTransactions(txHashes, { commitment: finality, maxSupportedTransactionVersion: 0 }),
     );
 
     const events: TransferEvent[] = [];
@@ -320,17 +319,46 @@ export class SolanaObserver implements ChainObserver {
   }
 
   /**
-   * Run a Solana RPC operation, classifying and re-throwing any failure as a
-   * structured {@link ObserverError} and emitting a `rpc` failure event
-   * (D3-B-003). Wraps the already-retried RPC call so the *final* failure (after
-   * retries are exhausted) surfaces classified rather than as a raw web3.js error.
+   * Emit a structured `rpc.retry` event (outcome `"degraded"`, level `warn`)
+   * when a transient Solana RPC failure is about to be retried (PB-WCO-004).
+   * Previously Solana retried silently — this restores the early-warning window
+   * for a degrading endpoint (rising retry rate per chain) that EVM/XRPL now
+   * also emit. Low-cardinality attributes only (`chainId`, `code`, `attempt`).
+   * Never throws.
+   */
+  private emitRpcRetry(code: string, attempt: number): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc.retry",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { chainId: this.chainId, code, attempt },
+        message: `SolanaObserver: retrying transient RPC failure (${code}) on ${this.chainId}, attempt ${attempt}`,
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run a Solana RPC operation under the shared retry-with-backoff discipline
+   * (PB-WCO-001): transient classified failures (RATE_LIMITED / RPC_TIMEOUT /
+   * RPC_UNREACHABLE) are retried, all other classes fail closed immediately. The
+   * FINAL failure (after retries are exhausted) is classified and re-thrown as a
+   * structured {@link ObserverError} with a `rpc` failure event (D3-B-003); each
+   * retry emits an `rpc.retry` event (PB-WCO-004).
    *
    * @param context Operation name for the error message (e.g. "getBalance").
-   * @param fn The RPC call (typically a withRetry(...) invocation) to execute.
+   * @param fn The raw RPC call (web3.js) to execute — retry is applied here.
    */
   private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
     try {
-      return await fn();
+      return await withRetry(fn, {
+        maxRetries: this.retryConfig.maxRetries,
+        delayMs: this.retryConfig.delayMs,
+        onRetry: ({ attempt, code }) => this.emitRpcRetry(code, attempt),
+      });
     } catch (err) {
       const observerError = toObserverError(err, `SolanaObserver.${context}`, this.chainId);
       this.emitRpcFailure(observerError.code);

@@ -13,9 +13,12 @@
 export {
   // Schema
   SNAPSHOT_VERSION,
+  SUPPORTED_SNAPSHOT_VERSIONS,
   type RegistrarSnapshotV1,
   SnapshotValidationError,
   validateSnapshot,
+  // Migration seam
+  migrateToLatest,
 
   // Hash computation
   computeLegacyRegistryHash,
