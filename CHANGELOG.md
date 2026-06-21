@@ -4,6 +4,19 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [2.0.1] - 2026-06-21
+
+First npm release as a single bundled package, plus Node baseline modernization.
+No library API changes from 2.0.0.
+
+- **Published to npm as `@mcptoolshop/attestia`** — the whole Attestia library in
+  one package (subpath exports per domain; the internal `@attestia/*` packages
+  are inlined at build time, so there is no per-package sprawl).
+  `npm install @mcptoolshop/attestia`. Published with provenance via GitHub
+  Actions OIDC Trusted Publishing — no long-lived tokens.
+- **Node baseline → 22 + 24** — dropped the stale Node 20 from CI; `engines.node`
+  is now `>=22`.
+
 ## [2.0.0] - 2026-06-21
 
 A second full hardening cycle plus the durability and API layers that make the
