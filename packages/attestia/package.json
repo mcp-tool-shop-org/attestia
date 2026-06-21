@@ -1,0 +1,73 @@
+{
+  "name": "@mcptoolshop/attestia",
+  "version": "2.0.0",
+  "description": "Financial truth infrastructure for the decentralized world — the full Attestia library in one package (deterministic ledger, constitutional registrar, Merkle proofs, multi-chain observation, XRPL witness, replay verification).",
+  "type": "module",
+  "license": "MIT",
+  "author": "mcp-tool-shop-org",
+  "homepage": "https://mcp-tool-shop-org.github.io/attestia/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-tool-shop-org/attestia.git"
+  },
+  "keywords": [
+    "attestation",
+    "financial-infrastructure",
+    "double-entry",
+    "merkle-proof",
+    "xrpl",
+    "web3",
+    "deterministic",
+    "audit"
+  ],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./types": { "types": "./dist/types.d.ts", "import": "./dist/types.js" },
+    "./ledger": { "types": "./dist/ledger.d.ts", "import": "./dist/ledger.js" },
+    "./registrum": { "types": "./dist/registrum.d.ts", "import": "./dist/registrum.js" },
+    "./event-store": { "types": "./dist/event-store.d.ts", "import": "./dist/event-store.js" },
+    "./proof": { "types": "./dist/proof.d.ts", "import": "./dist/proof.js" },
+    "./vault": { "types": "./dist/vault.d.ts", "import": "./dist/vault.js" },
+    "./treasury": { "types": "./dist/treasury.d.ts", "import": "./dist/treasury.js" },
+    "./reconciler": { "types": "./dist/reconciler.d.ts", "import": "./dist/reconciler.js" },
+    "./chain-observer": { "types": "./dist/chain-observer.d.ts", "import": "./dist/chain-observer.js" },
+    "./witness": { "types": "./dist/witness.d.ts", "import": "./dist/witness.js" },
+    "./verify": { "types": "./dist/verify.d.ts", "import": "./dist/verify.js" },
+    "./sdk": { "types": "./dist/sdk.d.ts", "import": "./dist/sdk.js" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "json-canonicalize": "^2.0.0",
+    "ripple-keypairs": "^2.0.0",
+    "viem": "^2.0.0",
+    "xrpl": "^4.4.0"
+  },
+  "devDependencies": {
+    "@attestia/chain-observer": "workspace:*",
+    "@attestia/event-store": "workspace:*",
+    "@attestia/ledger": "workspace:*",
+    "@attestia/proof": "workspace:*",
+    "@attestia/reconciler": "workspace:*",
+    "@attestia/registrum": "workspace:*",
+    "@attestia/sdk": "workspace:*",
+    "@attestia/treasury": "workspace:*",
+    "@attestia/types": "workspace:*",
+    "@attestia/vault": "workspace:*",
+    "@attestia/verify": "workspace:*",
+    "@attestia/witness": "workspace:*",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
