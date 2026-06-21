@@ -270,7 +270,7 @@ export function createApp(options: CreateAppOptions): AppInstance {
     // Unsecured mode (tests, dev): use default tenant with synthetic admin auth
     app.use("/api/*", async (c, next) => {
       const tenantId = c.req.header("X-Tenant-Id") ?? defaultTenantId;
-      const service = tenantRegistry.getOrCreate(tenantId);
+      const service = await tenantRegistry.getOrCreate(tenantId);
       c.set("service", service);
       // Set synthetic auth so requirePermission() works in unsecured mode
       c.set("auth", {

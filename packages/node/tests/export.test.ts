@@ -99,8 +99,8 @@ describe("GET /api/v1/export/state", () => {
 
 describe("export events streaming (B-NODE-006)", () => {
   /** Append N events to the default tenant's event store. */
-  function seedEvents(tenantRegistry: AppInstance["tenantRegistry"], n: number): void {
-    const service = tenantRegistry.getOrCreate("test-tenant");
+  async function seedEvents(tenantRegistry: AppInstance["tenantRegistry"], n: number): Promise<void> {
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     for (let i = 0; i < n; i++) {
       service.eventStore.append("export.stream", [
         {
@@ -120,7 +120,7 @@ describe("export events streaming (B-NODE-006)", () => {
 
   it("sets X-Total-Count to the streamed line count", async () => {
     const { app, tenantRegistry } = createTestApp();
-    seedEvents(tenantRegistry, 3);
+    await seedEvents(tenantRegistry, 3);
 
     const res = await app.request(
       jsonRequest("/api/v1/export/events", "GET", undefined, {
@@ -141,7 +141,7 @@ describe("export events streaming (B-NODE-006)", () => {
 
   it("streams each event as its own valid JSON line (NDJSON)", async () => {
     const { app, tenantRegistry } = createTestApp();
-    seedEvents(tenantRegistry, 4);
+    await seedEvents(tenantRegistry, 4);
 
     const res = await app.request(
       jsonRequest("/api/v1/export/events", "GET", undefined, {

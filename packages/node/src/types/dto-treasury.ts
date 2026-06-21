@@ -112,27 +112,44 @@ export type ListDistributionsQuery = z.infer<
 // Funding Gate DTOs
 // =============================================================================
 
-/** Submit a funding request (the first leg of the dual-gate flow). */
+/**
+ * Submit a funding request (the first leg of the dual-gate flow).
+ *
+ * SECURITY (AUTHZ-FUNDING-SOD-BYPASS): the actor is NOT accepted from the body.
+ * The requester is bound server-side to the authenticated principal
+ * (`c.get("auth").identity`) in the route, so a client cannot forge a distinct
+ * requester label to defeat separation of duties. A `requestedBy` field in the
+ * body is therefore intentionally absent from this schema (and ignored if sent).
+ */
 export const SubmitFundingSchema = z.object({
   id: z.string().min(1).max(128),
   description: z.string().min(1).max(1024),
   amount: MoneySchema,
-  requestedBy: z.string().min(1).max(256),
 });
 
 export type SubmitFundingDto = z.infer<typeof SubmitFundingSchema>;
 
-/** Approve a funding gate. The approver and an optional reason are supplied. */
+/**
+ * Approve a funding gate. Only an optional reason is supplied.
+ *
+ * SECURITY (AUTHZ-FUNDING-SOD-BYPASS): the approver is NOT accepted from the
+ * body — it is bound server-side to `c.get("auth").identity`. Trusting a
+ * client-chosen `approvedBy` let a single key forge two distinct approvers and
+ * defeat dual control, with the forged approver recorded in the audit log.
+ */
 export const ApproveFundingGateSchema = z.object({
-  approvedBy: z.string().min(1).max(256),
   reason: z.string().max(1024).optional(),
 });
 
 export type ApproveFundingGateDto = z.infer<typeof ApproveFundingGateSchema>;
 
-/** Reject a funding request. */
+/**
+ * Reject a funding request. Only an optional reason is supplied.
+ *
+ * SECURITY (AUTHZ-FUNDING-SOD-BYPASS): the rejector is bound server-side to
+ * `c.get("auth").identity`, not read from the body.
+ */
 export const RejectFundingSchema = z.object({
-  rejectedBy: z.string().min(1).max(256),
   reason: z.string().max(1024).optional(),
 });
 

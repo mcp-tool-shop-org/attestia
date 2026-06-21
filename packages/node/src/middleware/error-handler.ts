@@ -83,6 +83,14 @@ const STATUS_MAP: Record<string, number> = {
   ENVELOPE_NOT_FOUND: 404,
   INSUFFICIENT_BUDGET: 422,
   CURRENCY_MISMATCH: 400,
+
+  // Governance errors (SEAM-2): the GovernanceStore throws plain Errors which
+  // the service delegators translate to these coded conflicts so they surface as
+  // 4xx rather than a generic 500.
+  SIGNER_EXISTS: 409,
+  SIGNER_NOT_FOUND: 404,
+  INVALID_QUORUM: 400,
+  GOVERNANCE_CONFLICT: 409,
 };
 
 // =============================================================================
@@ -291,6 +299,24 @@ const CODE_MESSAGES: Record<string, HumanError> = {
   REQUESTER_CANNOT_APPROVE: {
     message: "The requester of an action cannot also approve it.",
     hint: "A different authorized approver must approve this request (separation of duties).",
+  },
+
+  // ── Governance domain codes (SEAM-2) ─────────────────────────────────────
+  SIGNER_EXISTS: {
+    message: "A signer with that address already exists in the governance policy.",
+    hint: "Use a different signer address, or update the existing signer.",
+  },
+  SIGNER_NOT_FOUND: {
+    message: "The requested signer was not found in the governance policy.",
+    hint: "Verify the signer address; it may already have been removed.",
+  },
+  INVALID_QUORUM: {
+    message: "The requested governance change is invalid.",
+    hint: "The quorum, weight, or key is out of range — check it against the current signer set and retry.",
+  },
+  GOVERNANCE_CONFLICT: {
+    message: "The governance change conflicts with the current policy state.",
+    hint: "Re-fetch the current policy to see its state, then retry.",
   },
 };
 

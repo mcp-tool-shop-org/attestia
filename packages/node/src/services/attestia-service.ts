@@ -86,7 +86,7 @@ import type {
 import { StructuralRegistrar, INITIAL_INVARIANTS } from "@attestia/registrum";
 import { ObserverRegistry } from "@attestia/chain-observer";
 import { GovernanceStore } from "@attestia/witness";
-import type { GovernanceChangeEvent } from "@attestia/witness";
+import type { GovernanceChangeEvent, GovernancePolicy } from "@attestia/witness";
 import {
   verifyByReplay,
   verifyHash,
@@ -96,6 +96,80 @@ import type { ReplayInput, ReplayResult, VerificationResult, GlobalStateHash } f
 import { NOOP_TELEMETRY } from "@attestia/types";
 import type { Telemetry, DomainEvent, Money } from "@attestia/types";
 import { tenantPaths } from "./persistence-paths.js";
+
+// =============================================================================
+// Errors
+// =============================================================================
+
+/**
+ * Thrown by {@link AttestiaService.restoreAll} when the latest snapshot is
+ * stamped AHEAD of the durable event log (DUR-COMPOSED-002) and no explicit
+ * recovery override is set. A snapshot newer than its own audit log means the
+ * audit truth was truncated/rolled back/corrupted under it, so adopting it
+ * would silently elevate unbacked state above the audit log. Fail closed.
+ */
+export class RestoreAheadOfLogError extends Error {
+  readonly code = "RESTORE_SNAPSHOT_AHEAD_OF_LOG";
+  constructor(stampedPosition: number, livePosition: number) {
+    super(
+      `Snapshot is ahead of the durable event log (snapshot@${stampedPosition}, ` +
+        `log@${livePosition}); refusing to adopt a snapshot newer than its own ` +
+        `audit log. Set persistence.allowSnapshotAheadOfLog to override for a ` +
+        `deliberate recovery.`,
+    );
+    this.name = "RestoreAheadOfLogError";
+  }
+}
+
+/**
+ * Coded governance conflict (SEAM-2). The underlying {@link GovernanceStore}
+ * throws plain `Error`s (duplicate signer, unknown signer, invalid quorum),
+ * which would otherwise surface to clients as a generic 500. The governance
+ * delegators on {@link AttestiaService} translate them into one of these coded
+ * errors so the route's global error handler maps them to a 4xx with a safe
+ * `{code,message,hint}` envelope, never the raw thrown message.
+ */
+export class GovernanceConflictError extends Error {
+  constructor(
+    readonly code:
+      | "SIGNER_EXISTS"
+      | "SIGNER_NOT_FOUND"
+      | "INVALID_QUORUM"
+      | "GOVERNANCE_CONFLICT",
+    message: string,
+  ) {
+    super(message);
+    this.name = "GovernanceConflictError";
+  }
+}
+
+/**
+ * Classify a plain Error thrown by the GovernanceStore into a coded
+ * {@link GovernanceConflictError}. The store's messages are stable, prefixed
+ * sentences; we match on the prefix and discard the (internal-detail-bearing)
+ * message in favor of a safe coded error. An unrecognized message becomes a
+ * generic GOVERNANCE_CONFLICT (409) rather than leaking through as a 500.
+ */
+function asGovernanceError(err: unknown): GovernanceConflictError {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.startsWith("Signer already exists")) {
+    return new GovernanceConflictError("SIGNER_EXISTS", message);
+  }
+  if (message.startsWith("Signer not found")) {
+    return new GovernanceConflictError("SIGNER_NOT_FOUND", message);
+  }
+  if (
+    message.startsWith("Quorum") ||
+    message.startsWith("Weight must be") ||
+    message.includes("public key")
+  ) {
+    // Invalid input the caller can fix (bad quorum / weight / key) → 400.
+    return new GovernanceConflictError("INVALID_QUORUM", message);
+  }
+  // State conflicts (e.g. "Cannot remove signer … would be less than quorum")
+  // and any unrecognized governance error → a generic 409 conflict, never a 500.
+  return new GovernanceConflictError("GOVERNANCE_CONFLICT", message);
+}
 
 // =============================================================================
 // Configuration
@@ -132,6 +206,22 @@ export interface PersistenceConfig {
   readonly verifyOnLoad?: boolean;
   /** Defensive cap (bytes) on the event-log file read into memory on boot. */
   readonly maxLoadBytes?: number;
+  /**
+   * Explicit recovery override (DUR-COMPOSED-002). When the latest snapshot is
+   * stamped AHEAD of the durable event log (its `eventPosition` exceeds the
+   * log's live position), the snapshot describes state the log cannot back —
+   * the audit truth was truncated, rolled back, or corrupted UNDER the snapshot.
+   * By default {@link AttestiaService.restoreAll} FAILS CLOSED in this case
+   * (refuses to adopt the snapshot and throws) rather than silently trusting a
+   * snapshot newer than its own audit log.
+   *
+   * Set this to `true` only for a deliberate operator-driven recovery where the
+   * out-of-band log loss is understood and accepted; restore then proceeds with
+   * the ahead-of-log snapshot and emits the same crash-window WARN. Default
+   * false (fail closed). The log-ahead-of-snapshot case (the documented crash
+   * window) is unaffected — it always warns and proceeds.
+   */
+  readonly allowSnapshotAheadOfLog?: boolean;
 }
 
 export interface AttestiaServiceConfig {
@@ -575,6 +665,88 @@ export class AttestiaService {
     return this.vault.observePortfolio();
   }
 
+  // ─── Governance delegators (SEAM-2) ────────────────────────────────
+  //
+  // Governance policy changes are value-authorizing mutations (they change WHO
+  // can approve), so they MUST go through the same durability gate as treasury /
+  // vault: append the matching GOVERNANCE_* domain event to the audit log
+  // (fail-closed) BEFORE applying the in-memory change, then snapshot per
+  // cadence. Routes call these delegators instead of touching governanceStore
+  // directly — so a governance change is in the audit trail and survives a
+  // restart, and the GovernanceStore's plain Errors become coded conflicts
+  // (mapped to 4xx by the error handler) instead of leaking as 500.
+
+  addSigner(
+    address: string,
+    label: string,
+    weight?: number,
+    publicKey?: string,
+  ): GovernancePolicy {
+    return this._mutate(
+      "governance",
+      ATTESTIA_EVENTS.GOVERNANCE_SIGNER_ADDED,
+      {
+        signerAddress: address,
+        addedBy: this._config.ownerId,
+        // newSignerCount AFTER this add (the store has not applied it yet).
+        newSignerCount: this.governanceStore.signerCount + 1,
+      },
+      () => {
+        try {
+          this.governanceStore.addSigner(address, label, weight, publicKey);
+        } catch (err) {
+          throw asGovernanceError(err);
+        }
+        return this.governanceStore.getCurrentPolicy();
+      },
+    );
+  }
+
+  removeSigner(address: string): GovernancePolicy {
+    return this._mutate(
+      "governance",
+      ATTESTIA_EVENTS.GOVERNANCE_SIGNER_REMOVED,
+      {
+        signerAddress: address,
+        removedBy: this._config.ownerId,
+        newSignerCount: Math.max(0, this.governanceStore.signerCount - 1),
+      },
+      () => {
+        try {
+          this.governanceStore.removeSigner(address);
+        } catch (err) {
+          throw asGovernanceError(err);
+        }
+        return this.governanceStore.getCurrentPolicy();
+      },
+    );
+  }
+
+  changeQuorum(quorum: number): GovernancePolicy {
+    const previousQuorum = this.governanceStore.getCurrentPolicy().quorum;
+    return this._mutate(
+      "governance",
+      ATTESTIA_EVENTS.GOVERNANCE_QUORUM_CHANGED,
+      {
+        previousQuorum,
+        newQuorum: quorum,
+        changedBy: this._config.ownerId,
+      },
+      () => {
+        try {
+          this.governanceStore.changeQuorum(quorum);
+        } catch (err) {
+          throw asGovernanceError(err);
+        }
+        return this.governanceStore.getCurrentPolicy();
+      },
+    );
+  }
+
+  getCurrentPolicy(): GovernancePolicy {
+    return this.governanceStore.getCurrentPolicy();
+  }
+
   // ─── Events ────────────────────────────────────────────────────────
 
   readAllEvents(options?: ReadAllOptions): readonly StoredEvent[] {
@@ -868,6 +1040,39 @@ export class AttestiaService {
           `un-acknowledged mutations present in the audit log but not the restored ` +
           `snapshot state — the documented crash window. Audit truth is the event log.`,
       });
+    } else if (stampedPosition > livePosition) {
+      // DUR-COMPOSED-002: the REVERSE anomaly. The latest snapshot was stamped
+      // AHEAD of the durable event log — it describes state the log cannot back.
+      // This means the audit log was truncated, rolled back, or corrupted UNDER
+      // the snapshot (the audit truth was lost/rewound). Treat it as a
+      // crash-window-class anomaly and, by default, FAIL CLOSED: we refuse to
+      // adopt a snapshot newer than its own audit log, because doing so would
+      // silently elevate unbacked snapshot state above the (now shorter) audit
+      // truth. An explicit operator recovery override
+      // (persistence.allowSnapshotAheadOfLog) lets a deliberate recovery proceed.
+      const gap = stampedPosition - livePosition;
+      this._telemetry.record({
+        package: "@attestia/node",
+        op: "restore.crashWindow",
+        level: "warn",
+        outcome: "degraded",
+        attributes: {
+          gap,
+          stampedPosition,
+          livePosition,
+          direction: "snapshotAheadOfLog",
+        },
+        message:
+          `Snapshot is ahead of the durable event log by ${gap} event(s) ` +
+          `(snapshot@${stampedPosition}, log@${livePosition}). The snapshot ` +
+          `describes state the audit log cannot back — the log was truncated, ` +
+          `rolled back, or corrupted under it. Refusing to adopt a snapshot ` +
+          `newer than its own audit log (fail-closed). Set ` +
+          `persistence.allowSnapshotAheadOfLog to override for a deliberate recovery.`,
+      });
+      if (this._persistence?.allowSnapshotAheadOfLog !== true) {
+        throw new RestoreAheadOfLogError(stampedPosition, livePosition);
+      }
     }
   }
 
@@ -956,6 +1161,10 @@ function streamSource(
     case "treasury":
       return "treasury";
     case "registrum":
+    // Governance is a structural-policy concern; its domain events declare
+    // source "registrum" in the event catalog (see GOVERNANCE_SCHEMAS), so map
+    // the "governance" stream to that source for metadata consistency.
+    case "governance":
       return "registrum";
     case "vault":
     default:

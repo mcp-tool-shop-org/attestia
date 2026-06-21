@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { AttestiaService } from "../../src/services/attestia-service.js";
 import type { Telemetry, ObservabilityEvent } from "@attestia/types";
+import { FileSnapshotStore } from "@attestia/event-store";
 import { tenantPaths } from "../../src/services/persistence-paths.js";
 
 const OWNER = "tenant-durable-1";
@@ -285,6 +286,113 @@ describe("crash-window — event log ahead of snapshot emits a gap warn", () => 
     );
     expect(gapWarn).toBeDefined();
     expect(Number(gapWarn?.attributes?.gap)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("governance mutations route through the durability gate (SEAM-2)", () => {
+  const SIGNER = "rGovSignerAAAAAAAAAAAAAAAAAAAAAAA1";
+
+  it("appends a GOVERNANCE_* event to the durable log and restores after restart", async () => {
+    // ── First instance: add a signer through the service delegator. ──
+    const s1 = makePersistentService();
+    await s1.initialize();
+    s1.addSigner(SIGNER, "Treasury lead", 2);
+
+    // The mutation appended a governance domain event to the AUDIT TRUTH (the
+    // durable event log) — exactly like every treasury/vault mutation. Before
+    // SEAM-2, governance routes mutated the store directly and appended NOTHING.
+    const govTypes = s1
+      .readAllEvents()
+      .map((e) => e.event.type)
+      .filter((t) => t.startsWith("governance."));
+    expect(govTypes).toContain("governance.signer.added");
+
+    // The current policy reflects the signer.
+    expect(s1.getCurrentPolicy().signers.some((sg) => sg.address === SIGNER)).toBe(true);
+
+    await s1.stop();
+
+    // ── Discard s1 → a new instance over the same dataDir restores governance. ──
+    const s2 = makePersistentService();
+    await s2.initialize();
+    expect(s2.getCurrentPolicy().signers.some((sg) => sg.address === SIGNER)).toBe(true);
+  });
+});
+
+describe("snapshot-ahead-of-log — fail closed, never silently adopt (DUR-COMPOSED-002)", () => {
+  /**
+   * Stamp the manifest AHEAD of the durable event log so restore sees a snapshot
+   * the log cannot back. We seed real state + a real snapshot, then save a NEW
+   * manifest snapshot (higher version) whose eventPosition exceeds the live log
+   * position — exactly the shape of a log that was truncated/rolled back under a
+   * newer snapshot. We use the public FileSnapshotStore.save (which recomputes a
+   * valid stateHash) so the manifest itself passes integrity verification — the
+   * only anomaly is that it is stamped ahead of the log.
+   */
+  function stampManifestAhead(eventPosition: number): void {
+    const { snapshotBaseDir } = tenantPaths(dataDir, OWNER);
+    const store = new FileSnapshotStore(snapshotBaseDir);
+    store.save({
+      streamId: "_manifest",
+      version: eventPosition,
+      state: { eventPosition, ts: new Date().toISOString() },
+    });
+  }
+
+  it("restore warns AND fails closed when a snapshot is stamped ahead of the log", async () => {
+    // Seed a small amount of durable state: log advances to position 1, and a
+    // snapshot set (including a manifest@1) is written on shutdown.
+    const s1 = makePersistentService();
+    await s1.initialize();
+    s1.declareIntent("i-1", "transfer", "d", { toAddress: "0xabc" });
+    await s1.stop();
+
+    // Forge a manifest stamped FAR ahead of the log (log is at position 1).
+    stampManifestAhead(999);
+
+    // Reload: the latest manifest (@999) is ahead of the live log (@1).
+    const { sink, events } = captureSink();
+    const s2 = makePersistentService(sink);
+
+    // FAIL CLOSED: initialize() (→ restoreAll) refuses to adopt and throws.
+    await expect(s2.initialize()).rejects.toThrow();
+
+    // A crash-window-class WARN naming the snapshot-ahead direction fired.
+    const aheadWarn = events.find(
+      (e) =>
+        e.op === "restore.crashWindow" &&
+        e.level === "warn" &&
+        e.attributes?.direction === "snapshotAheadOfLog",
+    );
+    expect(aheadWarn).toBeDefined();
+    expect(Number(aheadWarn?.attributes?.gap)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("proceeds (with a warn) when the explicit recovery override is set", async () => {
+    const s1 = makePersistentService();
+    await s1.initialize();
+    s1.declareIntent("i-1", "transfer", "d", { toAddress: "0xabc" });
+    await s1.stop();
+
+    stampManifestAhead(999);
+
+    const { sink, events } = captureSink();
+    const s2 = new AttestiaService({
+      ownerId: OWNER,
+      defaultCurrency: "USDC",
+      defaultDecimals: 6,
+      telemetry: sink,
+      persistence: { dataDir, allowSnapshotAheadOfLog: true },
+    });
+
+    // Override set → restore proceeds without throwing, but still warns.
+    await expect(s2.initialize()).resolves.toBeUndefined();
+    const aheadWarn = events.find(
+      (e) =>
+        e.op === "restore.crashWindow" &&
+        e.attributes?.direction === "snapshotAheadOfLog",
+    );
+    expect(aheadWarn).toBeDefined();
   });
 });
 

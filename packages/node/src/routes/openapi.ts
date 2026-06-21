@@ -1007,29 +1007,30 @@ const OPENAPI_SCHEMA = {
       },
       SubmitFunding: {
         type: "object",
+        // The requester is bound server-side to the authenticated principal
+        // (separation of duties); it is NOT accepted in the request body.
         properties: {
           id: { type: "string" },
           description: { type: "string" },
           amount: { $ref: "#/components/schemas/Money" },
-          requestedBy: { type: "string" },
         },
-        required: ["id", "description", "amount", "requestedBy"],
+        required: ["id", "description", "amount"],
       },
       ApproveFundingGate: {
         type: "object",
+        // The approver is bound server-side to the authenticated principal
+        // (separation of duties); it is NOT accepted in the request body.
         properties: {
-          approvedBy: { type: "string" },
           reason: { type: "string" },
         },
-        required: ["approvedBy"],
       },
       RejectFunding: {
         type: "object",
+        // The rejector is bound server-side to the authenticated principal; it
+        // is NOT accepted in the request body.
         properties: {
-          rejectedBy: { type: "string" },
           reason: { type: "string" },
         },
-        required: ["rejectedBy"],
       },
 
       // ── Vault bodies ────────────────────────────────────────────────────

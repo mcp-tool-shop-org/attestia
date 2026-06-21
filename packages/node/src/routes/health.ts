@@ -56,7 +56,7 @@ export function createHealthRoutes(
     });
   });
 
-  routes.get("/ready", (c) => {
+  routes.get("/ready", async (c) => {
     const tenantIds = tenantRegistry.tenantIds();
 
     // Deep health is computed PER tenant. This endpoint is mounted before auth,
@@ -68,7 +68,7 @@ export function createHealthRoutes(
     let notReadyCount = 0;
 
     for (const tenantId of tenantIds) {
-      const service = tenantRegistry.getOrCreate(tenantId);
+      const service = await tenantRegistry.getOrCreate(tenantId);
 
       // Deep health: check event store integrity + writability
       const { writable, integrity } = service.checkEventStoreWritable();

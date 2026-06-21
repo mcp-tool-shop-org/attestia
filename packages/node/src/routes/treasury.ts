@@ -382,11 +382,16 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
       const auth = c.get("auth");
       const body = c.get("validatedBody") as SubmitFundingDto;
 
+      // SECURITY (AUTHZ-FUNDING-SOD-BYPASS): bind the requester to the
+      // authenticated principal — never a client-supplied label. Trusting a body
+      // field let one key forge distinct requester/approver identities and defeat
+      // the domain's two-distinct-approver separation of duties, and recorded a
+      // forged actor in the audit log. Mirrors intents.ts (server-derived actor).
       const request = service.submitFunding(
         body.id,
         body.description,
         body.amount,
-        body.requestedBy,
+        auth.identity,
       );
 
       metrics?.incrementCounter("attestia_funding_requests_total", {
@@ -397,7 +402,7 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
         action: "submit",
         resourceType: "funding-request",
         resourceId: body.id,
-        actor: "api",
+        actor: auth.identity,
       });
 
       setETag(c, request);
@@ -416,9 +421,13 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
       const id = c.req.param("id");
       const body = c.get("validatedBody") as ApproveFundingGateDto;
 
+      // SECURITY (AUTHZ-FUNDING-SOD-BYPASS): the approver is the authenticated
+      // principal, never a client-supplied label. This is what makes the domain's
+      // gate1 !== gate2 / REQUESTER_CANNOT_APPROVE checks enforce SoD against the
+      // REAL caller — one key can no longer self-satisfy both gates.
       const request = service.approveFundingGate(
         id,
-        body.approvedBy,
+        auth.identity,
         body.reason,
       );
 
@@ -430,7 +439,7 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
         action: "approve",
         resourceType: "funding-request",
         resourceId: id,
-        actor: "api",
+        actor: auth.identity,
       });
 
       setETag(c, request);
@@ -449,7 +458,9 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
       const id = c.req.param("id");
       const body = c.get("validatedBody") as RejectFundingDto;
 
-      const request = service.rejectFunding(id, body.rejectedBy, body.reason);
+      // SECURITY (AUTHZ-FUNDING-SOD-BYPASS): the rejector is the authenticated
+      // principal, never a client-supplied label.
+      const request = service.rejectFunding(id, auth.identity, body.reason);
 
       metrics?.incrementCounter("attestia_funding_requests_total", {
         action: "reject",
@@ -459,7 +470,7 @@ export function createTreasuryRoutes(deps?: TreasuryRouteDeps): Hono<AppEnv> {
         action: "reject",
         resourceType: "funding-request",
         resourceId: id,
-        actor: "api",
+        actor: auth.identity,
       });
 
       setETag(c, request);

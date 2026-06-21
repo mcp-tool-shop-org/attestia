@@ -15,17 +15,16 @@
  * admin-only operation. The read (`GET /policy`) requires only the ambient
  * authenticated context.
  *
- * DELEGATOR GAP (noted, not patched): AttestiaService currently exposes the
- * GovernanceStore as a public field (`service.governanceStore`) but has NO thin
- * governance delegator methods (addSigner / removeSigner / changeQuorum /
- * getCurrentPolicy) the way it does for treasury + vault. These handlers reach
- * governance THROUGH the service field — they still never import @attestia/witness
- * directly — but the proper fix is to add governance delegators to
- * AttestiaService (out of scope here: services/ is owned elsewhere). The error
- * surface also differs: the GovernanceStore throws plain `Error` (not coded
- * domain errors), so add/remove/quorum conflicts surface as 500 via the global
- * handler rather than a 4xx, until coded errors land in the store. This is the
- * documented ceiling of exposing governance without its delegators.
+ * DURABILITY + ERROR SURFACE (SEAM-2, fixed): these handlers call the
+ * AttestiaService governance delegators (addSigner / removeSigner /
+ * changeQuorum / getCurrentPolicy), NOT service.governanceStore directly. The
+ * delegators route every mutation through the same durability gate (_mutate)
+ * used by treasury + vault — appending the matching GOVERNANCE_* domain event to
+ * the durable audit log (fail-closed) and triggering the snapshot cadence — so a
+ * governance change is in the audit trail and survives a restart. The delegators
+ * also translate the GovernanceStore's plain `Error`s (duplicate signer, unknown
+ * signer, invalid quorum) into coded conflicts, which the global error handler
+ * maps to a 4xx `{code,message,hint}` envelope instead of a generic 500.
  */
 
 import { Hono } from "hono";
@@ -68,14 +67,14 @@ export function createGovernanceRoutes(
       const auth = c.get("auth");
       const body = c.get("validatedBody") as AddSignerDto;
 
-      // Reached via the service field; the route never imports @attestia/witness.
-      service.governanceStore.addSigner(
+      // Delegator routes through the durability gate (audit append + snapshot)
+      // and maps store conflicts to coded 4xx; the route never imports witness.
+      const policy = service.addSigner(
         body.address,
         body.label,
         body.weight,
         body.publicKey,
       );
-      const policy = service.governanceStore.getCurrentPolicy();
 
       metrics?.incrementCounter("attestia_governance_total", {
         action: "add-signer",
@@ -107,8 +106,7 @@ export function createGovernanceRoutes(
       const auth = c.get("auth");
       const body = c.get("validatedBody") as RemoveSignerDto;
 
-      service.governanceStore.removeSigner(body.address);
-      const policy = service.governanceStore.getCurrentPolicy();
+      const policy = service.removeSigner(body.address);
 
       metrics?.incrementCounter("attestia_governance_total", {
         action: "remove-signer",
@@ -136,8 +134,7 @@ export function createGovernanceRoutes(
       const auth = c.get("auth");
       const body = c.get("validatedBody") as ChangeQuorumDto;
 
-      service.governanceStore.changeQuorum(body.quorum);
-      const policy = service.governanceStore.getCurrentPolicy();
+      const policy = service.changeQuorum(body.quorum);
 
       metrics?.incrementCounter("attestia_governance_total", {
         action: "change-quorum",
@@ -158,7 +155,7 @@ export function createGovernanceRoutes(
   // GET /policy — Current governance policy
   routes.get("/policy", (c) => {
     const service = c.get("service");
-    const policy = service.governanceStore.getCurrentPolicy();
+    const policy = service.getCurrentPolicy();
 
     setETag(c, policy);
     return c.json({ data: policy });

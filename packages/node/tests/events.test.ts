@@ -34,7 +34,7 @@ describe("GET /api/v1/events", () => {
     const { app, tenantRegistry } = instance;
 
     // Get the default tenant's service
-    const service = tenantRegistry.getOrCreate("test-tenant");
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     service.eventStore.append("stream-1", [
       { type: "IntentDeclared", payload: { id: "i1" }, metadata: {} },
     ]);
@@ -52,7 +52,7 @@ describe("GET /api/v1/events", () => {
   it("supports pagination with limit", async () => {
     const { app, tenantRegistry } = instance;
 
-    const service = tenantRegistry.getOrCreate("test-tenant");
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     service.eventStore.append("stream-1", [
       { type: "Event1", payload: {}, metadata: {} },
       { type: "Event2", payload: {}, metadata: {} },
@@ -76,7 +76,7 @@ describe("GET /api/v1/events/:streamId", () => {
   it("returns events for a specific stream", async () => {
     const { app, tenantRegistry } = instance;
 
-    const service = tenantRegistry.getOrCreate("test-tenant");
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     service.eventStore.append("orders", [
       { type: "OrderCreated", payload: { orderId: "o1" }, metadata: {} },
     ]);

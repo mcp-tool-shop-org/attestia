@@ -233,6 +233,66 @@ describe("governance mutations", () => {
 });
 
 // =============================================================================
+// SEAM-2 — governance mutations route through the durability gate AND map
+// store conflicts to coded 4xx (not 500).
+// =============================================================================
+
+describe("governance conflicts → coded 4xx, not 500 (SEAM-2)", () => {
+  let instance: AppInstance;
+  beforeEach(() => {
+    instance = createTestApp();
+  });
+
+  it("a duplicate signer returns 409 CONFLICT, not 500", async () => {
+    await instance.app.request(
+      makeRequest("/api/v1/governance/signers", "POST", {
+        address: SIGNER_A,
+        label: "A",
+      }),
+    );
+    // Adding the same signer again is a domain conflict.
+    const res = await instance.app.request(
+      makeRequest("/api/v1/governance/signers", "POST", {
+        address: SIGNER_A,
+        label: "A again",
+      }),
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("SIGNER_EXISTS");
+    // Never the raw thrown message (no internal detail leaked).
+    expect(body.error.message).not.toContain("Signer already exists");
+  });
+
+  it("removing an unknown signer returns 404, not 500", async () => {
+    const res = await instance.app.request(
+      makeRequest("/api/v1/governance/signers/remove", "POST", {
+        address: "rUnknownSignerXXXXXXXXXXXXXXXXXXXX",
+      }),
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("SIGNER_NOT_FOUND");
+  });
+
+  it("an invalid quorum (exceeds total weight) returns 400, not 500", async () => {
+    // One unit-weight signer → total weight 1; quorum 5 is invalid.
+    await instance.app.request(
+      makeRequest("/api/v1/governance/signers", "POST", {
+        address: SIGNER_A,
+        label: "A",
+      }),
+    );
+    const res = await instance.app.request(
+      makeRequest("/api/v1/governance/quorum", "POST", { quorum: 5 }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID_QUORUM");
+  });
+});
+
+// =============================================================================
 // Get policy
 // =============================================================================
 

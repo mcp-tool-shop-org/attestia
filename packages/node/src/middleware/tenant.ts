@@ -21,7 +21,7 @@ export function tenantMiddleware(
 ): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const auth = c.get("auth");
-    const service = tenantRegistry.getOrCreate(auth.tenantId);
+    const service = await tenantRegistry.getOrCreate(auth.tenantId);
     c.set("service", service);
     return next();
   };

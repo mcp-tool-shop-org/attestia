@@ -70,7 +70,7 @@ describe("deep health check", () => {
     const { app, tenantRegistry } = createTestApp();
 
     // Create a tenant, then stop it
-    const service = tenantRegistry.getOrCreate("test-tenant");
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     await service.stop();
 
     const res = await app.request(jsonRequest("/ready"));
@@ -84,7 +84,7 @@ describe("deep health check", () => {
     // Counts enabled so the aggregate not-ready number is present to assert on.
     const { app, tenantRegistry } = createCountsApp();
 
-    const service = tenantRegistry.getOrCreate("test-tenant");
+    const service = await tenantRegistry.getOrCreate("test-tenant");
     await service.stop();
 
     const res = await app.request(jsonRequest("/ready"));
@@ -127,7 +127,7 @@ describe("readiness flip observability (B-NODE-007)", () => {
     const registry = makeRegistry();
 
     // A stopped service reports not-ready via isReady()=false.
-    const service = registry.getOrCreate("test-tenant");
+    const service = await registry.getOrCreate("test-tenant");
     await service.stop();
 
     const routes = createHealthRoutes(registry, {
@@ -158,7 +158,7 @@ describe("readiness flip observability (B-NODE-007)", () => {
     const warn = vi.fn();
     const incrementCounter = vi.fn();
     const registry = makeRegistry();
-    registry.getOrCreate("test-tenant"); // healthy
+    await registry.getOrCreate("test-tenant"); // healthy
 
     const routes = createHealthRoutes(registry, {
       logger: { warn },

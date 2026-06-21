@@ -231,7 +231,7 @@ describe("distributions", () => {
     // Distributions reference payees; the in-memory treasury validates them.
     // Register through the service directly via the tenant registry, since
     // there is no payee REST surface in this pass.
-    const service = instance.tenantRegistry.getOrCreate("test-tenant");
+    const service = await instance.tenantRegistry.getOrCreate("test-tenant");
     service.registerPayee(payeeId, payeeId, `0x${payeeId}`);
   }
 
@@ -362,22 +362,34 @@ describe("funding-gates", () => {
   });
 
   it("approves a funding gate (first leg)", async () => {
-    await instance.app.request(
-      makeRequest("/api/v1/treasury/funding-gates", "POST", {
-        id: "fund-approve",
-        description: "Tooling",
-        amount: { amount: "10", currency: "USDC", decimals: 6 },
-        requestedBy: "alice",
-      }),
+    // The approver is now bound to the authenticated identity (not the body), so
+    // this flow uses a secured app whose key identities are configured
+    // gatekeepers. Submit as gatekeeper-2 (the requester), approve as
+    // gatekeeper-1 (a distinct gatekeeper — separation of duties).
+    const apiKeys = new Map<string, ApiKeyRecord>([
+      ["gatekeeper-1", { key: "gatekeeper-1", role: "operator", tenantId: "test-tenant" }],
+      ["gatekeeper-2", { key: "gatekeeper-2", role: "operator", tenantId: "test-tenant" }],
+    ]);
+    const app = createApp({
+      serviceConfig: { ownerId: "test-tenant", defaultCurrency: "USDC", defaultDecimals: 6 },
+      auth: { apiKeys },
+    }).app;
+
+    await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates",
+        "POST",
+        { id: "fund-approve", description: "Tooling", amount: { amount: "10", currency: "USDC", decimals: 6 } },
+        { "X-Api-Key": "gatekeeper-2" },
+      ),
     );
-    // The treasury is configured with gatekeepers ["gatekeeper-1",
-    // "gatekeeper-2"] (see attestia-service.ts); only a configured gatekeeper
-    // may approve a gate, and never the requester (separation of duties).
-    const res = await instance.app.request(
-      makeRequest("/api/v1/treasury/funding-gates/fund-approve/approve", "POST", {
-        approvedBy: "gatekeeper-1",
-        reason: "ok",
-      }),
+    const res = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates/fund-approve/approve",
+        "POST",
+        { reason: "ok" },
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { status: string } };
@@ -429,5 +441,144 @@ describe("funding-gates", () => {
       ),
     );
     expect(res.status).toBe(403);
+  });
+});
+
+// =============================================================================
+// Funding gates — separation-of-duties is bound to the authenticated principal
+// (AUTHZ-FUNDING-SOD-BYPASS). The actor (requestedBy / approvedBy / rejectedBy)
+// MUST be derived from c.get("auth").identity, NOT from client-supplied body
+// fields. Otherwise a single key can forge distinct approver labels and defeat
+// dual control, and the audit log records a fabricated approver.
+// =============================================================================
+
+describe("funding-gates — actor bound to authenticated principal (AUTHZ-FUNDING-SOD-BYPASS)", () => {
+  /**
+   * A secured app whose API-key identities ARE the two configured gatekeepers
+   * (auth.identity === record.key). This lets us exercise a SUCCESSFUL dual-gate
+   * flow under real authenticated identities and assert the recorded approver
+   * equals the caller — and that ONE caller cannot satisfy both gates.
+   *
+   * NOTE (known follow-up): the per-tenant gatekeeper set is currently the fixed
+   * literal ['gatekeeper-1','gatekeeper-2'] in attestia-service.ts (services/).
+   * Binding the approver to auth.identity is the security fix; making the
+   * gatekeeper allowlist the authenticated admin identities is a separate
+   * services/ follow-up. Here we name the keys to match that literal so the
+   * end-to-end approval path is exercisable today.
+   */
+  function createGatekeeperApp(): AppInstance {
+    const apiKeys = new Map<string, ApiKeyRecord>([
+      ["gatekeeper-1", { key: "gatekeeper-1", role: "operator", tenantId: "test-tenant" }],
+      ["gatekeeper-2", { key: "gatekeeper-2", role: "operator", tenantId: "test-tenant" }],
+    ]);
+    return createApp({
+      serviceConfig: {
+        ownerId: "test-tenant",
+        defaultCurrency: "USDC",
+        defaultDecimals: 6,
+      },
+      auth: { apiKeys },
+    });
+  }
+
+  it("records the SUBMITTER as the authenticated identity, ignoring body.requestedBy", async () => {
+    const app = createGatekeeperApp().app;
+    const res = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates",
+        "POST",
+        {
+          id: "sod-1",
+          description: "Server costs",
+          amount: { amount: "500", currency: "USDC", decimals: 6 },
+          // Forged label — must be ignored in favor of auth.identity.
+          requestedBy: "someone-else",
+        },
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: { requestedBy: string } };
+    // The recorded requester is the authenticated caller, NOT the forged label.
+    expect(body.data.requestedBy).toBe("gatekeeper-1");
+  });
+
+  it("records the APPROVER as the authenticated identity, ignoring body.approvedBy", async () => {
+    const app = createGatekeeperApp().app;
+    // Submit as gatekeeper-1 (so gatekeeper-1 is the requester).
+    await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates",
+        "POST",
+        { id: "sod-2", description: "x", amount: { amount: "10", currency: "USDC", decimals: 6 } },
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
+    );
+    // Approve as gatekeeper-2; body claims a different approver — must be ignored.
+    const res = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates/sod-2/approve",
+        "POST",
+        { approvedBy: "i-am-whoever-i-say", reason: "ok" },
+        { "X-Api-Key": "gatekeeper-2" },
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { status: string; gate1: { approvedBy: string } };
+    };
+    expect(body.data.status).toBe("gate1-approved");
+    // Approver in the result == the authenticated caller, not the body label.
+    expect(body.data.gate1.approvedBy).toBe("gatekeeper-2");
+  });
+
+  it("a SINGLE caller cannot self-satisfy both funding gates", async () => {
+    const app = createGatekeeperApp().app;
+    // gatekeeper-2 submits the request (so gatekeeper-2 is the requester).
+    await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates",
+        "POST",
+        { id: "sod-3", description: "x", amount: { amount: "10", currency: "USDC", decimals: 6 } },
+        { "X-Api-Key": "gatekeeper-2" },
+      ),
+    );
+    // gatekeeper-1 approves gate1 (a distinct, valid approver).
+    const g1 = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates/sod-3/approve",
+        "POST",
+        {},
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
+    );
+    expect(g1.status).toBe(200);
+
+    // gatekeeper-1 attempts to ALSO approve gate2 (forging body.approvedBy is
+    // useless now — the actor is auth.identity). A single caller cannot satisfy
+    // both gates: the second approval by the same identity is rejected.
+    const g2 = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates/sod-3/approve",
+        "POST",
+        { approvedBy: "gatekeeper-2" }, // forged — ignored
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
+    );
+    // ALREADY_APPROVED → 409 (the same gatekeeper cannot fill both gates).
+    expect(g2.status).toBe(409);
+
+    // The request is NOT fully approved — dual control held.
+    const get = await app.request(
+      makeRequest(
+        "/api/v1/treasury/funding-gates/sod-3",
+        "GET",
+        undefined,
+        { "X-Api-Key": "gatekeeper-1" },
+      ),
+    );
+    const body = (await get.json()) as { data: { status: string } };
+    expect(body.data.status).toBe("gate1-approved");
+    expect(body.data.status).not.toBe("approved");
   });
 });

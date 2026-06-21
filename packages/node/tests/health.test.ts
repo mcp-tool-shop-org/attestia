@@ -71,7 +71,7 @@ describe("GET /ready", () => {
 
   it("returns only boolean readiness by default — no counts leaked (V2-002)", async () => {
     const { app, tenantRegistry } = createTestApp();
-    tenantRegistry.getOrCreate("tenant-1");
+    await tenantRegistry.getOrCreate("tenant-1");
 
     const res = await app.request("/ready");
     expect(res.status).toBe(200);
@@ -89,7 +89,7 @@ describe("GET /ready", () => {
     const { app, tenantRegistry } = createCountsApp();
 
     // Create a tenant
-    tenantRegistry.getOrCreate("tenant-1");
+    await tenantRegistry.getOrCreate("tenant-1");
 
     const res = await app.request("/ready");
     expect(res.status).toBe(200);
@@ -110,7 +110,7 @@ describe("GET /ready", () => {
     const { app, tenantRegistry } = createTestApp();
 
     // Create a tenant and stop it
-    const service = tenantRegistry.getOrCreate("tenant-1");
+    const service = await tenantRegistry.getOrCreate("tenant-1");
     await service.stop();
 
     const res = await app.request("/ready");
@@ -139,8 +139,8 @@ describe("GET /ready tenant enumeration (D6-A-003)", () => {
     const { app, tenantRegistry } = createTestApp();
 
     // Two tenants with recognisable IDs.
-    tenantRegistry.getOrCreate("acme-corp");
-    tenantRegistry.getOrCreate("globex-inc");
+    await tenantRegistry.getOrCreate("acme-corp");
+    await tenantRegistry.getOrCreate("globex-inc");
 
     const res = await app.request("/ready");
     expect(res.status).toBe(200);
@@ -166,8 +166,8 @@ describe("GET /ready tenant enumeration (D6-A-003)", () => {
 
   it("still reports aggregate readiness (boolean) without leaking a count", async () => {
     const { app, tenantRegistry } = createTestApp();
-    tenantRegistry.getOrCreate("tenant-1");
-    tenantRegistry.getOrCreate("tenant-2");
+    await tenantRegistry.getOrCreate("tenant-1");
+    await tenantRegistry.getOrCreate("tenant-2");
 
     const res = await app.request("/ready");
     expect(res.status).toBe(200);
@@ -180,7 +180,7 @@ describe("GET /ready tenant enumeration (D6-A-003)", () => {
 
   it("still returns 503 not_ready when a tenant is down (without leaking which)", async () => {
     const { app, tenantRegistry } = createTestApp();
-    const svc = tenantRegistry.getOrCreate("secret-tenant");
+    const svc = await tenantRegistry.getOrCreate("secret-tenant");
     await svc.stop();
 
     const res = await app.request("/ready");
