@@ -371,8 +371,14 @@ export class EvmObserver implements ChainObserver {
           });
 
           for (const log of outgoingLogs) {
-            // Avoid duplicates (self-transfers)
-            if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
+            // A-CO-002: de-dup on the (transactionHash, logIndex) tuple, which
+            // uniquely identifies a log event. A single tx can emit MANY distinct
+            // Transfer logs (DEX swap, router, multisend) — and when the watched
+            // address both receives and sends in one tx, those distinct logs share
+            // a txHash but differ by logIndex. De-duping on txHash alone silently
+            // drops the later distinct transfer; the tuple removes only TRUE
+            // duplicates (the same log returned by both the from- and to-filters).
+            if (!EvmObserver.logSeen(allLogs, log)) {
               allLogs.push(log);
             }
           }
@@ -398,7 +404,9 @@ export class EvmObserver implements ChainObserver {
           });
 
           for (const log of outgoingLogs) {
-            if (!allLogs.some((e) => e.transactionHash === log.transactionHash)) {
+            // A-CO-002: de-dup on (transactionHash, logIndex). See the token-
+            // filtered path above for the full rationale.
+            if (!EvmObserver.logSeen(allLogs, log)) {
               allLogs.push(log);
             }
           }
@@ -443,6 +451,21 @@ export class EvmObserver implements ChainObserver {
   // ===========================================================================
   // Private helpers
   // ===========================================================================
+
+  /**
+   * True when `log` is already present in `seen`, keyed on the
+   * (transactionHash, logIndex) tuple that uniquely identifies a log event
+   * (A-CO-002). Distinct transfers within the same tx (same hash, different
+   * logIndex) are NOT considered duplicates; only the exact same log is.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static logSeen(seen: any[], log: any): boolean {
+    return seen.some(
+      (e) =>
+        e.transactionHash === log.transactionHash &&
+        e.logIndex === log.logIndex,
+    );
+  }
 
   /** Per-token metadata cache to avoid repeated on-chain queries. Max 1000 entries. */
   private static readonly MAX_TOKEN_CACHE = 1000;

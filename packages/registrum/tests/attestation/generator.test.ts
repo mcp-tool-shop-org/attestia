@@ -17,6 +17,7 @@ import {
   encodeAsXrplMemos,
   decodeXrplMemos,
   validateAttestationPayload,
+  verifyAttestationBinding,
   REGISTRUM_VERSION,
 } from "../../src/attestation/index.js";
 import type { AttestationPayload } from "../../src/attestation/index.js";
@@ -42,7 +43,12 @@ const createTestSnapshot = (): RegistrarSnapshotV1 => ({
   },
 });
 
-const TEST_REGISTRY_HASH = "fedcba987654".padEnd(64, "0");
+// The generator now fail-closed binds the attestation's registry_hash to the
+// snapshot's own registry_hash (A-REG-001). The test registry hash MUST equal
+// the snapshot fixture's registry_hash, otherwise generateAttestationPayload
+// correctly refuses to stamp a forged constitution binding. (Previously these
+// differed, which silently produced a mismatched binding.)
+const TEST_REGISTRY_HASH = createTestSnapshot().registry_hash;
 
 describe("Attestation Generator", () => {
   describe("generateAttestationPayload", () => {
@@ -380,6 +386,102 @@ describe("Attestation Determinism", () => {
       const hash = computeAttestationHash(payload);
       expect(hash).not.toBe(baseHash);
     }
+  });
+});
+
+describe("Constitution binding (A-REG-001, fail-closed)", () => {
+  // RED-first regression for the constitution-binding gap: the attestation's
+  // top-level registry_hash was taken verbatim from caller input and never
+  // cross-checked against the snapshot's own registry_hash. An attestation
+  // could therefore advertise a "good" constitution while witnessing a
+  // snapshot produced under a different/weaker one, and a spec-compliant
+  // verifier (told to check registry_hash against a local registry) would pass
+  // it. The generator must now refuse the mismatch, and a verify helper must
+  // reject any attestation whose top-level registry_hash != snapshot's.
+
+  const SNAPSHOT_HASH_X = createTestSnapshot().registry_hash; // the REAL hash
+  const MISMATCHED_HASH_Y = "deadbeefcafe".padEnd(64, "1"); // a DIFFERENT hash
+
+  it("generateAttestationPayload THROWS when registryHash != snapshot.registry_hash", () => {
+    const snapshot = createTestSnapshot(); // registry_hash === SNAPSHOT_HASH_X
+    expect(() =>
+      generateAttestationPayload(snapshot, MISMATCHED_HASH_Y, {
+        registrumVersion: REGISTRUM_VERSION,
+        mode: "dual",
+        parityStatus: "AGREED",
+        transitionFrom: 0,
+        transitionTo: 100,
+      })
+    ).toThrow(/registry_hash mismatch/i);
+  });
+
+  it("generateAttestationPayload stamps the snapshot's registry_hash (X), never a mismatched Y", () => {
+    const snapshot = createTestSnapshot();
+    // Calling with the matching hash succeeds and stamps X.
+    const payload = generateAttestationPayload(snapshot, SNAPSHOT_HASH_X, {
+      registrumVersion: REGISTRUM_VERSION,
+      mode: "dual",
+      parityStatus: "AGREED",
+      transitionFrom: 0,
+      transitionTo: 100,
+    });
+    expect(payload.registry_hash).toBe(SNAPSHOT_HASH_X);
+    expect(payload.registry_hash).toBe(snapshot.registry_hash);
+    expect(payload.registry_hash).not.toBe(MISMATCHED_HASH_Y);
+  });
+
+  it("verifyAttestationBinding accepts a correctly-bound attestation", () => {
+    const snapshot = createTestSnapshot();
+    const payload = generateAttestationPayload(snapshot, SNAPSHOT_HASH_X, {
+      registrumVersion: REGISTRUM_VERSION,
+      mode: "dual",
+      parityStatus: "AGREED",
+      transitionFrom: 0,
+      transitionTo: 100,
+    });
+    expect(() => verifyAttestationBinding(payload, snapshot)).not.toThrow();
+  });
+
+  it("verifyAttestationBinding REJECTS an attestation whose registry_hash != snapshot.registry_hash", () => {
+    const snapshot = createTestSnapshot();
+    const goodPayload = generateAttestationPayload(snapshot, SNAPSHOT_HASH_X, {
+      registrumVersion: REGISTRUM_VERSION,
+      mode: "dual",
+      parityStatus: "AGREED",
+      transitionFrom: 0,
+      transitionTo: 100,
+    });
+    // Forge the constitution binding: a verifier checking registry_hash against
+    // a local registry would pass MISMATCHED_HASH_Y if it happened to match
+    // that registry — but it does NOT match the snapshot this payload witnesses.
+    const forged: AttestationPayload = {
+      ...goodPayload,
+      registry_hash: MISMATCHED_HASH_Y,
+    };
+    expect(() => verifyAttestationBinding(forged, snapshot)).toThrow(
+      /constitution binding failed/i
+    );
+  });
+
+  it("verifyAttestationBinding REJECTS an attestation whose snapshot_hash does not match the snapshot", () => {
+    const snapshot = createTestSnapshot();
+    const goodPayload = generateAttestationPayload(snapshot, SNAPSHOT_HASH_X, {
+      registrumVersion: REGISTRUM_VERSION,
+      mode: "dual",
+      parityStatus: "AGREED",
+      transitionFrom: 0,
+      transitionTo: 100,
+    });
+    // Same registry_hash, but witnesses a DIFFERENT snapshot.
+    const otherSnapshot: RegistrarSnapshotV1 = {
+      ...createTestSnapshot(),
+      state_ids: ["only-one"],
+      lineage: { "only-one": null },
+      ordering: { max_index: 0, assigned: { "only-one": 0 } },
+    };
+    expect(() => verifyAttestationBinding(goodPayload, otherSnapshot)).toThrow(
+      /snapshot binding failed/i
+    );
   });
 });
 

@@ -374,5 +374,201 @@ describe("XrplObserver", () => {
       });
       expect(events).toEqual([]);
     });
+
+    // A-CO-001: partial-payment over-statement.
+    //
+    // On XRPL, Amount/DeliverMax is the INTENDED MAXIMUM — for a tfPartialPayment
+    // (flag 0x00020000) the actual delivered amount is far smaller and lives ONLY
+    // in transaction metadata (`meta.delivered_amount`). The observer must report
+    // the delivered amount, never the ceiling.
+    it("reports the metadata delivered_amount for a partial payment, not DeliverMax", async () => {
+      mockRequest.mockResolvedValue({
+        result: {
+          transactions: [
+            {
+              hash: "PARTIAL_XRP",
+              ledger_index: 85000300,
+              tx_json: {
+                TransactionType: "Payment",
+                Account: "rSender123",
+                Destination: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+                DeliverMax: "10000", // intended ceiling
+                Flags: 0x00020000, // tfPartialPayment
+                date: 790000000,
+              },
+              meta: {
+                delivered_amount: "1", // actually delivered: 1 drop
+              },
+            },
+          ],
+        },
+      });
+
+      const observer = new XrplObserver(createConfig());
+      await observer.connect();
+
+      const events = await observer.getTransfers({
+        address: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+        direction: "incoming",
+      });
+
+      expect(events.length).toBe(1);
+      // Must report the DELIVERED 1 drop, not the 10000 ceiling.
+      expect(events[0]!.amount).toBe("1");
+      expect(events[0]!.symbol).toBe("XRP");
+      expect(events[0]!.decimals).toBe(6);
+    });
+
+    it("reports the metadata delivered_amount for a partial issued-token payment", async () => {
+      mockRequest.mockResolvedValue({
+        result: {
+          transactions: [
+            {
+              hash: "PARTIAL_IOU",
+              ledger_index: 85000400,
+              tx_json: {
+                TransactionType: "Payment",
+                Account: "rSender456",
+                Destination: "rReceiver789",
+                DeliverMax: {
+                  value: "100.50",
+                  currency: "USD",
+                  issuer: "rIssuer123",
+                },
+                Flags: 0x00020000, // tfPartialPayment
+                date: 790000100,
+              },
+              meta: {
+                delivered_amount: {
+                  value: "0.01",
+                  currency: "USD",
+                  issuer: "rIssuer123",
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const observer = new XrplObserver(createConfig());
+      await observer.connect();
+
+      const events = await observer.getTransfers({
+        address: "rReceiver789",
+        direction: "incoming",
+      });
+
+      expect(events.length).toBe(1);
+      expect(events[0]!.amount).toBe("0.01");
+      expect(events[0]!.symbol).toBe("USD");
+      expect(events[0]!.token).toBe("USD:rIssuer123");
+      expect(events[0]!.decimals).toBe(15);
+    });
+
+    it("falls back to deprecated meta.DeliveredAmount for partial payments", async () => {
+      mockRequest.mockResolvedValue({
+        result: {
+          transactions: [
+            {
+              hash: "PARTIAL_DEPRECATED",
+              ledger_index: 85000500,
+              tx_json: {
+                TransactionType: "Payment",
+                Account: "rSender123",
+                Destination: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+                DeliverMax: "10000",
+                Flags: 0x00020000,
+                date: 790000000,
+              },
+              meta: {
+                DeliveredAmount: "5", // deprecated field name
+              },
+            },
+          ],
+        },
+      });
+
+      const observer = new XrplObserver(createConfig());
+      await observer.connect();
+
+      const events = await observer.getTransfers({
+        address: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+        direction: "incoming",
+      });
+
+      expect(events.length).toBe(1);
+      expect(events[0]!.amount).toBe("5");
+    });
+
+    it("fails closed when a partial payment's delivered_amount is 'unavailable'", async () => {
+      mockRequest.mockResolvedValue({
+        result: {
+          transactions: [
+            {
+              hash: "PARTIAL_UNAVAILABLE",
+              ledger_index: 85000600,
+              tx_json: {
+                TransactionType: "Payment",
+                Account: "rSender123",
+                Destination: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+                DeliverMax: "10000",
+                Flags: 0x00020000,
+                date: 790000000,
+              },
+              meta: {
+                delivered_amount: "unavailable",
+              },
+            },
+          ],
+        },
+      });
+
+      const observer = new XrplObserver(createConfig());
+      await observer.connect();
+
+      // Must NOT substitute the requested amount — fail closed.
+      await expect(
+        observer.getTransfers({
+          address: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+          direction: "incoming",
+        }),
+      ).rejects.toMatchObject({ code: "MALFORMED_RESPONSE" });
+    });
+
+    it("uses DeliverMax for a non-partial payment (full delivery)", async () => {
+      // No tfPartialPayment flag → Amount/DeliverMax IS the delivered amount.
+      mockRequest.mockResolvedValue({
+        result: {
+          transactions: [
+            {
+              hash: "FULL_XRP",
+              ledger_index: 85000700,
+              tx_json: {
+                TransactionType: "Payment",
+                Account: "rSender123",
+                Destination: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+                DeliverMax: "10000000",
+                Flags: 0, // not a partial payment
+                date: 790000000,
+              },
+              meta: {
+                delivered_amount: "10000000",
+              },
+            },
+          ],
+        },
+      });
+
+      const observer = new XrplObserver(createConfig());
+      await observer.connect();
+
+      const events = await observer.getTransfers({
+        address: "rN7n3473SaZBCG4dFL83w7p1W9cgZw6XtR",
+        direction: "incoming",
+      });
+
+      expect(events.length).toBe(1);
+      expect(events[0]!.amount).toBe("10000000");
+    });
   });
 });

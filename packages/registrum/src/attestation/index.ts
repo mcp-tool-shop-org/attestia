@@ -37,6 +37,7 @@ export {
   encodeAsXrplMemos,
   decodeXrplMemos,
   validateAttestationPayload,
+  verifyAttestationBinding,
 } from "./generator.js";
 
 export type { RegistrarAttestationOptions } from "./generator.js";

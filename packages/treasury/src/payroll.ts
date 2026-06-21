@@ -18,6 +18,8 @@ import {
   addMoney,
   subtractMoney,
   zeroMoney,
+  isPositive,
+  validateMoney,
   Ledger,
 } from "@attestia/ledger";
 import type { Money, Currency, LedgerEntry, Telemetry } from "@attestia/types";
@@ -259,6 +261,31 @@ export class PayrollEngine {
       );
     }
 
+    // Atomic execution (A-TREAS-003): computeEntry's netPay = gross -
+    // deductions has no floor, so an entry whose deductions meet or exceed
+    // gross yields a zero/negative netPay. The ledger rejects non-positive
+    // amounts (Rule 6), so appending per-entry used to throw mid-loop after
+    // earlier payees were already committed — wedging the run (still
+    // 'approved') and colliding on corrId on retry. Pre-validate EVERY entry's
+    // netPay (well-formed and strictly positive) BEFORE any ledger write, then
+    // commit the whole run as one balanced batch.
+    for (const entry of run.entries) {
+      try {
+        validateMoney(entry.netPay);
+      } catch {
+        throw new PayrollError(
+          "INVALID_AMOUNT",
+          `Payee '${entry.payeeId}' has a malformed net pay '${String(entry.netPay.amount)}'`,
+        );
+      }
+      if (!isPositive(entry.netPay)) {
+        throw new PayrollError(
+          "INVALID_AMOUNT",
+          `Payee '${entry.payeeId}' has net pay '${entry.netPay.amount}' ${entry.netPay.currency}, which is not strictly positive — refusing to execute run '${run.id}'`,
+        );
+      }
+    }
+
     // Ensure accounts exist
     const expenseAccountId = `payroll:expense:${run.period.label}`;
     if (!ledger.hasAccount(expenseAccountId)) {
@@ -268,6 +295,13 @@ export class PayrollEngine {
         name: `Payroll Expense: ${run.period.label}`,
       });
     }
+
+    // One correlationId for the whole run: the ledger requires every entry in
+    // a batch to share it (Rule 2), and it makes the run a single recoverable
+    // transaction. Per-payee entry IDs stay unique.
+    const corrId = `payroll:${run.id}`;
+    const now = new Date().toISOString();
+    const entries: LedgerEntry[] = [];
 
     for (const entry of run.entries) {
       const payeeAccountId = `payroll:payee:${entry.payeeId}`;
@@ -279,13 +313,10 @@ export class PayrollEngine {
         });
       }
 
-      const now = new Date().toISOString();
-      const corrId = `payroll:${run.id}:${entry.payeeId}`;
-
       // Double-entry: debit expense, credit payee liability
-      const entries: LedgerEntry[] = [
+      entries.push(
         {
-          id: `${corrId}:debit`,
+          id: `${corrId}:${entry.payeeId}:debit`,
           accountId: expenseAccountId,
           type: "debit",
           money: entry.netPay,
@@ -293,16 +324,20 @@ export class PayrollEngine {
           correlationId: corrId,
         },
         {
-          id: `${corrId}:credit`,
+          id: `${corrId}:${entry.payeeId}:credit`,
           accountId: payeeAccountId,
           type: "credit",
           money: entry.netPay,
           timestamp: now,
           correlationId: corrId,
         },
-      ];
+      );
+    }
+
+    // Append the entire balanced batch atomically (skip a no-op empty run).
+    if (entries.length > 0) {
       ledger.append(entries, {
-        description: `Payroll: ${run.period.label} - ${entry.payeeId}`,
+        description: `Payroll: ${run.period.label}`,
       });
     }
 

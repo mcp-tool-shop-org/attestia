@@ -42,6 +42,23 @@ export function generateAttestationPayload(
   registryHash: string,
   options: AttestationOptions
 ): AttestationPayload {
+  // Constitution-binding (fail-closed): the attestation's top-level
+  // registry_hash advertises the constitution the attested snapshot was
+  // produced under. The snapshot ALREADY carries that real content hash in
+  // `snapshot.registry_hash`. If the caller-supplied registryHash disagrees,
+  // the attestation would advertise a registry the snapshot was NOT produced
+  // under — a spec-compliant verifier checking registry_hash against a local
+  // registry could then pass an attestation of a snapshot produced under a
+  // different/weaker constitution. Refuse to stamp a mismatched binding.
+  if (registryHash !== snapshot.registry_hash) {
+    throw new Error(
+      `Attestation registry_hash mismatch: caller-supplied registryHash ` +
+        `'${registryHash}' does not match snapshot.registry_hash ` +
+        `'${snapshot.registry_hash}'. The attestation must witness the ` +
+        `constitution the snapshot was actually produced under (fail-closed).`
+    );
+  }
+
   const snapshotHash = computeSnapshotHashForAttestation(snapshot);
 
   return {
@@ -108,7 +125,26 @@ export function generateAttestationFromRegistrar(
     parityStatus
   );
 
-  return generateAttestationPayload(registrar.snapshot(), options.registryHash, {
+  const snapshot = registrar.snapshot();
+
+  // Fail-closed constitution binding: the snapshot carries the REAL registry
+  // content hash it was produced under. We bind the attestation to THAT hash,
+  // never to unverified caller input. If a caller still supplies
+  // options.registryHash (preserved for API stability), it must equal the
+  // snapshot's hash — a disagreement means the caller believes the snapshot was
+  // produced under a different constitution than it actually was, which would
+  // forge the constitution binding. Refuse rather than silently trust input.
+  if (options.registryHash !== snapshot.registry_hash) {
+    throw new Error(
+      `Attestation registry_hash mismatch: supplied registryHash ` +
+        `'${options.registryHash}' does not match the registrar snapshot's ` +
+        `registry_hash '${snapshot.registry_hash}'. An attestation must ` +
+        `witness the constitution the snapshot was actually produced under ` +
+        `(fail-closed).`
+    );
+  }
+
+  return generateAttestationPayload(snapshot, snapshot.registry_hash, {
     registrumVersion: options.registrumVersion ?? REGISTRUM_VERSION,
     mode,
     parityStatus,
@@ -369,5 +405,63 @@ export function validateAttestationPayload(payload: unknown): void {
   }
   if (!hashRegex.test(p.registry_hash as string)) {
     throw new Error("Invalid registry_hash format (expected 64 hex chars)");
+  }
+}
+
+/**
+ * Verify that an attestation is correctly bound to the snapshot it claims to
+ * witness — the single function an external verifier can call to close the
+ * constitution-binding gap.
+ *
+ * Two fail-closed bindings are checked:
+ *
+ * 1. **Snapshot binding** — the payload's `snapshot_hash` MUST equal the hash
+ *    recomputed from the supplied snapshot. This proves the attestation
+ *    actually witnesses THIS snapshot and not some other state set.
+ *
+ * 2. **Constitution binding** — the payload's top-level `registry_hash` MUST
+ *    equal the snapshot's own `registry_hash`. This is the gap a verifier that
+ *    only checks `registry_hash` against a local registry cannot see on its
+ *    own: an attestation could advertise a "good" constitution hash while
+ *    witnessing a snapshot produced under a different/weaker constitution.
+ *    Asserting equality here makes that forgery fail closed.
+ *
+ * Determinism: `snapshot_hash` is recomputed via {@link
+ * computeSnapshotHashForAttestation} (RFC 8785 canonicalization, no wall-clock
+ * input), so the same (payload, snapshot) pair always verifies identically.
+ *
+ * @param payload - The attestation payload to verify.
+ * @param snapshot - The snapshot the attestation claims to witness.
+ * @throws Error if either binding fails. Returns normally on success.
+ */
+export function verifyAttestationBinding(
+  payload: AttestationPayload,
+  snapshot: RegistrarSnapshotV1
+): void {
+  // Structural validation first, so downstream comparisons act on a
+  // well-formed payload (and so a malformed payload fails with a clear shape
+  // error rather than a confusing binding error).
+  validateAttestationPayload(payload);
+
+  // Constitution binding: top-level registry_hash MUST match the snapshot's.
+  if (payload.registry_hash !== snapshot.registry_hash) {
+    throw new Error(
+      `Attestation constitution binding failed: payload.registry_hash ` +
+        `'${payload.registry_hash}' does not match snapshot.registry_hash ` +
+        `'${snapshot.registry_hash}'. The attestation advertises a different ` +
+        `constitution than the snapshot was produced under (rejected ` +
+        `fail-closed).`
+    );
+  }
+
+  // Snapshot binding: recompute the snapshot hash and require it to match.
+  const recomputed = computeSnapshotHashForAttestation(snapshot);
+  if (payload.snapshot_hash !== recomputed) {
+    throw new Error(
+      `Attestation snapshot binding failed: payload.snapshot_hash ` +
+        `'${payload.snapshot_hash}' does not match the hash recomputed from ` +
+        `the supplied snapshot '${recomputed}'. The attestation does not ` +
+        `witness this snapshot (rejected fail-closed).`
+    );
   }
 }

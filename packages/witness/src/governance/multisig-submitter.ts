@@ -12,7 +12,7 @@
  * - Compatible with existing XrplSubmitter memo format
  */
 
-import { Client as XrplClient, Wallet, multisign, decode } from "xrpl";
+import { Client as XrplClient, Wallet, multisign, decode, hashes } from "xrpl";
 import type { Payment, Transaction } from "xrpl";
 import { encodeMemo } from "../memo-encoder.js";
 import type { AttestationPayload, WitnessRecord, XrplMemo, SecretProvider } from "../types.js";
@@ -332,13 +332,29 @@ export class MultiSigSubmitter {
     // Combine all signed blobs into a single multi-signed transaction
     const combinedBlob = multisign([...signedBlobs]);
 
+    // A-WIT-001: the transaction that actually lands on-chain is the COMBINED
+    // multi-signed blob, whose serialization (and therefore its tx id) differs
+    // from any single signer's `wallet.sign(prepared, /*multisign*/ true).hash`
+    // (`expectedHash`, the per-signer signing hash). The idempotency / replay
+    // guard (`_checkExistingTx`) queries the on-chain tx by hash, so it MUST use
+    // the combined-blob hash — querying the per-signer hash would never find the
+    // applied tx, defeating the lost-but-applied recovery (false negative →
+    // duplicate fund-affecting submission). Derive the on-chain tx id from the
+    // combined blob via xrpl's `hashes.hashSignedTx`.
+    //
+    // `expectedHash` (the per-signer hash, asserted identical across signers
+    // above) is retained only as a tamper guard: a signer producing a different
+    // per-signer hash signed different transaction content and is rejected before
+    // we reach here. It is NOT the on-chain hash.
+    const onChainTxHash = hashes.hashSignedTx(combinedBlob);
+
     return {
       signedBlobs,
       signerSignatures,
       combinedBlob,
-      // expectedHash is the prepared-tx hash, identical across signers (asserted
-      // above) and stable for the fixed autofilled transaction.
-      txHash: expectedHash ?? "",
+      // The on-chain transaction id for the combined multi-signed blob — the
+      // hash the replay/idempotency check must query (A-WIT-001).
+      txHash: onChainTxHash,
     };
   }
 

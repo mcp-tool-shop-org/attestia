@@ -88,6 +88,12 @@ vi.mock("xrpl", async () => {
       Destination: MASTER_ACCOUNT,
       TransactionType: "Payment",
     })),
+    // A-WIT-001: idempotency hash is derived from the COMBINED multisign blob via
+    // hashes.hashSignedTx. Mock it (real hashSignedTx requires a valid hex blob).
+    hashes: {
+      ...actual.hashes,
+      hashSignedTx: vi.fn().mockReturnValue("combined_onchain_hash"),
+    },
   };
 });
 

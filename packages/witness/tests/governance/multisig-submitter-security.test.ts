@@ -96,6 +96,12 @@ vi.mock("xrpl", async () => {
       Destination: MASTER_ACCOUNT,
       TransactionType: "Payment",
     })),
+    // A-WIT-001: idempotency hash is derived from the COMBINED multisign blob via
+    // hashes.hashSignedTx. Mock it (real hashSignedTx requires a valid hex blob).
+    hashes: {
+      ...actual.hashes,
+      hashSignedTx: vi.fn().mockReturnValue("combined_onchain_hash"),
+    },
   };
 });
 
@@ -249,8 +255,10 @@ describe("MultiSigSubmitter security (D3-A-002 / D3-A-004 / D3-A-003)", () => {
       await submitter.connect();
 
       // The tx is ALREADY confirmed on-chain (e.g. resubmission of a prior witness).
-      mockRequest.mockResolvedValue({
-        result: { validated: true, ledger_index: 555, hash: "already" },
+      const queriedHashes: unknown[] = [];
+      mockRequest.mockImplementation(async (req: { transaction: string }) => {
+        queriedHashes.push(req.transaction);
+        return { result: { validated: true, ledger_index: 555, hash: "already" } };
       });
 
       const record = await submitter.submit(makePayload(), store.getCurrentPolicy());
@@ -258,6 +266,11 @@ describe("MultiSigSubmitter security (D3-A-002 / D3-A-004 / D3-A-003)", () => {
       expect(record.ledgerIndex).toBe(555);
       // Must NOT submit again — recognized as already witnessed.
       expect(mockSubmitAndWait).not.toHaveBeenCalled();
+      // A-WIT-001: the existence check must query the COMBINED multisign blob's
+      // on-chain hash (hashes.hashSignedTx of the combined blob), NOT a
+      // per-signer signing hash.
+      expect(queriedHashes).toContain("combined_onchain_hash");
+      expect(queriedHashes.every((h) => !String(h).startsWith("MULTISIG_HASH"))).toBe(true);
     });
   });
 });

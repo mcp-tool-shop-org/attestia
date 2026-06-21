@@ -207,6 +207,127 @@ describe("EvmObserver", () => {
       expect(result[0]!.decimals).toBe(6);
     });
 
+    // A-CO-002: dedup must not drop distinct transfers in the same tx.
+    //
+    // A single tx routinely emits multiple DISTINCT ERC-20 Transfer logs (swaps,
+    // routers, multisend). When the watched address both receives and sends in
+    // one tx, dedup-by-txHash silently drops the second distinct log. Dedup must
+    // key on (transactionHash, logIndex), which uniquely identifies a log event.
+    it("preserves two distinct Transfer logs in the same tx (token-filtered)", async () => {
+      const watched = "0x1234567890abcdef1234567890abcdef12345678";
+      // Incoming query (to: watched) — one log at logIndex 0.
+      mockGetLogs.mockResolvedValueOnce([
+        {
+          transactionHash: "0xsametx",
+          logIndex: 0,
+          blockNumber: 150n,
+          address: "0xtoken",
+          args: { from: "0xother", to: watched, value: 100n },
+        },
+      ]);
+      // Outgoing query (from: watched) — a DISTINCT log at logIndex 3, same tx.
+      mockGetLogs.mockResolvedValueOnce([
+        {
+          transactionHash: "0xsametx",
+          logIndex: 3,
+          blockNumber: 150n,
+          address: "0xtoken",
+          args: { from: watched, to: "0xthird", value: 40n },
+        },
+      ]);
+
+      mockReadContract
+        .mockResolvedValueOnce("USDC") // symbol
+        .mockResolvedValueOnce(6); // decimals
+
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      const result = await observer.getTransfers({
+        address: watched,
+        token: "0xtoken",
+        fromBlock: 100,
+        toBlock: 200,
+      });
+
+      // Both distinct transfers must survive — not just the incoming one.
+      expect(result.length).toBe(2);
+      const values = result.map((e) => e.amount).sort();
+      expect(values).toEqual(["100", "40"]);
+    });
+
+    it("preserves two distinct Transfer logs in the same tx (filterless)", async () => {
+      const watched = "0x1234567890abcdef1234567890abcdef12345678";
+      mockGetLogs.mockResolvedValueOnce([
+        {
+          transactionHash: "0xsametx",
+          logIndex: 0,
+          blockNumber: 150n,
+          address: "0xtoken",
+          args: { from: "0xother", to: watched, value: 100n },
+        },
+      ]);
+      mockGetLogs.mockResolvedValueOnce([
+        {
+          transactionHash: "0xsametx",
+          logIndex: 3,
+          blockNumber: 150n,
+          address: "0xtoken",
+          args: { from: watched, to: "0xthird", value: 40n },
+        },
+      ]);
+
+      mockReadContract
+        .mockResolvedValueOnce("USDC")
+        .mockResolvedValueOnce(6);
+
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      // No token → filterless path.
+      const result = await observer.getTransfers({
+        address: watched,
+        fromBlock: 100,
+        toBlock: 200,
+      });
+
+      expect(result.length).toBe(2);
+      const values = result.map((e) => e.amount).sort();
+      expect(values).toEqual(["100", "40"]);
+    });
+
+    it("removes true duplicates (same txHash AND logIndex) returned by both filters", async () => {
+      const watched = "0x1234567890abcdef1234567890abcdef12345678";
+      // A self-transfer (from === to === watched) is returned by BOTH the to- and
+      // from-filtered queries as the SAME log (same txHash + logIndex) → dedup it.
+      const selfLog = {
+        transactionHash: "0xselftx",
+        logIndex: 1,
+        blockNumber: 150n,
+        address: "0xtoken",
+        args: { from: watched, to: watched, value: 7n },
+      };
+      mockGetLogs.mockResolvedValueOnce([selfLog]); // incoming
+      mockGetLogs.mockResolvedValueOnce([selfLog]); // outgoing (same log)
+
+      mockReadContract
+        .mockResolvedValueOnce("USDC")
+        .mockResolvedValueOnce(6);
+
+      const observer = new EvmObserver(createConfig());
+      await observer.connect();
+
+      const result = await observer.getTransfers({
+        address: watched,
+        token: "0xtoken",
+        fromBlock: 100,
+        toBlock: 200,
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0]!.amount).toBe("7");
+    });
+
     it("falls back to ERC20 defaults when token metadata query fails", async () => {
       mockGetLogs.mockResolvedValueOnce([
         {

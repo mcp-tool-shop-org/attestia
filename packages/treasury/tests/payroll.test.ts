@@ -248,6 +248,60 @@ describe("PayrollEngine", () => {
     });
   });
 
+  // ─── Atomic execution (A-TREAS-003) ────────────────────────────────
+  // executeRun must be all-or-nothing. computeEntry's netPay = gross -
+  // deductions has no floor, so an entry whose deductions meet or exceed gross
+  // produces a zero/negative netPay. Appending per-entry meant a later bad
+  // entry threw mid-loop, leaving earlier entries committed and the run stuck
+  // 'approved' (retry collides on corrId). Execution must validate every
+  // netPay is strictly positive BEFORE any ledger write and append the whole
+  // run as one balanced batch.
+
+  describe("atomic execution", () => {
+    it("rejects a run with a non-positive netPay before any ledger write", () => {
+      const ledger = new Ledger();
+      engine.registerPayee("p-1", "Alice", "0xAlice");
+      engine.registerPayee("p-2", "Bob", "0xBob");
+      // Alice nets positive; Bob's deduction exceeds gross → negative netPay.
+      engine.setSchedule("p-1", [comp("base", "Base", "base", "5000")]);
+      engine.setSchedule("p-2", [
+        comp("base", "Base", "base", "1000"),
+        comp("ded", "Garnish", "deduction", "1500"),
+      ]);
+      engine.createRun("run-1", JAN_2024);
+      engine.approveRun("run-1");
+
+      let err: PayrollError | undefined;
+      try {
+        engine.executeRun("run-1", ledger);
+      } catch (e) {
+        err = e as PayrollError;
+      }
+
+      // Rejected with a clear treasury error — not an opaque ledger throw.
+      expect(err).toBeInstanceOf(PayrollError);
+      expect(err!.code).toBe("INVALID_AMOUNT");
+
+      // Nothing committed: all-or-nothing.
+      expect(ledger.getEntries().length).toBe(0);
+    });
+
+    it("writes all entries of a valid run in a single balanced batch", () => {
+      const ledger = new Ledger();
+      engine.registerPayee("p-1", "Alice", "0xAlice");
+      engine.registerPayee("p-2", "Bob", "0xBob");
+      engine.setSchedule("p-1", [comp("base", "Base", "base", "5000")]);
+      engine.setSchedule("p-2", [comp("base", "Base", "base", "4000")]);
+      engine.createRun("run-1", JAN_2024);
+      engine.approveRun("run-1");
+      engine.executeRun("run-1", ledger);
+
+      expect(ledger.transactionCount).toBe(1);
+      expect(ledger.getEntries().length).toBe(4);
+      expect(() => ledger.getTrialBalance()).not.toThrow();
+    });
+  });
+
   // ─── Export / Import ───────────────────────────────────────────────
 
   describe("export / import", () => {

@@ -154,8 +154,11 @@ describe("dual-witness: attestation derives parity_status from comparison", () =
     });
     registrar.register(createTransition(null, createRootState("Doc1")));
 
+    // A-REG-001: the attestation's registry_hash is fail-closed bound to the
+    // snapshot's own registry_hash, so the caller must supply the REAL hash the
+    // snapshot was produced under (not a fabricated one).
     const payload = generateAttestationFromRegistrar(registrar, {
-      registryHash: "a".repeat(64),
+      registryHash: registrar.snapshot().registry_hash,
       transitionFrom: 0,
       transitionTo: 0,
     });
@@ -172,9 +175,11 @@ describe("dual-witness: attestation derives parity_status from comparison", () =
       invariants: INITIAL_INVARIANTS,
     });
     // No register/validate yet → no actual parity result to attest. Fail-closed.
+    // (registry_hash is the snapshot's real hash so the parity guard — not the
+    // registry_hash binding — is the assertion under test.)
     expect(() =>
       generateAttestationFromRegistrar(registrar, {
-        registryHash: "a".repeat(64),
+        registryHash: registrar.snapshot().registry_hash,
         transitionFrom: 0,
         transitionTo: 0,
       })

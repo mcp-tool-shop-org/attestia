@@ -360,6 +360,95 @@ describe("DistributionEngine", () => {
     });
   });
 
+  // ─── Fixed-amount precision (A-TREAS-001) ─────────────────────────
+  // For the "fixed" strategy, recipient.share is a JS number used as the
+  // FIXED payout amount. JS numbers lose integer precision above 2^53, so a
+  // share above Number.MAX_SAFE_INTEGER silently rounds (e.g.
+  // String(9007199254740993) === "9007199254740992"). Money must never
+  // round-trip through a JS number: callers supply a decimal-string `amount`
+  // for exactness, and a numeric `share` above MAX_SAFE_INTEGER is rejected.
+
+  describe("fixed-amount precision", () => {
+    it("rejects a fixed numeric share above MAX_SAFE_INTEGER (no silent precision loss)", () => {
+      // 9007199254740993 is not representable as a JS number; it becomes
+      // 9007199254740992. createPlan must reject it rather than pay the wrong
+      // amount. Pool is comfortably larger so the only failure is precision.
+      let err: DistributionError | undefined;
+      try {
+        engine.createPlan("d-1", "Whale", "fixed", usdc("99999999999999999"), [
+          { payeeId: "p-1", share: 9007199254740993 },
+        ]);
+      } catch (e) {
+        err = e as DistributionError;
+      }
+      expect(err).toBeInstanceOf(DistributionError);
+      expect(err!.code).toBe("INVALID_SHARES");
+    });
+
+    it("prefers the exact decimal-string amount for fixed payouts", () => {
+      // A precise amount that no JS number could represent exactly.
+      const exact = "9007199254740993";
+      engine.createPlan("d-1", "Exact stipend", "fixed", usdc("99999999999999999"), [
+        { payeeId: "p-1", amount: usdc(exact) },
+      ]);
+      const result = engine.computeDistribution("d-1");
+      expect(result.payouts[0]!.amount.amount).toBe(`${exact}.000000`);
+    });
+
+    it("still accepts a small numeric fixed share (non-breaking)", () => {
+      engine.createPlan("d-1", "Stipend", "fixed", usdc("500"), [
+        { payeeId: "p-1", share: 200 },
+      ]);
+      const result = engine.computeDistribution("d-1");
+      expect(result.payouts[0]!.amount.amount).toBe("200.000000");
+    });
+  });
+
+  // ─── Atomic execution (A-TREAS-002) ───────────────────────────────
+  // executeDistribution must be all-or-nothing. A zero/negative payout in the
+  // middle of the recipient list must not leave earlier payouts committed to
+  // the ledger with the plan still 'approved' (which would wedge a retry on
+  // DUPLICATE_ENTRY_ID). Zero payouts are filtered before any ledger write.
+
+  describe("atomic execution", () => {
+    it("does not commit a partial ledger when a later payout would be zero", () => {
+      const ledger = new Ledger();
+      engine.createPlan("d-1", "Mixed", "fixed", usdc("1000"), [
+        { payeeId: "p-1", share: 100 },
+        { payeeId: "p-2", share: 0 }, // zero payout — must not wedge the run
+      ]);
+      engine.approvePlan("d-1");
+
+      const result = engine.executeDistribution("d-1", ledger);
+
+      // Zero payout is filtered: only p-1 is written (1 debit + 1 credit).
+      expect(ledger.getEntries().length).toBe(2);
+      expect(result.payouts.length).toBe(1);
+      expect(result.payouts[0]!.payeeId).toBe("p-1");
+
+      // Plan reaches a terminal 'executed' state — no wedge, retry rejected.
+      expect(engine.getPlan("d-1").status).toBe("executed");
+
+      // Trial balance is intact (atomic, balanced batch).
+      expect(() => ledger.getTrialBalance()).not.toThrow();
+    });
+
+    it("writes all payouts in a single balanced batch", () => {
+      const ledger = new Ledger();
+      engine.createPlan("d-1", "Revenue", "proportional", usdc("1000"), [
+        { payeeId: "p-1", share: 5000 },
+        { payeeId: "p-2", share: 5000 },
+      ]);
+      engine.approvePlan("d-1");
+      engine.executeDistribution("d-1", ledger);
+
+      // One atomic transaction covering both recipients.
+      expect(ledger.transactionCount).toBe(1);
+      expect(ledger.getEntries().length).toBe(4);
+      expect(() => ledger.getTrialBalance()).not.toThrow();
+    });
+  });
+
   // ─── Export / Import ──────────────────────────────────────────────
 
   describe("export / import", () => {

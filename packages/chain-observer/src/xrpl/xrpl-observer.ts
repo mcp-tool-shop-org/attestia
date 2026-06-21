@@ -36,6 +36,15 @@ import type {
 } from "../observer.js";
 import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
 
+/**
+ * tfPartialPayment transaction flag (0x00020000).
+ *
+ * When set on a Payment, `Amount`/`DeliverMax` is only the *intended maximum* —
+ * the actual delivered amount is reported in transaction metadata as
+ * `delivered_amount`. See A-CO-001 in {@link XrplObserver.getTransfers}.
+ */
+const TF_PARTIAL_PAYMENT = 0x00020000;
+
 // =============================================================================
 // XRPL Observer
 // =============================================================================
@@ -220,7 +229,67 @@ export class XrplObserver implements ChainObserver {
       let decimals: number;
       let token: string | undefined;
 
-      const deliveredAmount = tx.DeliverMax ?? (tx as Record<string, unknown>).Amount;
+      // A-CO-001: On XRPL both `Amount` and `DeliverMax` are the INTENDED MAXIMUM,
+      // not what was actually delivered. For a tfPartialPayment (Flags & 0x00020000)
+      // the real delivered amount is far smaller and is reported ONLY in the
+      // transaction metadata as `meta.delivered_amount` (or deprecated
+      // `meta.DeliveredAmount`). Reading Amount/DeliverMax for a partial payment
+      // over-states received funds. So: branch on the partial-payment flag, read
+      // the delivered amount from metadata for partials, and only trust
+      // Amount/DeliverMax when the tx is NOT a partial payment.
+      const flags = typeof tx.Flags === "number" ? tx.Flags : 0;
+      const isPartialPayment = (flags & TF_PARTIAL_PAYMENT) !== 0;
+
+      let deliveredAmount: unknown = tx.DeliverMax ?? (tx as Record<string, unknown>).Amount;
+
+      if (isPartialPayment) {
+        // `delivered_amount` (and the deprecated `DeliveredAmount`) are reported
+        // on the transaction metadata object but are not in xrpl.js's typed
+        // metadata shape, so read through `unknown`. `meta` may also be a string
+        // when account_tx is requested in binary mode — guard for the object form.
+        const rawMeta = (txEntry as { meta?: unknown }).meta;
+        const meta =
+          rawMeta && typeof rawMeta === "object"
+            ? (rawMeta as Record<string, unknown>)
+            : undefined;
+        const metaDelivered =
+          meta?.delivered_amount ?? meta?.DeliveredAmount;
+
+        // The ledger reports `"unavailable"` when the delivered amount cannot be
+        // determined (e.g. pre-2014 partial payments). We MUST fail closed here —
+        // substituting the requested Amount/DeliverMax would over-state funds,
+        // which is exactly the bug this guard prevents.
+        if (metaDelivered === "unavailable") {
+          throw new ObserverError({
+            code: "MALFORMED_RESPONSE",
+            chainId: this.chainId,
+            message:
+              `XrplObserver.getTransfers: partial payment ${txEntry.hash ?? "<unknown>"} ` +
+              `reports delivered_amount "unavailable"; the actual delivered amount ` +
+              `cannot be determined and must not be inferred from DeliverMax/Amount.`,
+            hint:
+              "This transaction predates reliable delivered_amount reporting. " +
+              "Resolve the delivered amount from a full ledger/metadata source, or exclude it.",
+          });
+        }
+
+        // For a partial payment, the delivered amount lives in metadata only.
+        // If metadata is absent, fail closed rather than fall back to the ceiling.
+        if (metaDelivered === undefined || metaDelivered === null) {
+          throw new ObserverError({
+            code: "MALFORMED_RESPONSE",
+            chainId: this.chainId,
+            message:
+              `XrplObserver.getTransfers: partial payment ${txEntry.hash ?? "<unknown>"} ` +
+              `is missing delivered_amount in transaction metadata.`,
+            hint:
+              "Ensure account_tx returns metadata (non-binary) so delivered_amount is available.",
+          });
+        }
+
+        deliveredAmount = metaDelivered;
+      }
+
       if (typeof deliveredAmount === "string") {
         // Native XRP (in drops)
         amount = deliveredAmount;
