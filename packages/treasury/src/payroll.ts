@@ -56,7 +56,9 @@ export type PayrollErrorCode =
   | "RUN_NOT_FOUND"
   | "INVALID_TRANSITION"
   | "NO_COMPONENTS"
-  | "INVALID_AMOUNT";
+  | "INVALID_AMOUNT"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Payroll Engine
@@ -188,10 +190,21 @@ export class PayrollEngine {
     let totalDeductions = this.zero();
     let totalNet = this.zero();
 
+    // Track silent omissions: a payee with a schedule who is dropped because
+    // they are not 'active'. Surfacing this (below) means a short run — one
+    // that pays fewer people than expected — is visible BEFORE approval,
+    // instead of only surfacing when someone reports they weren't paid.
+    let skippedInactive = 0;
+
     // Process each active payee that has a schedule
     for (const [payeeId, schedule] of this.schedules) {
       const payee = this.payees.get(payeeId);
-      if (!payee || payee.status !== "active") continue;
+      if (!payee || payee.status !== "active") {
+        // A schedule exists, so this payee was meant to be paid; an
+        // inactive/suspended status (or a dangling schedule) drops them.
+        skippedInactive += 1;
+        continue;
+      }
 
       const entry = this.computeEntry(payeeId, schedule.components);
       entries.push(entry);
@@ -213,6 +226,18 @@ export class PayrollEngine {
     };
 
     this.runs.set(id, run);
+
+    // Emit creation telemetry so an approver can see a short run before signing
+    // off. included/skipped counts are low-cardinality; ids stay in `message`.
+    this.telemetry.record({
+      package: "@attestia/treasury",
+      op: "payroll.run.created",
+      level: skippedInactive > 0 ? "warn" : "info",
+      outcome: skippedInactive > 0 ? "degraded" : "ok",
+      attributes: { included: entries.length, skippedInactive },
+      message: `payroll run '${id}' (${period.label}) created: ${entries.length} payee(s) included${skippedInactive > 0 ? `, ${skippedInactive} scheduled payee(s) skipped (inactive/suspended)` : ""}`,
+    });
+
     return run;
   }
 
@@ -371,13 +396,46 @@ export class PayrollEngine {
   }
 
   importPayees(payees: readonly Payee[]): void {
+    // Restore is into a FRESH engine: importing over existing state would
+    // silently overwrite live records by id. Fail closed (caller bug).
+    if (this.payees.size > 0) {
+      throw new PayrollError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import payees into a non-empty engine (${this.payees.size} already present) — restore into a fresh PayrollEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const p of payees) {
+      // A duplicate id within the incoming batch would silently keep only the
+      // last record — reject it so a corrupt/merged snapshot is caught here,
+      // not as a missing payee at run time.
+      if (seen.has(p.id)) {
+        throw new PayrollError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate payee id '${p.id}' in imported snapshot`,
+        );
+      }
+      seen.add(p.id);
       this.payees.set(p.id, p);
     }
   }
 
   importRuns(runs: readonly PayrollRun[]): void {
+    if (this.runs.size > 0) {
+      throw new PayrollError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import runs into a non-empty engine (${this.runs.size} already present) — restore into a fresh PayrollEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const r of runs) {
+      if (seen.has(r.id)) {
+        throw new PayrollError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate payroll run id '${r.id}' in imported snapshot`,
+        );
+      }
+      seen.add(r.id);
       this.runs.set(r.id, r);
     }
   }

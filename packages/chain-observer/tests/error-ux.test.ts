@@ -284,7 +284,9 @@ describe("queries throw structured ObserverError + emit telemetry (D3-B-003)", (
     evmGetBalance.mockRejectedValueOnce(new Error("Request failed with status 429 Too Many Requests"));
     evmGetBlockNumber.mockResolvedValue(999n);
 
-    const observer = new EvmObserver({ chain: CHAINS.ETHEREUM_MAINNET, rpcUrl: "https://x", telemetry });
+    // Isolate classification from retry: a single transient failure would
+    // otherwise be absorbed by the retry layer (PB-WCO-001).
+    const observer = new EvmObserver({ chain: CHAINS.ETHEREUM_MAINNET, rpcUrl: "https://x", telemetry, retry: { maxRetries: 0, delayMs: 0 } });
     await observer.connect();
 
     let caught: unknown;
@@ -303,10 +305,12 @@ describe("queries throw structured ObserverError + emit telemetry (D3-B-003)", (
     expect(Object.keys(rpcFailures[0]!.attributes ?? {}).sort()).toEqual(["chainId", "code"]);
   });
 
-  it("EVM: connect() to an unsupported chain throws ObserverError UNSUPPORTED_CHAIN", async () => {
-    // eip155:999999 is not in the supported viem chain map.
+  it("EVM: connect() to a structurally-invalid eip155 ref throws UNSUPPORTED_CHAIN", async () => {
+    // PB-WCO-006: UNSUPPORTED_CHAIN now fires only when the eip155 chain id
+    // cannot be parsed to a positive integer (a malformed chain ref) — a
+    // numeric-but-unknown chain instead synthesizes a minimal chain (see below).
     const observer = new EvmObserver({
-      chain: { chainId: "eip155:999999", name: "nope", family: "evm" },
+      chain: { chainId: "eip155:not-a-number", name: "nope", family: "evm" },
       rpcUrl: "https://x",
     });
     await expect(observer.connect()).rejects.toBeInstanceOf(ObserverError);
@@ -315,6 +319,37 @@ describe("queries throw structured ObserverError + emit telemetry (D3-B-003)", (
     } catch (err) {
       expect((err as ObserverError).code).toBe("UNSUPPORTED_CHAIN");
     }
+  });
+
+  it("EVM: connect() to a numeric-but-unknown eip155 chain synthesizes a chain (PB-WCO-006)", async () => {
+    // A valid eip155:<id> that is NOT in the built-in map should degrade to
+    // "works with defaults" rather than hard-failing — supporting a new L2 is
+    // configuration, not a source edit.
+    evmGetBlockNumber.mockResolvedValue(42n);
+    const observer = new EvmObserver({
+      chain: { chainId: "eip155:8217", name: "Klaytn", family: "evm" },
+      rpcUrl: "https://x",
+    });
+    await expect(observer.connect()).resolves.toBeUndefined();
+    const status = await observer.getStatus();
+    expect(status.connected).toBe(true);
+    expect(status.latestBlock).toBe(42);
+  });
+
+  it("EVM: connect() honors a config-supplied evmChain descriptor (PB-WCO-006)", async () => {
+    evmGetBlockNumber.mockResolvedValue(7n);
+    const observer = new EvmObserver({
+      chain: { chainId: "eip155:1313161554", name: "Aurora", family: "evm" },
+      rpcUrl: "https://x",
+      evmChain: {
+        id: 1313161554,
+        name: "Aurora Mainnet",
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      },
+    });
+    await expect(observer.connect()).resolves.toBeUndefined();
+    const status = await observer.getStatus();
+    expect(status.connected).toBe(true);
   });
 
   it("XRPL: a not-connected getBalance throws ObserverError NOT_CONNECTED and emits telemetry", async () => {
@@ -338,7 +373,8 @@ describe("queries throw structured ObserverError + emit telemetry (D3-B-003)", (
     xrplIsConnected.mockReturnValue(true);
     xrplRequest.mockRejectedValueOnce(new Error("connect ETIMEDOUT"));
 
-    const observer = new XrplObserver({ chain: CHAINS.XRPL_MAINNET, rpcUrl: "wss://x", telemetry });
+    // Isolate classification from retry (PB-WCO-001).
+    const observer = new XrplObserver({ chain: CHAINS.XRPL_MAINNET, rpcUrl: "wss://x", telemetry, retry: { maxRetries: 0, delayMs: 0 } });
     await observer.connect();
 
     let caught: unknown;
@@ -390,5 +426,123 @@ describe("queries throw structured ObserverError + emit telemetry (D3-B-003)", (
     // requireClient() emits a failure event then throws the ObserverError.
     // The sink throwing must NOT mask the ObserverError or surface "sink exploded".
     await expect(observer.getBalance({ address: ADDR })).rejects.toBeInstanceOf(ObserverError);
+  });
+});
+
+// =============================================================================
+// PB-WCO-001 / PB-WCO-004 — retry parity + retry telemetry across families
+// =============================================================================
+
+describe("RPC retry parity + telemetry (PB-WCO-001, PB-WCO-004)", () => {
+  it("EVM: absorbs a transient blip with a retry and emits rpc.retry", async () => {
+    const { telemetry, events } = makeCapturingSink();
+    evmGetBlockNumber.mockResolvedValue(123n);
+    // First call rate-limited, second succeeds — the retry layer recovers it.
+    evmGetBalance
+      .mockRejectedValueOnce(new Error("Request failed with status 429"))
+      .mockResolvedValue(7n);
+
+    const observer = new EvmObserver({
+      chain: CHAINS.ETHEREUM_MAINNET,
+      rpcUrl: "https://x",
+      telemetry,
+      retry: { maxRetries: 3, delayMs: 0 },
+    });
+    await observer.connect();
+
+    const result = await observer.getBalance({ address: ADDR });
+    expect(result.balance).toBe("7");
+
+    const retries = events.filter((e) => e.op === "rpc.retry");
+    expect(retries.length).toBeGreaterThan(0);
+    expect(retries[0]!.outcome).toBe("degraded");
+    expect(retries[0]!.attributes).toMatchObject({ chainId: "eip155:1", code: "RATE_LIMITED", attempt: 1 });
+    // No hard failure event was emitted, since the call ultimately succeeded.
+    expect(events.some((e) => e.op === "rpc" && e.outcome === "failed")).toBe(false);
+  });
+
+  it("XRPL: absorbs a transient blip with a retry (parity with EVM/Solana)", async () => {
+    const { telemetry, events } = makeCapturingSink();
+    xrplIsConnected.mockReturnValue(true);
+    xrplRequest
+      .mockRejectedValueOnce(new Error("socket hang up"))
+      .mockResolvedValue({ result: { account_data: { Balance: "1000000" }, ledger_index: 42 } });
+
+    const observer = new XrplObserver({
+      chain: CHAINS.XRPL_MAINNET,
+      rpcUrl: "wss://x",
+      telemetry,
+      retry: { maxRetries: 3, delayMs: 0 },
+    });
+    await observer.connect();
+
+    const result = await observer.getBalance({ address: "rSomeAddress" });
+    expect(result.balance).toBe("1000000");
+    expect(events.some((e) => e.op === "rpc.retry" && e.attributes?.code === "RPC_UNREACHABLE")).toBe(true);
+  });
+
+  it("Solana: retries are no longer silent — emits rpc.retry (PB-WCO-004)", async () => {
+    const { telemetry, events } = makeCapturingSink();
+    solGetSlot.mockResolvedValue(250_000_000);
+    solGetBalance
+      .mockRejectedValueOnce(new Error("503 Service Unavailable fetch failed"))
+      .mockResolvedValue(5_000_000_000);
+
+    const observer = new SolanaObserver({
+      chain: CHAINS.SOLANA_MAINNET,
+      rpcUrl: "https://x",
+      telemetry,
+      retry: { maxRetries: 3, delayMs: 0 },
+    });
+    await observer.connect();
+
+    await observer.getBalance({ address: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM" });
+    expect(events.some((e) => e.op === "rpc.retry")).toBe(true);
+  });
+});
+
+// =============================================================================
+// PB-WCO-005 — token-metadata fallback is flagged + metered, not silent
+// =============================================================================
+
+describe("token metadata fallback is surfaced (PB-WCO-005)", () => {
+  it("EVM: emits token_meta_fallback and does NOT cache the guess", async () => {
+    const { telemetry, events } = makeCapturingSink();
+    evmGetBlockNumber.mockResolvedValue(200n);
+    evmGetLogs.mockResolvedValue([
+      {
+        transactionHash: "0xabc",
+        blockNumber: 150n,
+        address: "0xbadtoken",
+        args: { from: "0xsender", to: ADDR, value: 100n },
+      },
+    ]);
+    // First resolve attempt fails (symbol+decimals readContract rejects)...
+    evmReadContract.mockRejectedValueOnce(new Error("revert")).mockRejectedValueOnce(new Error("revert"));
+
+    const observer = new EvmObserver({
+      chain: CHAINS.ETHEREUM_MAINNET,
+      rpcUrl: "https://x",
+      telemetry,
+    });
+    await observer.connect();
+
+    const result = await observer.getTransfers({
+      address: ADDR,
+      direction: "incoming",
+      token: "0xbadtoken",
+      fromBlock: 100,
+      toBlock: 200,
+    });
+
+    expect(result[0]!.metaResolved).toBe(false);
+    expect(result[0]!.symbol).toBe("UNKNOWN");
+
+    const fallbacks = events.filter((e) => e.op === "token_meta_fallback");
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(fallbacks[0]!.outcome).toBe("degraded");
+    expect(fallbacks[0]!.attributes).toMatchObject({ chainId: "eip155:1" });
+    // Low-cardinality: chainId only (no token address / amount in attributes).
+    expect(Object.keys(fallbacks[0]!.attributes ?? {})).toEqual(["chainId"]);
   });
 });

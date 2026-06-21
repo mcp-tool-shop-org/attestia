@@ -431,7 +431,11 @@ export async function run(opts: RunOptions): Promise<void> {
     observedAt: new Date().toISOString(),
   };
   observerRegistry.register(new DemoChainObserver("evm:1", observedTransfer));
+  // Connect inside a try so the matching finally (end of run) always tears the
+  // observer down — modelling correct lifecycle for a reader who copies this
+  // into real integration code against a live RPC connection (B-DEMO-001).
   await observerRegistry.connectAll();
+  try {
 
   const observed = await observerRegistry
     .get("evm:1")
@@ -650,4 +654,11 @@ export async function run(opts: RunOptions): Promise<void> {
   console.log();
   console.log(chalk.cyan.bold("    AI can advise. Humans decide."));
   console.log();
+
+  } finally {
+    // Always release the observer, even if a step above threw. A real
+    // ChainObserver holds a live RPC/websocket connection; connect-without-
+    // disconnect would teach a resource leak (B-DEMO-001).
+    await observerRegistry.disconnectAll();
+  }
 }

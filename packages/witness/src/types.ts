@@ -190,6 +190,23 @@ export interface WitnessConfig {
   /** Optional: connection timeout in ms */
   readonly timeoutMs?: number;
 
+  /**
+   * Optional: per-attempt deadline (ms) for `submitAndWait` (PB-WCO-002).
+   *
+   * `timeoutMs` is only the xrpl.js connection/request timeout; `submitAndWait`
+   * polls the ledger for validation and can wait far longer — and on a half-open
+   * WebSocket (TCP alive, peer gone) the poll can hang past LastLedgerSequence
+   * expiry, stalling the whole submit with no error, no retry, no signal. This
+   * bounds how long a SINGLE attempt waits: on expiry the attempt is treated as
+   * a (possibly-applied) transient, the retry loop fires, and the fixed-hash
+   * idempotency check (`_checkExistingTx`) recovers a lost-but-applied tx on the
+   * next attempt instead of resubmitting blindly.
+   *
+   * Defaults to {@link DEFAULT_SUBMIT_TIMEOUT_MS}. Set `<= 0` to disable
+   * (restores the prior unbounded wait).
+   */
+  readonly submitTimeoutMs?: number;
+
   /** Optional: retry configuration for submit failures */
   readonly retry?: import("./retry.js").RetryConfig | undefined;
 

@@ -44,7 +44,8 @@ export type BudgetErrorCode =
   | "ENVELOPE_NOT_FOUND"
   | "INSUFFICIENT_BUDGET"
   | "INVALID_AMOUNT"
-  | "CURRENCY_MISMATCH";
+  | "CURRENCY_MISMATCH"
+  | "INVALID_ENVELOPE_STATE";
 
 // =============================================================================
 // Budget Engine
@@ -218,6 +219,17 @@ export class BudgetEngine {
       decimals: this.decimals,
     };
     if (compareMoney(amount, available) > 0) {
+      // Limit pressure is operationally interesting — surface it before throwing
+      // so repeated budget-ceiling hits are visible to monitoring, not silent.
+      // The reason is a low-cardinality enum; raw id/amounts stay in `message`.
+      this.telemetry.record({
+        package: "@attestia/vault",
+        op: "budget.rejected",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { reason: "INSUFFICIENT_BUDGET" },
+        message: `spend rejected on envelope '${envelopeId}': need ${amount.amount} ${amount.currency}, available ${envelope.available}`,
+      });
       throw new BudgetError(
         "INSUFFICIENT_BUDGET",
         `Insufficient budget in '${envelopeId}': need ${amount.amount}, available ${envelope.available}`,
@@ -294,6 +306,78 @@ export class BudgetEngine {
     });
 
     return updated;
+  }
+
+  /**
+   * Restore an envelope's committed state DIRECTLY, without replaying
+   * allocate()/spend() against the live guards.
+   *
+   * Replaying spend() during restore is fragile: a valid snapshot whose
+   * `spent` happens to exceed the `available` the guard computes mid-replay
+   * (e.g. ordering differences, a future flooring change, or migrated data)
+   * would throw INSUFFICIENT_BUDGET and abort the whole restore, leaving a
+   * half-built vault. Instead we set the terminal `allocated`/`spent` fields
+   * and recompute `available = allocated - spent` so any consistent snapshot
+   * restores deterministically.
+   *
+   * We still fail CLOSED on a genuinely inconsistent envelope: `allocated`
+   * and `spent` must be non-negative and `spent` must not exceed `allocated`
+   * (that would imply a negative balance, which the spend/deallocate guards
+   * make impossible in live operation). Such an envelope is corruption, not a
+   * valid backup, and is rejected with INVALID_ENVELOPE_STATE before any
+   * mutation so the engine is never left partially populated.
+   */
+  restoreEnvelope(env: Envelope): Envelope {
+    if (this.envelopes.has(env.id)) {
+      throw new BudgetError(
+        "ENVELOPE_EXISTS",
+        `Envelope '${env.id}' already exists`,
+      );
+    }
+
+    const allocated: Money = {
+      amount: env.allocated,
+      currency: this.currency,
+      decimals: this.decimals,
+    };
+    const spent: Money = {
+      amount: env.spent,
+      currency: this.currency,
+      decimals: this.decimals,
+    };
+
+    if (isNegative(allocated)) {
+      throw new BudgetError(
+        "INVALID_ENVELOPE_STATE",
+        `Cannot restore envelope '${env.id}': allocated '${env.allocated}' is negative`,
+      );
+    }
+    if (isNegative(spent)) {
+      throw new BudgetError(
+        "INVALID_ENVELOPE_STATE",
+        `Cannot restore envelope '${env.id}': spent '${env.spent}' is negative`,
+      );
+    }
+    // spent must not exceed allocated → available would be negative.
+    if (compareMoney(spent, allocated) > 0) {
+      throw new BudgetError(
+        "INVALID_ENVELOPE_STATE",
+        `Cannot restore envelope '${env.id}': spent '${env.spent}' exceeds allocated '${env.allocated}' (would yield a negative balance)`,
+      );
+    }
+
+    const available = this.subtract(env.allocated, env.spent);
+    const restored: Envelope = {
+      ...env,
+      currency: this.currency,
+      decimals: this.decimals,
+      allocated: env.allocated,
+      spent: env.spent,
+      available,
+    };
+
+    this.envelopes.set(env.id, restored);
+    return restored;
   }
 
   // ───────────────────────────────────────────────────────────────────────

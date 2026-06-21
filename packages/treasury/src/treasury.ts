@@ -26,6 +26,35 @@ import { DistributionEngine } from "./distribution.js";
 import { FundingGateManager } from "./funding.js";
 
 // =============================================================================
+// Snapshot versioning
+// =============================================================================
+
+/**
+ * The treasury snapshot schema version this build writes and can restore. A
+ * snapshot carrying any other `version` is rejected at restore time (see
+ * {@link Treasury.fromSnapshot}) rather than silently mis-restored into a
+ * structurally-valid but semantically-wrong treasury.
+ */
+export const CURRENT_TREASURY_SNAPSHOT_VERSION = 1 as const;
+
+// =============================================================================
+// Error
+// =============================================================================
+
+export class TreasuryError extends Error {
+  public readonly code: TreasuryErrorCode;
+  public readonly hint: string;
+  constructor(code: TreasuryErrorCode, message: string, hint: string) {
+    super(message);
+    this.name = "TreasuryError";
+    this.code = code;
+    this.hint = hint;
+  }
+}
+
+export type TreasuryErrorCode = "UNSUPPORTED_SNAPSHOT_VERSION";
+
+// =============================================================================
 // Treasury
 // =============================================================================
 
@@ -168,7 +197,7 @@ export class Treasury {
 
   snapshot(): TreasurySnapshot {
     return {
-      version: 1,
+      version: CURRENT_TREASURY_SNAPSHOT_VERSION,
       config: this.config,
       payees: this.payroll.exportPayees(),
       payrollRuns: this.payroll.exportRuns(),
@@ -182,11 +211,40 @@ export class Treasury {
     snap: TreasurySnapshot,
     telemetry: Telemetry = NOOP_TELEMETRY,
   ): Treasury {
+    // Reject an unrecognised snapshot version up front rather than silently
+    // mis-restoring it into a structurally-valid but semantically-wrong
+    // treasury (fields defaulting to undefined/zero corrupt financial state).
+    if (snap.version !== CURRENT_TREASURY_SNAPSHOT_VERSION) {
+      throw new TreasuryError(
+        "UNSUPPORTED_SNAPSHOT_VERSION",
+        `Cannot restore treasury snapshot version ${String(snap.version)}: this build restores version ${CURRENT_TREASURY_SNAPSHOT_VERSION}`,
+        `Migrate the snapshot to version ${CURRENT_TREASURY_SNAPSHOT_VERSION} before restoring, or restore with a build that supports version ${String(snap.version)}.`,
+      );
+    }
+
     const treasury = new Treasury(snap.config, telemetry);
+    // Restore into a FRESH treasury (the documented pattern): import* below
+    // fail closed if their target map is already populated.
     treasury.payroll.importPayees(snap.payees);
     treasury.payroll.importRuns(snap.payrollRuns);
     treasury.distributions.importPlans(snap.distributionPlans);
     treasury.funding.importRequests(snap.fundingRequests);
+
+    telemetry.record({
+      package: "@attestia/treasury",
+      op: "treasury.restore",
+      level: "info",
+      outcome: "ok",
+      attributes: {
+        payeeCount: snap.payees.length,
+        runCount: snap.payrollRuns.length,
+        planCount: snap.distributionPlans.length,
+        requestCount: snap.fundingRequests.length,
+        snapshotVersion: snap.version,
+      },
+      message: `treasury '${snap.config.orgId}' restored from snapshot`,
+    });
+
     return treasury;
   }
 }

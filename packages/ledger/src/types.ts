@@ -118,7 +118,8 @@ export type LedgerErrorCode =
   | "DUPLICATE_ACCOUNT_ID"
   | "EMPTY_TRANSACTION"
   | "MIXED_CORRELATION_ID"
-  | "INVALID_MONEY";
+  | "INVALID_MONEY"
+  | "UNSUPPORTED_SNAPSHOT_VERSION";
 
 /**
  * Structured error from the ledger engine.

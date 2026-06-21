@@ -14,13 +14,14 @@ import type { AppEnv } from "./types/api-contract.js";
 import { TenantRegistry } from "./services/tenant-registry.js";
 import type { AttestiaServiceConfig } from "./services/attestia-service.js";
 import { TelemetryBridge } from "./observability/telemetry-bridge.js";
-import { handleError } from "./middleware/error-handler.js";
+import { createErrorHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { loggerMiddleware } from "./middleware/logger.js";
 import type { RequestLogEntry } from "./middleware/logger.js";
 import {
   idempotencyMiddleware,
   InMemoryIdempotencyStore,
+  DEFAULT_SWEEP_INTERVAL_MS as IDEMPOTENCY_SWEEP_INTERVAL_MS,
 } from "./middleware/idempotency.js";
 import { authMiddleware } from "./middleware/auth.js";
 import type { AuthConfig } from "./middleware/auth.js";
@@ -92,6 +93,16 @@ export interface CreateAppOptions {
    * `validate.ts`/`c.req.json()` buffering.
    */
   readonly maxBodyBytes?: number | undefined;
+  /**
+   * Enable the background sweepers on the in-memory idempotency + rate-limit
+   * stores (B-NODE-001/002). When true, each store runs an unref'd interval that
+   * periodically drops idle/expired entries so a long-running process does not
+   * leak memory. Default: false — the LRU/size caps still bound memory without a
+   * timer, so tests stay timer-free. `main.ts` sets this true for the real
+   * server. Caps and (when enabled) sweeper are released via
+   * {@link AppInstance.dispose}.
+   */
+  readonly enableStoreSweepers?: boolean | undefined;
 }
 
 /**
@@ -113,6 +124,13 @@ export interface AppInstance {
   readonly metricsCollector: MetricsCollector;
   readonly auditLog: AuditLog;
   readonly rateLimitStore?: TokenBucketStore | undefined;
+  /**
+   * Release all in-memory store resources (idempotency + authenticated and
+   * public rate-limit sweepers, B-NODE-001/002). Idempotent. Called during
+   * graceful shutdown (B-NODE-003) so timers do not keep the process alive and
+   * tests do not leak timers.
+   */
+  readonly dispose: () => void;
 }
 
 /**
@@ -132,8 +150,17 @@ export function createApp(options: CreateAppOptions): AppInstance {
     ...options.serviceConfig,
     telemetry: options.serviceConfig.telemetry ?? telemetryBridge,
   });
+  // Sweepers run only for the real server (main.ts). Off by default so the
+  // size/LRU caps still bound memory without leaving timers behind in tests
+  // (B-NODE-001/002). 0 = no timer; a positive interval enables the unref'd
+  // sweep, released via dispose() on shutdown.
+  const sweepIntervalMs = options.enableStoreSweepers
+    ? IDEMPOTENCY_SWEEP_INTERVAL_MS
+    : 0;
+
   const idempotencyStore = new InMemoryIdempotencyStore(
     options.idempotencyTtlMs ?? 86400000,
+    { sweepIntervalMs },
   );
   const auditLog = new AuditLog();
   const defaultTenantId = options.defaultTenantId ?? options.serviceConfig.ownerId;
@@ -141,7 +168,7 @@ export function createApp(options: CreateAppOptions): AppInstance {
 
   let rateLimitStore: TokenBucketStore | undefined;
   if (options.rateLimit !== undefined) {
-    rateLimitStore = new TokenBucketStore(options.rateLimit);
+    rateLimitStore = new TokenBucketStore({ ...options.rateLimit, sweepIntervalMs });
   }
 
   const app = new Hono<AppEnv>();
@@ -188,11 +215,20 @@ export function createApp(options: CreateAppOptions): AppInstance {
   app.use("/public/*", bodyLimitMiddleware);
 
   // ─── Error Handler ──────────────────────────────────────────────
-  app.onError(handleError);
+  // Wire the logger + metrics so 5xx faults are recorded server-side with the
+  // request id, not silently flattened (B-NODE-005). The client envelope still
+  // leaks nothing beyond that (non-sensitive) request id.
+  app.onError(
+    createErrorHandler({ logger: bridgeLogger, metrics: metricsCollector }),
+  );
 
   // ─── Health Routes (no auth required) ───────────────────────────
   const healthRoutes = createHealthRoutes(tenantRegistry, {
     exposeReadinessCounts: options.exposeReadinessCounts ?? false,
+    // Make readiness flips observable in logs + metrics without leaking
+    // per-tenant detail on the unauthenticated probe body (B-NODE-007).
+    logger: bridgeLogger,
+    metrics: metricsCollector,
   });
   app.route("/", healthRoutes);
 
@@ -211,7 +247,8 @@ export function createApp(options: CreateAppOptions): AppInstance {
   }
 
   // ─── Public Routes (no auth required) ──────────────────────────
-  app.route("/public/v1/verify", createPublicVerifyRoutes(options.publicVerify));
+  const publicVerify = createPublicVerifyRoutes(options.publicVerify, sweepIntervalMs);
+  app.route("/public/v1/verify", publicVerify.routes);
   app.route("/public/v1/proofs", createPublicProofRoutes());
   app.route("/public/v1/compliance", createPublicComplianceRoutes());
   app.route("/public/v1", createPublicOpenApiRoutes());
@@ -256,5 +293,24 @@ export function createApp(options: CreateAppOptions): AppInstance {
   app.route("/api/v1/compliance", createComplianceRoutes());
   app.route("/api/v1/audit-logs", createAuditLogRoutes(auditLog));
 
-  return { app, tenantRegistry, idempotencyStore, metricsCollector, auditLog, rateLimitStore };
+  // Release every in-memory store sweeper on shutdown (B-NODE-001/002). When
+  // sweepers are disabled (tests), dispose() is a harmless no-op.
+  let disposed = false;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    idempotencyStore.dispose();
+    rateLimitStore?.dispose();
+    publicVerify.rateLimitStore.dispose();
+  };
+
+  return {
+    app,
+    tenantRegistry,
+    idempotencyStore,
+    metricsCollector,
+    auditLog,
+    rateLimitStore,
+    dispose,
+  };
 }

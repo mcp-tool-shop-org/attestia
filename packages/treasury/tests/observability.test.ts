@@ -99,7 +99,8 @@ describe("treasury observability (D4-B-001)", () => {
     const exec = sink.events.find((e) => e.op === "distribution.execute");
     expect(exec).toBeDefined();
     expect(exec!.outcome).toBe("ok");
-    expect(exec!.attributes).toEqual({ recipientCount: 2 });
+    // A clean 50/50 split of 1000 leaves no dust, so remainderNonZero is false.
+    expect(exec!.attributes).toEqual({ recipientCount: 2, remainderNonZero: false });
   });
 
   it("defaults to a silent sink when none is injected", () => {

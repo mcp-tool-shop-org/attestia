@@ -20,7 +20,12 @@
  */
 
 import type { Context } from "hono";
+import type { Logger } from "pino";
 import { createErrorEnvelope } from "../types/error.js";
+import type { MetricsCollector } from "./metrics.js";
+
+/** Metric name for the server-side 5xx counter (B-NODE-005). */
+export const SERVER_ERROR_COUNTER = "attestia_server_errors_total";
 
 // =============================================================================
 // Domain Error → HTTP Status Mapping
@@ -323,29 +328,75 @@ function getErrorCode(error: DomainError): string {
 // =============================================================================
 
 /**
- * Global error handler. Registered as Hono's onError handler.
+ * Dependencies for {@link createErrorHandler}. Both optional so the handler
+ * works in tests/dev with no observability wired.
  */
-export function handleError(err: Error, c: Context): Response {
-  const domainError = err as unknown as DomainError;
-  const status = getStatusCode(domainError);
-  const code = getErrorCode(domainError);
-
-  // 5xx: never reveal internals — a single generic message, no hint.
-  if (status >= 500) {
-    return c.json(
-      createErrorEnvelope(code, "Internal server error"),
-      status as 400,
-    );
-  }
-
-  // 4xx: a curated, safe human message + hint. Prefer the per-code copy; fall
-  // back to a status-class generic. Never the bare code, never the raw message.
-  const curated = CODE_MESSAGES[code];
-  const message =
-    curated?.message ??
-    STATUS_CLASS_FALLBACK[status] ??
-    "The request could not be processed.";
-  const hint = curated?.hint;
-
-  return c.json(createErrorEnvelope(code, message, hint), status as 400);
+export interface ErrorHandlerDeps {
+  /** Logger used to record the full 5xx fault server-side (B-NODE-005). */
+  readonly logger?: Pick<Logger, "error"> | undefined;
+  /** Metrics collector incremented on each 5xx (B-NODE-005). */
+  readonly metrics?: Pick<MetricsCollector, "incrementCounter"> | undefined;
 }
+
+/**
+ * Build the global error handler with optional observability wiring.
+ *
+ * For 5xx faults, the full error (message, stack, code) is logged server-side
+ * with the request id BEFORE the generic envelope is returned (B-NODE-005), so
+ * an internal fault is diagnosable from the logs instead of being a bare `500`.
+ * The same request id is echoed in the client envelope so a caller can quote it
+ * in a support request, tying the two records together. The client still never
+ * sees internal detail.
+ */
+export function createErrorHandler(
+  deps: ErrorHandlerDeps = {},
+): (err: Error, c: Context) => Response {
+  return (err: Error, c: Context): Response => {
+    const domainError = err as unknown as DomainError;
+    const status = getStatusCode(domainError);
+    const code = getErrorCode(domainError);
+
+    // 5xx: never reveal internals to the client — but record the real cause
+    // server-side so operators are not blind (B-NODE-005).
+    if (status >= 500) {
+      const requestId = c.get("requestId");
+      deps.logger?.error(
+        {
+          err,
+          code,
+          requestId,
+          method: c.req.method,
+          path: c.req.path,
+        },
+        "Unhandled server error",
+      );
+      deps.metrics?.incrementCounter(SERVER_ERROR_COUNTER, { code });
+
+      // Echo the request id (as details) so a caller can quote it; it is not
+      // sensitive and links the client-side and server-side records.
+      const details = requestId !== undefined ? { requestId } : undefined;
+      return c.json(
+        createErrorEnvelope(code, "Internal server error", undefined, details),
+        status as 400,
+      );
+    }
+
+    // 4xx: a curated, safe human message + hint. Prefer the per-code copy; fall
+    // back to a status-class generic. Never the bare code, never the raw message.
+    const curated = CODE_MESSAGES[code];
+    const message =
+      curated?.message ??
+      STATUS_CLASS_FALLBACK[status] ??
+      "The request could not be processed.";
+    const hint = curated?.hint;
+
+    return c.json(createErrorEnvelope(code, message, hint), status as 400);
+  };
+}
+
+/**
+ * Global error handler with no observability wiring. Registered as Hono's
+ * onError handler in tests/dev; `createApp` uses {@link createErrorHandler} with
+ * the real logger + metrics. Kept for backward compatibility.
+ */
+export const handleError = createErrorHandler();

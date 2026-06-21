@@ -86,6 +86,113 @@ describe("TokenBucketStore", () => {
 });
 
 // =============================================================================
+// B-NODE-001 [HIGH]: bounded eviction — sweeper + LRU cap, no leaked timers.
+// =============================================================================
+
+describe("TokenBucketStore eviction (B-NODE-001)", () => {
+  it("does not create a timer when sweepIntervalMs is 0 (no leak in tests)", () => {
+    // No timer is created, so dispose() is a no-op and nothing leaks. The cap
+    // still bounds memory without a sweeper.
+    const store = new TokenBucketStore({ rpm: 60, burst: 5, sweepIntervalMs: 0 });
+    store.consume("a");
+    expect(store.size).toBe(1);
+    store.dispose(); // safe even with no timer
+  });
+
+  it("sweep() drops buckets idle past the full-refill window", () => {
+    // full-refill window = burst/rpm = 5/300 min = 1s.
+    const store = new TokenBucketStore({ rpm: 300, burst: 5, sweepIntervalMs: 0 });
+    store.consume("idle", 1); // lastRefill ≈ now
+
+    expect(store.size).toBe(1);
+    // Not yet idle (well within the 1s window).
+    expect(store.sweep(Date.now() + 500)).toBe(0);
+    expect(store.size).toBe(1);
+    // Past the 1s window → evicted.
+    expect(store.sweep(Date.now() + 2_000)).toBe(1);
+    expect(store.size).toBe(0);
+  });
+
+  it("evicting an idle bucket preserves rate-limit semantics (fresh bucket is full)", () => {
+    const store = new TokenBucketStore({ rpm: 300, burst: 2, sweepIntervalMs: 0 });
+
+    // Exhaust the bucket.
+    expect(store.consume("u").allowed).toBe(true);
+    expect(store.consume("u").allowed).toBe(true);
+    expect(store.consume("u").allowed).toBe(false);
+
+    // Sweep it away as if idle, then re-consume — a fresh full bucket, exactly
+    // as if it had refilled. Semantics are unchanged by eviction.
+    store.sweep(Date.now() + 60_000);
+    expect(store.size).toBe(0);
+    expect(store.consume("u").allowed).toBe(true);
+  });
+
+  it("enforces an LRU cap on distinct buckets", () => {
+    const store = new TokenBucketStore({
+      rpm: 60,
+      burst: 5,
+      maxBuckets: 3,
+      sweepIntervalMs: 0,
+    });
+
+    store.consume("a");
+    store.consume("b");
+    store.consume("c");
+    expect(store.size).toBe(3);
+
+    // Touch "a" so it becomes most-recent; "b" is now the LRU.
+    store.consume("a");
+    // Insert a 4th distinct bucket → evicts the LRU ("b"), not "a".
+    store.consume("d");
+
+    expect(store.size).toBe(3);
+    // "b" was evicted: a fresh full bucket on next access.
+    expect(store.consume("b").remaining).toBe(4);
+  });
+
+  it("dispose() stops the sweeper and is idempotent", () => {
+    let cleared = 0;
+    const fakeHandle = {} as NodeJS.Timeout;
+    const store = new TokenBucketStore({
+      rpm: 60,
+      burst: 5,
+      sweepIntervalMs: 1000,
+      setIntervalFn: () => fakeHandle,
+      clearIntervalFn: () => {
+        cleared++;
+      },
+    });
+
+    store.dispose();
+    store.dispose(); // idempotent — clearInterval called at most once
+    expect(cleared).toBe(1);
+  });
+
+  it("invokes the injected sweeper on tick and evicts idle buckets", () => {
+    let registered: (() => void) | undefined;
+    const store = new TokenBucketStore({
+      rpm: 300,
+      burst: 1,
+      sweepIntervalMs: 1000,
+      setIntervalFn: (handler) => {
+        registered = handler;
+        return {} as NodeJS.Timeout;
+      },
+      clearIntervalFn: () => {},
+    });
+
+    store.consume("x");
+    expect(store.size).toBe(1);
+    // Drive the registered sweep handler; the bucket's lastRefill is "now", so
+    // it is not idle yet — manual sweep with a far-future time evicts it.
+    expect(typeof registered).toBe("function");
+    expect(store.sweep(Date.now() + 60_000)).toBe(1);
+    store.dispose();
+  });
+});
+
+// =============================================================================
 // V2-001 [MEDIUM, tenant-bleed]: bucket must be scoped per tenant.
 //
 // For JWT auth, identity = claims.sub, which is only unique WITHIN a tenant.

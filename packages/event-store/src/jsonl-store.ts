@@ -89,6 +89,61 @@ export interface JsonlEventStoreOptions {
    * @default NOOP_TELEMETRY (no events emitted)
    */
   readonly telemetry?: Telemetry;
+
+  /**
+   * Defensive upper bound, in bytes, on the size of the JSONL file the store
+   * will read into memory on construction (B-LES-007).
+   *
+   * The store is a whole-file, in-memory index: `_loadFromFile` reads the entire
+   * append-only log into a single string and builds in-memory indexes that hold
+   * every event for the life of the instance. An append-only log only grows, so
+   * a multi-GB log would otherwise OOM the process on construction with an
+   * opaque V8 allocation failure. When set, the constructor `statSync`s the file
+   * first and, if it exceeds this limit, fails closed with a structured
+   * `EventStoreError("LOG_TOO_LARGE")` naming the actual size and the limit —
+   * an actionable message instead of a crash.
+   *
+   * Leave unset (the default) to impose no limit and preserve current behavior.
+   *
+   * @default undefined (no size limit)
+   */
+  readonly maxLoadBytes?: number;
+}
+
+/**
+ * Why a single line was skipped during load. Stable, low-cardinality codes so
+ * an operator (or monitoring) can distinguish a torn/partial write from a
+ * structurally invalid record without re-parsing the file by hand.
+ *
+ * - `parse_error`  — the line was not valid JSON (commonly a torn last line).
+ * - `missing_field`— parsed, but a required field was absent or mistyped
+ *   (streamId / version / globalPosition / event / appendedAt).
+ */
+export type LoadSkipReason = "parse_error" | "missing_field";
+
+/**
+ * One skipped line, captured for {@link JsonlEventStore.loadDiagnostics}.
+ */
+export interface LoadSkip {
+  /** 1-based index of the line in the file (counts blank lines too). */
+  readonly lineIndex: number;
+  /** Stable reason code for the skip. */
+  readonly reason: LoadSkipReason;
+}
+
+/**
+ * Read-only summary of what happened when the store loaded its backing file.
+ * Exposed via {@link JsonlEventStore.loadDiagnostics} so an operator inspecting
+ * a damaged log can see exactly which lines were dropped, and why, without
+ * re-parsing the file. `skips` is non-empty iff `skippedLines > 0`.
+ */
+export interface LoadDiagnostics {
+  /** Number of events successfully loaded into memory. */
+  readonly eventsLoaded: number;
+  /** Number of non-empty lines skipped as corrupt/invalid. */
+  readonly skippedLines: number;
+  /** Per-line detail for each skipped line. */
+  readonly skips: readonly LoadSkip[];
 }
 
 /**
@@ -155,6 +210,20 @@ export class JsonlEventStore implements EventStore {
   /** Injected telemetry sink (defaults to a no-op; never throws). */
   private readonly _telemetry: Telemetry;
 
+  /** Optional defensive cap on file bytes read at load (B-LES-007). */
+  private readonly _maxLoadBytes: number | undefined;
+
+  /**
+   * Diagnostics captured by the most recent load (B-LES-002). Surfaced via the
+   * public {@link loadDiagnostics} accessor so a damaged log's dropped lines are
+   * inspectable even under the default NOOP telemetry sink.
+   */
+  private _loadDiagnostics: LoadDiagnostics = {
+    eventsLoaded: 0,
+    skippedLines: 0,
+    skips: [],
+  };
+
   /**
    * Create a new JsonlEventStore.
    *
@@ -166,6 +235,7 @@ export class JsonlEventStore implements EventStore {
     this._filePath = options.filePath;
     this._lockPath = this._filePath + ".lock";
     this._telemetry = options.telemetry ?? NOOP_TELEMETRY;
+    this._maxLoadBytes = options.maxLoadBytes;
 
     // Ensure parent directory exists
     const dir = dirname(this._filePath);
@@ -173,14 +243,26 @@ export class JsonlEventStore implements EventStore {
 
     // Load existing events from file (timed for observability)
     const loadStart = Date.now();
-    const { eventsLoaded, skippedLines } = this._loadFromFile();
+    const { eventsLoaded, skippedLines, skips } = this._loadFromFile();
+    this._loadDiagnostics = { eventsLoaded, skippedLines, skips };
+    // B-LES-002: skipping lines on load means records were silently dropped from
+    // tamper-evident history — a material event, not routine. Escalate to "warn"
+    // / "degraded" so it is visible even when a host maps levels to log streams,
+    // and carry a stable code plus the recovery hint pointing at loadDiagnostics.
+    const droppedLines = skippedLines > 0;
     this._emit({
       op: "load",
-      level: "info",
-      outcome: "ok",
+      level: droppedLines ? "warn" : "info",
+      outcome: droppedLines ? "degraded" : "ok",
       durationMs: Date.now() - loadStart,
-      attributes: { eventsLoaded, skippedLines },
-      message: `loaded ${eventsLoaded} event(s) from ${basename(this._filePath)}`,
+      attributes: {
+        eventsLoaded,
+        skippedLines,
+        ...(droppedLines ? { code: "LOAD_LINES_SKIPPED" } : {}),
+      },
+      message: droppedLines
+        ? `loaded ${eventsLoaded} event(s) from ${basename(this._filePath)}; SKIPPED ${skippedLines} corrupt line(s) — inspect store.loadDiagnostics for the dropped line indices and reasons`
+        : `loaded ${eventsLoaded} event(s) from ${basename(this._filePath)}`,
     });
 
     // Fail-closed: unless explicitly opted out, verify the hash chain on load
@@ -495,6 +577,20 @@ export class JsonlEventStore implements EventStore {
     return this._filePath;
   }
 
+  /**
+   * Diagnostics from the most recent load (B-LES-002).
+   *
+   * When a backing file has torn or structurally-invalid lines, those lines are
+   * silently dropped to keep the store openable after an unclean shutdown. This
+   * accessor exposes exactly which lines were dropped and why, so an operator
+   * inspecting a damaged log does not have to re-parse the file by hand. It is
+   * always populated (empty `skips` on a clean load) and is the recovery target
+   * referenced by the `LOAD_LINES_SKIPPED` telemetry event.
+   */
+  get loadDiagnostics(): LoadDiagnostics {
+    return this._loadDiagnostics;
+  }
+
   // ─── Integrity ──────────────────────────────────────────────────────
 
   /**
@@ -539,16 +635,53 @@ export class JsonlEventStore implements EventStore {
    * are loaded normally — chain verification starts from the first
    * hashed event.
    *
-   * @returns load statistics for observability: number of events loaded and
-   *   number of non-empty lines skipped (corrupt JSON or missing fields).
+   * @returns load statistics for observability: number of events loaded, the
+   *   number of non-empty lines skipped (corrupt JSON or missing fields), and
+   *   per-skip detail (line index + stable reason) for {@link loadDiagnostics}.
    */
-  private _loadFromFile(): { eventsLoaded: number; skippedLines: number } {
+  private _loadFromFile(): {
+    eventsLoaded: number;
+    skippedLines: number;
+    skips: LoadSkip[];
+  } {
     let eventsLoaded = 0;
     let skippedLines = 0;
+    const skips: LoadSkip[] = [];
 
     if (!existsSync(this._filePath)) {
       this._knownFileSize = undefined;
-      return { eventsLoaded, skippedLines };
+      return { eventsLoaded, skippedLines, skips };
+    }
+
+    // B-LES-007: defensive size guard. The store reads the whole file into
+    // memory and indexes every event; an append-only log only grows. Without
+    // this check, a log larger than available memory OOM-crashes construction
+    // with an opaque V8 allocation error. When maxLoadBytes is set, stat the
+    // file first and fail closed with an actionable, structured error.
+    if (this._maxLoadBytes !== undefined) {
+      let sizeOnDisk: number;
+      try {
+        sizeOnDisk = statSync(this._filePath).size;
+      } catch {
+        sizeOnDisk = 0; // Unstattable — fall through to the read path.
+      }
+      if (sizeOnDisk > this._maxLoadBytes) {
+        this._emit({
+          op: "load",
+          level: "error",
+          outcome: "failed",
+          attributes: {
+            code: "LOG_TOO_LARGE",
+            sizeBytes: sizeOnDisk,
+            maxLoadBytes: this._maxLoadBytes,
+          },
+          message: `event log "${basename(this._filePath)}" is ${sizeOnDisk} bytes, exceeding maxLoadBytes ${this._maxLoadBytes}`,
+        });
+        throw new EventStoreError(
+          "LOG_TOO_LARGE",
+          `Event log "${basename(this._filePath)}" is ${sizeOnDisk} bytes, which exceeds the configured maxLoadBytes limit of ${this._maxLoadBytes}. The JSONL store loads the entire log into memory; refusing to load to avoid an out-of-memory crash. Raise maxLoadBytes if this size is expected, or migrate to a snapshot-based recovery path.`,
+        );
+      }
     }
 
     const content = readFileSync(this._filePath, "utf-8");
@@ -558,7 +691,11 @@ export class JsonlEventStore implements EventStore {
     this._knownFileSize = Buffer.byteLength(content, "utf-8");
     const lines = content.split("\n");
 
+    // 1-based line index, incremented for EVERY line (including blanks) so the
+    // index reported in diagnostics matches what an operator sees in an editor.
+    let lineIndex = 0;
     for (const line of lines) {
+      lineIndex++;
       const trimmed = line.trim();
       if (trimmed.length === 0) {
         continue;
@@ -570,17 +707,23 @@ export class JsonlEventStore implements EventStore {
       } catch {
         // Corrupt/partial line — skip (crash safety)
         skippedLines++;
+        skips.push({ lineIndex, reason: "parse_error" });
         continue;
       }
 
-      // Validate minimum required fields
+      // Validate minimum required fields. appendedAt is included (B-LES-008):
+      // it feeds the hash chain (hash-chain.ts), so a missing/mistyped
+      // appendedAt that survives load surfaces later as a confusing "hash
+      // mismatch" instead of the truthful "malformed record". Catch it here.
       if (
         typeof record.streamId !== "string" ||
         typeof record.version !== "number" ||
         typeof record.globalPosition !== "number" ||
+        typeof record.appendedAt !== "string" ||
         record.event === undefined
       ) {
         skippedLines++;
+        skips.push({ lineIndex, reason: "missing_field" });
         continue;
       }
 
@@ -626,7 +769,7 @@ export class JsonlEventStore implements EventStore {
       eventsLoaded++;
     }
 
-    return { eventsLoaded, skippedLines };
+    return { eventsLoaded, skippedLines, skips };
   }
 
   /**
@@ -647,15 +790,27 @@ export class JsonlEventStore implements EventStore {
    *   lock and failing closed with CONCURRENCY_CONFLICT if the file grew (see
    *   A-ES-001) — the lock plus that check together prevent forked chains.
    *
-   * TODO (stale-lock robustness): a writer that crashes between acquire and
-   * release leaves the lockfile behind, and every subsequent append then times
-   * out with LOCK_TIMEOUT forever. The holder's PID is already written into the
-   * lockfile (see below); a future enhancement could read it and break a lock
-   * whose PID is no longer alive (e.g. `process.kill(pid, 0)` throwing ESRCH).
-   * Left as a TODO rather than implemented here because PID-liveness checks are
-   * racy across PID reuse and hard to test deterministically without a second
-   * real process; breaking a live writer's lock would be far worse than the
-   * current fail-closed timeout. Do not add this without a safe, isolated test.
+   * Stale-lock recovery (B-LES-001): a writer that crashes between acquire and
+   * release (kill -9, power loss, unhandled throw) leaves the lockfile behind,
+   * which would otherwise deadlock every future append with a permanent
+   * LOCK_TIMEOUT — turning one crashed writer into a total write outage. To
+   * recover, on EEXIST we read the PID written in the lockfile and probe it with
+   * `process.kill(pid, 0)`: if the holder is provably dead (ESRCH) we break the
+   * stale lock ONCE and retry the atomic acquire. The break is fail-SAFE:
+   * - We only break on a definitively-dead PID. A live holder (kill succeeds),
+   *   a permission-denied probe (EPERM — process exists, owned by another user),
+   *   or an unreadable/empty/non-numeric PID file keeps the current fail-closed
+   *   timeout behavior. We never break a lock we cannot prove is abandoned.
+   * - The break itself races: two acquirers can both observe the same dead PID.
+   *   We resolve that with the SAME atomic O_CREAT|O_EXCL used for normal
+   *   acquisition — after unlinking the stale file, only the acquirer whose
+   *   re-create wins proceeds; the loser sees EEXIST again (now held by a LIVE
+   *   PID, the winner) and falls back to the timeout path. PID reuse is handled
+   *   by this re-acquire: even if a dead PID was recycled, the worst case is we
+   *   decline to break (treat as live) — never a false break of a live writer.
+   * - We break at most ONCE per acquire call (guarded by `brokeStaleLock`), so a
+   *   pathological churn cannot loop us unbounded; a second stale lock within
+   *   one acquire falls through to the normal timeout.
    */
   private _acquireLock(): void {
     const maxWaitMs = 5_000;
@@ -663,6 +818,7 @@ export class JsonlEventStore implements EventStore {
     const lockStart = Date.now();
     const deadline = lockStart + maxWaitMs;
     let contended = false;
+    let brokeStaleLock = false;
 
     while (true) {
       try {
@@ -678,7 +834,7 @@ export class JsonlEventStore implements EventStore {
           level: "debug",
           outcome: "ok",
           durationMs: Date.now() - lockStart,
-          attributes: { contended },
+          attributes: { contended, brokeStaleLock },
         });
         return;
       } catch (err: unknown) {
@@ -686,18 +842,42 @@ export class JsonlEventStore implements EventStore {
           throw err;
         }
         contended = true;
+
+        // Stale-lock recovery: if the lockfile is held by a provably-dead PID,
+        // break it once and retry the atomic acquire. Guarded so we attempt the
+        // break at most once per call.
+        if (!brokeStaleLock && this._tryBreakStaleLock()) {
+          brokeStaleLock = true;
+          // Loop immediately and re-attempt the atomic O_CREAT|O_EXCL. The
+          // re-create is the race resolver: only one acquirer wins it.
+          continue;
+        }
+
         if (Date.now() >= deadline) {
+          const holderPid = this._readLockPid();
+          const pidDetail = holderPid !== undefined ? ` (held by PID ${holderPid})` : "";
           this._emit({
             op: "lock.acquire",
             level: "error",
             outcome: "failed",
             durationMs: Date.now() - lockStart,
-            attributes: { contended, code: "LOCK_TIMEOUT" },
-            message: `lock acquisition timed out after ${maxWaitMs}ms on ${basename(this._lockPath)}`,
+            attributes: {
+              contended,
+              code: "LOCK_TIMEOUT",
+              ...(holderPid !== undefined ? { holderPid } : {}),
+            },
+            message: `lock acquisition timed out after ${maxWaitMs}ms on ${basename(this._lockPath)}${pidDetail}`,
           });
+          // Operability (B-LES-001): tell the operator exactly how to recover.
+          // The message names the holder PID (when readable), the absolute
+          // lockfile path, and the explicit manual-recovery step — so a stuck
+          // append is a 1-second fix, not a mystery to be reverse-engineered.
+          const recovery = holderPid !== undefined
+            ? `The lockfile names PID ${holderPid}. If that process is NOT running, the lock is stale: delete "${this._lockPath}" to recover. (A dead-PID lock is normally broken automatically; a persisting one means the PID is still alive or the file is unreadable.)`
+            : `Could not read a PID from the lockfile. If no writer is running, delete "${this._lockPath}" to recover.`;
           throw new EventStoreError(
             "LOCK_TIMEOUT",
-            `Failed to acquire lock on ${this._lockPath} within ${maxWaitMs}ms — another process may be writing`,
+            `Failed to acquire lock on ${this._lockPath} within ${maxWaitMs}ms — another process may be writing. ${recovery}`,
           );
         }
         // Spin-wait (synchronous to match the synchronous append API)
@@ -707,6 +887,94 @@ export class JsonlEventStore implements EventStore {
         }
       }
     }
+  }
+
+  /**
+   * Read the PID recorded in the lockfile, if any.
+   *
+   * @returns the integer PID, or `undefined` if the file is missing, empty, or
+   *   does not contain a parseable positive integer (e.g. a torn write).
+   */
+  private _readLockPid(): number | undefined {
+    let raw: string;
+    try {
+      raw = readFileSync(this._lockPath, "utf-8");
+    } catch {
+      // Lockfile vanished or is unreadable — caller treats as "unknown".
+      return undefined;
+    }
+    const pid = Number.parseInt(raw.trim(), 10);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      return undefined;
+    }
+    return pid;
+  }
+
+  /**
+   * Attempt to break a stale lockfile whose holder PID is provably dead.
+   *
+   * Reads the PID and probes it with `process.kill(pid, 0)` (sends no signal,
+   * only checks existence/permission):
+   * - ESRCH → the process does not exist → the lock is stale → unlink it and
+   *   return true so the caller retries the atomic acquire.
+   * - kill succeeds, EPERM (exists, other-owner), or an unreadable/invalid PID
+   *   → keep the lock (fail-closed) and return false.
+   *
+   * The unlink is best-effort and the subsequent re-acquire is the real race
+   * resolver, so two processes both breaking the same stale lock is safe: at
+   * most one wins the re-create.
+   *
+   * @returns true if a stale lock was broken (caller should retry), else false.
+   */
+  private _tryBreakStaleLock(): boolean {
+    const pid = this._readLockPid();
+    if (pid === undefined) {
+      // No readable PID — refuse to break (could be a torn write by a live
+      // writer mid-acquire). Fail-closed.
+      return false;
+    }
+
+    // Never break our own lock via this path; a self-held lock is not stale.
+    if (pid === process.pid) {
+      return false;
+    }
+
+    let alive: boolean;
+    try {
+      // Signal 0 performs error checking without sending a signal.
+      process.kill(pid, 0);
+      alive = true;
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") {
+        alive = false; // No such process — provably dead.
+      } else {
+        // EPERM (process exists, owned by another user) or any other error:
+        // treat as alive / indeterminate and DO NOT break.
+        alive = true;
+      }
+    }
+
+    if (alive) {
+      return false;
+    }
+
+    // Provably-dead holder: break the stale lock. Unlink is best-effort; the
+    // atomic re-create the caller performs next is what actually resolves the
+    // race between concurrent breakers.
+    try {
+      unlinkSync(this._lockPath);
+    } catch {
+      // Already removed by a concurrent breaker — fine, the re-acquire decides.
+    }
+    this._emit({
+      op: "lock.break_stale",
+      level: "warn",
+      outcome: "degraded",
+      attributes: { stalePid: pid, code: "LOCK_STALE_BROKEN" },
+      message: `broke stale lock on ${basename(this._lockPath)} held by dead PID ${pid}`,
+    });
+    return true;
   }
 
   /**

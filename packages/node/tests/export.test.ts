@@ -90,3 +90,80 @@ describe("GET /api/v1/export/state", () => {
     expect(body1.data.globalStateHash.hash).toBe(body2.data.globalStateHash.hash);
   });
 });
+
+// =============================================================================
+// B-NODE-006 [degradation]: the export STREAMS NDJSON one line per event
+// (no full-history buffering) and surfaces the event count in a header so
+// auditors can detect truncation.
+// =============================================================================
+
+describe("export events streaming (B-NODE-006)", () => {
+  /** Append N events to the default tenant's event store. */
+  function seedEvents(tenantRegistry: AppInstance["tenantRegistry"], n: number): void {
+    const service = tenantRegistry.getOrCreate("test-tenant");
+    for (let i = 0; i < n; i++) {
+      service.eventStore.append("export.stream", [
+        {
+          type: "export.test.event",
+          metadata: {
+            eventId: `evt-${i}`,
+            timestamp: new Date().toISOString(),
+            actor: "test",
+            correlationId: `corr-${i}`,
+            source: "vault",
+          },
+          payload: { i },
+        },
+      ]);
+    }
+  }
+
+  it("sets X-Total-Count to the streamed line count", async () => {
+    const { app, tenantRegistry } = createTestApp();
+    seedEvents(tenantRegistry, 3);
+
+    const res = await app.request(
+      jsonRequest("/api/v1/export/events", "GET", undefined, {
+        "X-Tenant-Id": "test-tenant",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/x-ndjson");
+
+    const total = Number(res.headers.get("X-Total-Count"));
+    const text = await res.text();
+    const lines = text.length > 0 ? text.trimEnd().split("\n") : [];
+
+    expect(total).toBe(3);
+    // Header count matches the streamed line count exactly (truncation detector).
+    expect(lines.length).toBe(total);
+  });
+
+  it("streams each event as its own valid JSON line (NDJSON)", async () => {
+    const { app, tenantRegistry } = createTestApp();
+    seedEvents(tenantRegistry, 4);
+
+    const res = await app.request(
+      jsonRequest("/api/v1/export/events", "GET", undefined, {
+        "X-Tenant-Id": "test-tenant",
+      }),
+    );
+
+    const text = await res.text();
+    const lines = text.trimEnd().split("\n");
+    expect(lines.length).toBe(4);
+    for (const line of lines) {
+      // Each line independently parses — the hallmark of NDJSON streaming.
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+  });
+
+  it("returns an empty body and X-Total-Count 0 when there are no events", async () => {
+    const { app } = createTestApp();
+    const res = await app.request("/api/v1/export/events");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Total-Count")).toBe("0");
+    expect(await res.text()).toBe("");
+  });
+});

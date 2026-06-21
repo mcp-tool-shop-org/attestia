@@ -6,8 +6,13 @@
  */
 
 import { Hono } from "hono";
+import type { Logger } from "pino";
 import type { AppEnv } from "../types/api-contract.js";
 import type { TenantRegistry } from "../services/tenant-registry.js";
+import type { MetricsCollector } from "../middleware/metrics.js";
+
+/** Metric name for the readiness gauge-as-counter of not-ready tenants (B-NODE-007). */
+export const READINESS_FAILURE_COUNTER = "attestia_readiness_failures_total";
 
 export interface HealthRouteOptions {
   /**
@@ -22,6 +27,17 @@ export interface HealthRouteOptions {
    * or, better, expose them behind admin auth.
    */
   readonly exposeReadinessCounts?: boolean;
+  /**
+   * Logger for readiness-flip diagnostics (B-NODE-007). When a tenant fails
+   * readiness, a structured WARN is emitted naming the failing subsystem
+   * (`writable` vs `integrity`) so the flip is observable in logs even though
+   * the unauthenticated probe body stays minimal for security. Tenant ids are
+   * NOT logged at WARN level by default to preserve the no-enumeration posture;
+   * the failing subsystem reason is the operational signal.
+   */
+  readonly logger?: Pick<Logger, "warn"> | undefined;
+  /** Metrics collector incremented when a tenant fails readiness (B-NODE-007). */
+  readonly metrics?: Pick<MetricsCollector, "incrementCounter"> | undefined;
 }
 
 export function createHealthRoutes(
@@ -30,6 +46,8 @@ export function createHealthRoutes(
 ): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
   const exposeCounts = options.exposeReadinessCounts ?? false;
+  const logger = options.logger;
+  const metrics = options.metrics;
 
   routes.get("/health", (c) => {
     return c.json({
@@ -61,6 +79,23 @@ export function createHealthRoutes(
         readyCount++;
       } else {
         notReadyCount++;
+
+        // B-NODE-007: a not-ready result was previously computed and discarded.
+        // Emit a structured signal naming WHICH subsystem failed so an operator
+        // paged by a failing probe knows whether it is a writability, integrity
+        // (hash-chain), or service-lifecycle problem — without the probe body
+        // having to leak per-tenant detail. The metric label is the failing
+        // reason (low cardinality), not the tenant id.
+        const reason = !service.isReady()
+          ? "service_not_ready"
+          : !integrity.valid
+            ? "integrity"
+            : "not_writable";
+        logger?.warn(
+          { reason, subsystem: "event-store" },
+          "Tenant failed readiness check",
+        );
+        metrics?.incrementCounter(READINESS_FAILURE_COUNTER, { reason });
       }
     }
 

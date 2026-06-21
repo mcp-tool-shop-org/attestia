@@ -49,7 +49,9 @@ export type IntentErrorCode =
   | "INVALID_TRANSITION"
   | "ALREADY_EXISTS"
   | "BUDGET_EXCEEDED"
-  | "VALIDATION_FAILED";
+  | "VALIDATION_FAILED"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Valid Transitions
@@ -136,6 +138,18 @@ export class IntentManager {
 
       // Use BigInt-safe comparison from @attestia/ledger (no floating-point)
       if (compareMoney(params.amount, available) > 0) {
+        // Surface the rejection before throwing: a misconfigured automation
+        // repeatedly declaring over-budget intents should be visible to
+        // monitoring. Reason is a low-cardinality enum; the id/amounts stay in
+        // `message`.
+        this.telemetry.record({
+          package: "@attestia/vault",
+          op: "intent.declare",
+          level: "warn",
+          outcome: "degraded",
+          attributes: { reason: "BUDGET_EXCEEDED" },
+          message: `intent '${id}' declare rejected: needs ${params.amount.amount} ${params.amount.currency} but envelope '${envelopeId}' has ${envelope.available} available`,
+        });
         throw new IntentError(
           "BUDGET_EXCEEDED",
           `Intent requires ${params.amount.amount} ${params.amount.currency} but envelope '${envelopeId}' only has ${envelope.available} available`,
@@ -403,9 +417,28 @@ export class IntentManager {
 
   /**
    * Restore intents from a snapshot.
+   *
+   * Restore is into a FRESH manager: importing over existing state would
+   * silently overwrite live intents by id, and a duplicate id within the
+   * incoming batch would silently keep only the last record. Both are caller
+   * bugs / snapshot corruption — fail closed rather than admit them.
    */
   importIntents(intents: readonly VaultIntent[]): void {
+    if (this.intents.size > 0) {
+      throw new IntentError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import intents into a non-empty manager (${this.intents.size} already present) — restore into a fresh IntentManager`,
+      );
+    }
+    const seen = new Set<string>();
     for (const intent of intents) {
+      if (seen.has(intent.id)) {
+        throw new IntentError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate intent id '${intent.id}' in imported snapshot`,
+        );
+      }
+      seen.add(intent.id);
       this.intents.set(intent.id, intent);
     }
   }
@@ -423,8 +456,23 @@ export class IntentManager {
   }
 
   private assertTransition(intent: VaultIntent, target: IntentStatus): void {
-    const allowed = VALID_TRANSITIONS[intent.status];
+    // `?? []` future-proofs against a new IntentStatus added to the
+    // @attestia/types enum that is missing a key here: instead of throwing an
+    // opaque "cannot read includes of undefined", an unknown status yields an
+    // empty allow-list and a clean INVALID_TRANSITION below.
+    const allowed = VALID_TRANSITIONS[intent.status] ?? [];
     if (!allowed.includes(target)) {
+      // A wedged state machine (e.g. a retry loop on an invalid transition) is
+      // operationally interesting — surface it before throwing. from/to are
+      // low-cardinality status enums; the intent id stays in `message`.
+      this.telemetry.record({
+        package: "@attestia/vault",
+        op: "intent.transition",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { from: intent.status, to: target, reason: "INVALID_TRANSITION" },
+        message: `intent '${intent.id}' rejected transition ${intent.status} -> ${target}`,
+      });
       throw new IntentError(
         "INVALID_TRANSITION",
         `Cannot transition intent '${intent.id}' from '${intent.status}' to '${target}'`,

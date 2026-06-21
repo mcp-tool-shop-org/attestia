@@ -328,7 +328,7 @@ describe("EvmObserver", () => {
       expect(result[0]!.amount).toBe("7");
     });
 
-    it("falls back to ERC20 defaults when token metadata query fails", async () => {
+    it("flags a guessed (UNKNOWN) fallback when token metadata query fails (PB-WCO-005)", async () => {
       mockGetLogs.mockResolvedValueOnce([
         {
           transactionHash: "0xdeadbeef",
@@ -357,8 +357,11 @@ describe("EvmObserver", () => {
       });
 
       expect(result.length).toBe(1);
-      expect(result[0]!.symbol).toBe("ERC20");
+      // PB-WCO-005: the guess is now explicit — non-confident symbol + a flag —
+      // instead of a confident-looking "ERC20" that hides a fabricated decimals.
+      expect(result[0]!.symbol).toBe("UNKNOWN");
       expect(result[0]!.decimals).toBe(18);
+      expect(result[0]!.metaResolved).toBe(false);
     });
   });
 

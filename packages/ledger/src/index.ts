@@ -17,7 +17,7 @@
  */
 
 // Core engine
-export { Ledger } from "./ledger.js";
+export { Ledger, SUPPORTED_SNAPSHOT_VERSION } from "./ledger.js";
 
 // Account registry
 export { AccountRegistry } from "./accounts.js";

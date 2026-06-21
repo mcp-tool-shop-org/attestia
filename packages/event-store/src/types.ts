@@ -303,7 +303,8 @@ export type EventStoreErrorCode =
   | "INVALID_VERSION"
   | "STORE_CLOSED"
   | "LOCK_TIMEOUT"
-  | "INTEGRITY_VIOLATION";
+  | "INTEGRITY_VIOLATION"
+  | "LOG_TOO_LARGE";
 
 /**
  * Error thrown by EventStore operations.

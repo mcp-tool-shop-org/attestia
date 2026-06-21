@@ -33,8 +33,11 @@ import type {
   TransferQuery,
   TransferEvent,
   ConnectionStatus,
+  RpcRetryConfig,
 } from "../observer.js";
+import { DEFAULT_RPC_RETRY } from "../observer.js";
 import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
+import { withRetry } from "../retry.js";
 
 /**
  * tfPartialPayment transaction flag (0x00020000).
@@ -54,6 +57,7 @@ export class XrplObserver implements ChainObserver {
   private client: XrplClient | null = null;
   private readonly config: ObserverConfig;
   private readonly telemetry: Telemetry;
+  private readonly retryConfig: RpcRetryConfig;
 
   constructor(config: ObserverConfig) {
     if (!config.chain.chainId.startsWith("xrpl:")) {
@@ -64,6 +68,7 @@ export class XrplObserver implements ChainObserver {
     this.chainId = config.chain.chainId;
     this.config = config;
     this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
+    this.retryConfig = config.retry ?? DEFAULT_RPC_RETRY;
   }
 
   async connect(): Promise<void> {
@@ -376,15 +381,48 @@ export class XrplObserver implements ChainObserver {
   }
 
   /**
-   * Run an XRPL request, classifying and re-throwing any failure as a structured
-   * {@link ObserverError} and emitting a `rpc` failure event (D3-B-003).
+   * Emit a structured `rpc.retry` event (outcome `"degraded"`, level `warn`)
+   * when a transient XRPL request failure is about to be retried (PB-WCO-004).
+   * Low-cardinality attributes only (`chainId`, `code`, `attempt`). Never throws.
+   */
+  private emitRpcRetry(code: string, attempt: number): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc.retry",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { chainId: this.chainId, code, attempt },
+        message: `XrplObserver: retrying transient RPC failure (${code}) on ${this.chainId}, attempt ${attempt}`,
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run an XRPL request under the shared retry-with-backoff discipline
+   * (PB-WCO-001): transient classified failures (RATE_LIMITED / RPC_TIMEOUT /
+   * RPC_UNREACHABLE) are retried, all other classes fail closed immediately.
+   * The FINAL failure (after retries) is classified and re-thrown as a
+   * structured {@link ObserverError} with a `rpc` failure event (D3-B-003); each
+   * retry emits an `rpc.retry` event (PB-WCO-004).
+   *
+   * NOTE: an XRPL "not connected" / disconnected blip classifies as
+   * RPC_UNREACHABLE and IS retried here — xrpl.js can transparently reconnect a
+   * dropped client between attempts, so a brief WebSocket drop during a read is
+   * absorbed rather than failing the call outright.
    *
    * @param context Operation name for the error message (e.g. "getBalance").
    * @param fn The request to execute.
    */
   private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
     try {
-      return await fn();
+      return await withRetry(fn, {
+        maxRetries: this.retryConfig.maxRetries,
+        delayMs: this.retryConfig.delayMs,
+        onRetry: ({ attempt, code }) => this.emitRpcRetry(code, attempt),
+      });
     } catch (err) {
       const observerError = toObserverError(err, `XrplObserver.${context}`, this.chainId);
       this.emitRpcFailure(observerError.code);

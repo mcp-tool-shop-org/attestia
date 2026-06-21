@@ -205,6 +205,9 @@ importers:
 
   packages/proof:
     dependencies:
+      '@attestia/types':
+        specifier: workspace:*
+        version: link:../types
       json-canonicalize:
         specifier: ^1.0.6
         version: 1.2.0

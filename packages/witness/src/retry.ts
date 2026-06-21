@@ -33,6 +33,16 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 /**
+ * Default per-attempt `submitAndWait` deadline in ms (PB-WCO-002).
+ *
+ * Chosen to comfortably exceed legitimate ledger validation (XRPL ledgers close
+ * ~3-5s; a tx with the default LastLedgerSequence window validates well under a
+ * minute) while still bounding a hung half-open-WebSocket poll that would
+ * otherwise wait forever. Operators can tune via WitnessConfig.submitTimeoutMs.
+ */
+export const DEFAULT_SUBMIT_TIMEOUT_MS = 60_000;
+
+/**
  * Error thrown when all retry attempts are exhausted.
  */
 export class RetryExhaustedError extends Error {
@@ -54,6 +64,79 @@ export class RetryExhaustedError extends Error {
  */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Error thrown when a per-attempt deadline elapses before the wrapped promise
+ * settles (PB-WCO-002). The message is intentionally classified as RETRYABLE by
+ * {@link isRetryableXrplError} ("timed out") so the submit retry loop fires —
+ * and the next attempt's fixed-hash idempotency check (`_checkExistingTx`)
+ * recovers a possibly-applied transaction instead of blindly resubmitting.
+ */
+export class AttemptTimeoutError extends Error {
+  constructor(
+    /** The deadline that elapsed, in ms. */
+    public readonly timeoutMs: number,
+    /** What operation timed out (e.g. "submitAndWait"). */
+    public readonly operation: string,
+  ) {
+    super(
+      `${operation} did not complete within the per-attempt deadline of ${timeoutMs}ms; ` +
+      `treating as a (possibly-applied) transient — the next attempt's idempotency ` +
+      `check will recover it if it landed (timed out).`,
+    );
+    this.name = "AttemptTimeoutError";
+  }
+}
+
+/**
+ * Race a promise-producing operation against a per-attempt deadline
+ * (PB-WCO-002). If `fn` does not settle within `timeoutMs`, reject with an
+ * {@link AttemptTimeoutError} so a hung call (e.g. a half-open XRPL WebSocket
+ * where `submitAndWait` polls forever) cannot stall the retry loop indefinitely.
+ *
+ * IMPORTANT: this does NOT cancel the underlying operation (JS promises are not
+ * cancellable) — it bounds how long the CALLER waits. For the idempotent,
+ * fixed-hash submit path that is exactly what we want: a timed-out attempt is
+ * retried, and the retry recognizes a lost-but-applied tx via its on-chain hash
+ * check rather than resubmitting.
+ *
+ * A `timeoutMs <= 0` disables the deadline (awaits `fn` directly), preserving
+ * the prior unbounded behavior when an operator opts out.
+ *
+ * @param fn The operation to run with a deadline.
+ * @param timeoutMs The per-attempt deadline in ms (<= 0 disables).
+ * @param operation Label for the error message.
+ * @param scheduleTimer Injectable timer (for deterministic tests).
+ */
+export async function withTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  operation: string,
+  scheduleTimer: (cb: () => void, ms: number) => { clear: () => void } = defaultTimer,
+): Promise<T> {
+  if (timeoutMs <= 0) {
+    return fn();
+  }
+
+  let handle: { clear: () => void } | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    handle = scheduleTimer(() => reject(new AttemptTimeoutError(timeoutMs, operation)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([fn(), timeout]);
+  } finally {
+    handle?.clear();
+  }
+}
+
+/** Default timer for {@link withTimeout}, backed by setTimeout. */
+function defaultTimer(cb: () => void, ms: number): { clear: () => void } {
+  const id = setTimeout(cb, ms);
+  // Don't keep the process alive solely for this deadline timer.
+  (id as { unref?: () => void }).unref?.();
+  return { clear: () => clearTimeout(id) };
 }
 
 /**

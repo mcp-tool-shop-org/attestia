@@ -36,7 +36,7 @@ export {
 // Multi-sig submitter and witness
 export { MultiSigSubmitter, normalizeTimestamp } from "./multisig-submitter.js";
 export type { SignerConfig, MultiSigConfig, MultiSignResult } from "./multisig-submitter.js";
-export { MultiSigWitness } from "./multisig-witness.js";
+export { MultiSigWitness, DEFAULT_MAX_RECORDS } from "./multisig-witness.js";
 export type { MultiSigWitnessConfig } from "./multisig-witness.js";
 
 // Registrum–governance bridge

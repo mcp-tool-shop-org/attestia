@@ -47,7 +47,9 @@ export type FundingErrorCode =
   | "NOT_GATEKEEPER"
   | "ALREADY_APPROVED"
   | "DUPLICATE_GATEKEEPER"
-  | "REQUESTER_CANNOT_APPROVE";
+  | "REQUESTER_CANNOT_APPROVE"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Funding Gate
@@ -335,7 +337,23 @@ export class FundingGateManager {
   }
 
   importRequests(requests: readonly FundingRequest[]): void {
+    // Restore is into a FRESH manager: importing over existing state would
+    // silently overwrite live requests by id. Fail closed (caller bug).
+    if (this.requests.size > 0) {
+      throw new FundingError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import requests into a non-empty manager (${this.requests.size} already present) — restore into a fresh FundingGateManager`,
+      );
+    }
+    const seen = new Set<string>();
     for (const r of requests) {
+      if (seen.has(r.id)) {
+        throw new FundingError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate request id '${r.id}' in imported snapshot`,
+        );
+      }
+      seen.add(r.id);
       this.requests.set(r.id, r);
     }
   }

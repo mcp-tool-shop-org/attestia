@@ -2,8 +2,10 @@
  * Tests for deep health check (/ready endpoint).
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { createHealthRoutes, READINESS_FAILURE_COUNTER } from "../src/routes/health.js";
+import { TenantRegistry } from "../src/services/tenant-registry.js";
 import { createTestApp, jsonRequest } from "./setup.js";
 
 /**
@@ -101,5 +103,71 @@ describe("deep health check", () => {
     const body = await res.json();
 
     expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+// =============================================================================
+// B-NODE-007 [observability / HUMANIZATION]: a readiness flip emits a
+// structured WARN + metric naming the failing subsystem, even though the
+// unauthenticated probe body stays minimal for security.
+// =============================================================================
+
+describe("readiness flip observability (B-NODE-007)", () => {
+  function makeRegistry(): TenantRegistry {
+    return new TenantRegistry({
+      ownerId: "test-tenant",
+      defaultCurrency: "USDC",
+      defaultDecimals: 6,
+    });
+  }
+
+  it("emits a WARN + counter naming the reason when a tenant is not ready", async () => {
+    const warn = vi.fn();
+    const incrementCounter = vi.fn();
+    const registry = makeRegistry();
+
+    // A stopped service reports not-ready via isReady()=false.
+    const service = registry.getOrCreate("test-tenant");
+    await service.stop();
+
+    const routes = createHealthRoutes(registry, {
+      logger: { warn },
+      metrics: { incrementCounter },
+    });
+
+    const res = await routes.request("/ready");
+    expect(res.status).toBe(503);
+
+    // A structured WARN fired, naming the failing reason.
+    expect(warn).toHaveBeenCalledTimes(1);
+    const [fields] = warn.mock.calls[0]!;
+    expect(fields.reason).toBe("service_not_ready");
+
+    // The metric fired with a low-cardinality reason label.
+    expect(incrementCounter).toHaveBeenCalledWith(
+      READINESS_FAILURE_COUNTER,
+      expect.objectContaining({ reason: "service_not_ready" }),
+    );
+
+    // The probe body stays minimal — no tenant id leaks.
+    const body = await res.json();
+    expect(JSON.stringify(body)).not.toContain("test-tenant");
+  });
+
+  it("does not warn or count when all tenants are ready", async () => {
+    const warn = vi.fn();
+    const incrementCounter = vi.fn();
+    const registry = makeRegistry();
+    registry.getOrCreate("test-tenant"); // healthy
+
+    const routes = createHealthRoutes(registry, {
+      logger: { warn },
+      metrics: { incrementCounter },
+    });
+
+    const res = await routes.request("/ready");
+    expect(res.status).toBe(200);
+    expect(warn).not.toHaveBeenCalled();
+    expect(incrementCounter).not.toHaveBeenCalled();
   });
 });

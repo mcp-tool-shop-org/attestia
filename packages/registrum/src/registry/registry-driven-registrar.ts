@@ -34,6 +34,7 @@ import { enrichViolation } from "../violation-detail.js";
 import type { CompiledInvariantRegistry, CompiledInvariant } from "./loader.js";
 import { evaluatePredicate } from "./predicate/evaluator.js";
 import type { EvaluationContext } from "./predicate/evaluator.js";
+import { type Telemetry, NOOP_TELEMETRY } from "@attestia/types";
 
 /**
  * Internal state entry for a single registered VERSION of a state.
@@ -87,8 +88,33 @@ export class RegistryDrivenRegistrar implements Registrar {
    */
   private readonly invariantRegistry: CompiledInvariantRegistry;
 
-  constructor(invariantRegistry: CompiledInvariantRegistry) {
+  /**
+   * Observability sink. Defaults to {@link NOOP_TELEMETRY}.
+   *
+   * Threaded through every evaluatePredicate call (with the invariant id) so a
+   * predicate that throws and fails closed to `false` — a structurally-broken
+   * invariant that has effectively stopped enforcing its rule — emits the same
+   * `degraded` event StructuralRegistrar does. Without this, this registrar
+   * (which implements the public Registrar interface and is exported) could run
+   * with a silently-broken constitution that looks healthy.
+   */
+  private readonly telemetry: Telemetry;
+
+  /**
+   * @param invariantRegistry - The compiled constitution to evaluate against.
+   * @param telemetry - Optional observability sink. Defaults to no-op (silent).
+   *
+   * NOTE: this registrar is EXPERIMENTAL — its intended use is parity testing
+   * against {@link StructuralRegistrar}, not standalone production governance.
+   * Prefer StructuralRegistrar.dualWitness for production. The telemetry sink is
+   * supported so that if it IS run directly, degraded evaluations are visible.
+   */
+  constructor(
+    invariantRegistry: CompiledInvariantRegistry,
+    telemetry: Telemetry = NOOP_TELEMETRY
+  ) {
     this.invariantRegistry = invariantRegistry;
+    this.telemetry = telemetry;
   }
 
   /**
@@ -111,11 +137,13 @@ export class RegistryDrivenRegistrar implements Registrar {
         continue;
       }
 
-      // Evaluate the predicate AST
+      // Evaluate the predicate AST. Pass the telemetry sink + invariant id so a
+      // predicate that throws and fails closed to false is observable as a
+      // `degraded` event (matching StructuralRegistrar), not silently swallowed.
       const passed = evaluatePredicate(
         invariant.ast,
         context,
-        undefined,
+        this.telemetry,
         invariant.id
       );
 
@@ -223,7 +251,12 @@ export class RegistryDrivenRegistrar implements Registrar {
       for (const invariant of this.invariantRegistry.invariants) {
         if (invariant.scope !== "state") continue;
 
-        const passed = evaluatePredicate(invariant.ast, context);
+        const passed = evaluatePredicate(
+          invariant.ast,
+          context,
+          this.telemetry,
+          invariant.id
+        );
         if (!passed) {
           violations.push({
             invariantId: invariant.id,
@@ -240,7 +273,12 @@ export class RegistryDrivenRegistrar implements Registrar {
           continue;
         }
 
-        const passed = evaluatePredicate(invariant.ast, context);
+        const passed = evaluatePredicate(
+          invariant.ast,
+          context,
+          this.telemetry,
+          invariant.id
+        );
         if (!passed) {
           violations.push({
             invariantId: invariant.id,

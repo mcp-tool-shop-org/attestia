@@ -32,10 +32,12 @@ export {
   getSettlementChain,
   preventDoubleCounting,
   linkCrossChainEvents,
+  DEFAULT_SETTLEMENT_PAIRS,
 } from "./cross-chain-rules.js";
 export type {
   CrossChainEvent,
   CrossChainLink,
+  CrossChainRuleOptions,
 } from "./cross-chain-rules.js";
 
 // Structured discrepancies (D4-B-002)

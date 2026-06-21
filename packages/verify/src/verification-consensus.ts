@@ -12,6 +12,7 @@
  * - Deterministic: same reports → same consensus (minus timestamp)
  */
 
+import { NOOP_TELEMETRY, type Telemetry } from "@attestia/types";
 import type {
   VerifierReport,
   ConsensusResult,
@@ -68,18 +69,24 @@ export function isConsensusReached(
  *
  * @param reports - All submitted verifier reports
  * @param minimumVerifiers - Minimum DISTINCT verifiers before consensus is valid (default: 1, permissive — see above)
- * @returns ConsensusResult with verdict, counts, dissenters, and the weak-quorum flag
+ * @param telemetry - Optional sink (B-RVP-001). When provided, one
+ *   `"consensus.aggregate"` event is emitted with low-cardinality outcome
+ *   labels. Side-channel only: never changes the verdict; a throwing sink is
+ *   swallowed. Defaults to a silent no-op sink.
+ * @returns ConsensusResult with verdict, counts, dissenters, a human-readable
+ *   reason, and the weak-quorum flag
  */
 export function aggregateVerifierReports(
   reports: readonly VerifierReport[],
   minimumVerifiers: number = 1,
+  telemetry: Telemetry = NOOP_TELEMETRY,
 ): ConsensusResult {
   // A PASS is "single-verifier" (weak) when the applied quorum threshold is
   // <= 1, i.e. one verifier would have sufficed.
   const weakThreshold = minimumVerifiers <= 1;
 
   if (reports.length === 0) {
-    return {
+    const empty: ConsensusResult = {
       verdict: "FAIL",
       totalVerifiers: 0,
       passCount: 0,
@@ -89,8 +96,11 @@ export function aggregateVerifierReports(
       singleVerifierPass: false,
       bundleAgreement: true,
       dissenters: [],
+      reason: "no verifier reports submitted",
       consensusAt: new Date().toISOString(),
     };
+    emitConsensus(telemetry, empty);
+    return empty;
   }
 
   // ── Collapse reports to one vote per DISTINCT verifierId ──────────────────
@@ -149,7 +159,22 @@ export function aggregateVerifierReports(
   const majorityCount = verdict === "PASS" ? passCount : failCount;
   const agreementRatio = majorityCount / total;
 
-  return {
+  // Human-readable reason (B-RVP-009). For a FAIL, name the SPECIFIC cause in
+  // priority order so an operator knows the next step: wait for more verifiers
+  // (quorum), investigate a bundle mismatch, or escalate a genuine dissent.
+  // The conditions mirror the verdict computation above exactly.
+  let reason: string;
+  if (verdict === "PASS") {
+    reason = `consensus PASS: ${passCount}/${total} distinct verifiers agree (quorum ${minimumVerifiers} met)`;
+  } else if (!quorumReached) {
+    reason = `quorum not reached: ${total} of ${minimumVerifiers} required distinct verifiers reported`;
+  } else if (!bundleAgreement) {
+    reason = `verifiers disagree on bundleHash (${distinctBundles.size} distinct bundles) — they are not attesting to the same artifact`;
+  } else {
+    reason = `majority did not pass: ${passCount}/${total} distinct verifiers reported PASS (need > ${total / 2})`;
+  }
+
+  const result: ConsensusResult = {
     verdict,
     totalVerifiers: total,
     passCount,
@@ -160,6 +185,43 @@ export function aggregateVerifierReports(
     singleVerifierPass: verdict === "PASS" && weakThreshold,
     bundleAgreement,
     dissenters,
+    reason,
     consensusAt: new Date().toISOString(),
   };
+
+  emitConsensus(telemetry, result);
+  return result;
+}
+
+/**
+ * Emit a `"consensus.aggregate"` telemetry event (B-RVP-001).
+ *
+ * Attributes are low-cardinality and safe as metric labels; raw verifier ids
+ * (dissenters / bundle hashes) stay out of attributes — the human `reason`
+ * carries the detail in `message`. Defensively guarded: a throwing sink must
+ * never alter or abort the consensus verdict (the {@link Telemetry} contract
+ * forbids throwing, but we do not trust a host to honor it).
+ */
+function emitConsensus(telemetry: Telemetry, result: ConsensusResult): void {
+  try {
+    telemetry.record({
+      package: "@attestia/verify",
+      op: "consensus.aggregate",
+      level: result.verdict === "PASS" ? "info" : "warn",
+      outcome: result.verdict === "PASS" ? "ok" : "failed",
+      attributes: {
+        verdict: result.verdict,
+        totalVerifiers: result.totalVerifiers,
+        passCount: result.passCount,
+        failCount: result.failCount,
+        quorumReached: result.quorumReached,
+        bundleAgreement: result.bundleAgreement,
+        dissenterCount: result.dissenters.length,
+        singleVerifierPass: result.singleVerifierPass,
+      },
+      message: `verifier consensus ${result.verdict.toLowerCase()}: ${result.reason}`,
+    });
+  } catch {
+    /* a sink must not break consensus — see NOOP_TELEMETRY contract */
+  }
 }

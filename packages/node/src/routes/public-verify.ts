@@ -105,9 +105,24 @@ export interface PublicVerifyDeps {
 // Route Factory
 // =============================================================================
 
+/** What {@link createPublicVerifyRoutes} returns: the Hono sub-app plus the
+ * per-IP rate-limit store, so the host can dispose its sweeper on shutdown
+ * (B-NODE-001). */
+export interface PublicVerifyRoutes {
+  readonly routes: Hono<AppEnv>;
+  /** The unauthenticated per-IP rate-limit store; dispose() stops its sweeper. */
+  readonly rateLimitStore: TokenBucketStore;
+}
+
 export function createPublicVerifyRoutes(
   deps?: PublicVerifyDeps,
-): Hono<AppEnv> {
+  /**
+   * Sweep interval (ms) for the per-IP rate-limit store. 0 disables the timer
+   * (cap-only eviction) — the default for tests; `main.ts` enables it via
+   * createApp's `enableStoreSweepers`.
+   */
+  sweepIntervalMs?: number,
+): PublicVerifyRoutes {
   const routes = new Hono<AppEnv>();
 
   // ─── CORS ──────────────────────────────────────────────────────
@@ -127,9 +142,10 @@ export function createPublicVerifyRoutes(
   );
 
   // ─── Public Rate Limit ────────────────────────────────────────
-  const rateLimitStore = new TokenBucketStore(
-    deps?.rateLimitConfig ?? PUBLIC_RATE_LIMIT_DEFAULT,
-  );
+  const rateLimitStore = new TokenBucketStore({
+    ...(deps?.rateLimitConfig ?? PUBLIC_RATE_LIMIT_DEFAULT),
+    sweepIntervalMs: sweepIntervalMs ?? 0,
+  });
   routes.use(
     "*",
     publicRateLimitMiddleware(rateLimitStore, {
@@ -278,5 +294,5 @@ export function createPublicVerifyRoutes(
     return c.json({ data: result });
   });
 
-  return routes;
+  return { routes, rateLimitStore };
 }

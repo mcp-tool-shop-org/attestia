@@ -14,6 +14,7 @@
  */
 
 import { parseAmount } from "@attestia/ledger";
+import { NOOP_TELEMETRY, type Telemetry } from "@attestia/types";
 
 // =============================================================================
 // Types
@@ -272,6 +273,62 @@ export function checkEventOrdering(
 }
 
 /**
+ * Check sequence contiguity within each chain (B-RVP-003).
+ *
+ * {@link checkEventOrdering} only requires strictly-increasing indices, so a
+ * chain observed as [1, 2, 5] passes cleanly even though indices 3 and 4 are
+ * absent. A hole in the sequence is the signature of exactly the failure the
+ * verify layer exists to catch: a dropped, withheld, or not-yet-observed
+ * on-chain event during a partial RPC outage. This check flags any gap so
+ * partial ingestion is VISIBLE rather than silently tolerated.
+ *
+ * This is deliberately a SEPARATE, opt-in check rather than folded into
+ * {@link checkEventOrdering}: the {@link InvariantEvent} model does not
+ * universally guarantee dense indices, so an operator who knows a chain is
+ * dense opts in by running this check (e.g. via the `additionalChecks` option
+ * of {@link auditCrossChainInvariants}).
+ */
+export function checkSequenceContiguity(
+  events: readonly InvariantEvent[],
+): InvariantCheckResult {
+  const violations: string[] = [];
+
+  const byChain = new Map<string, InvariantEvent[]>();
+  for (const event of events) {
+    const chain = byChain.get(event.chainId) ?? [];
+    chain.push(event);
+    byChain.set(event.chainId, chain);
+  }
+
+  for (const [chainId, chainEvents] of byChain) {
+    const sorted = [...chainEvents].sort(
+      (a, b) => a.sequenceIndex - b.sequenceIndex,
+    );
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1]!;
+      const curr = sorted[i]!;
+      const gap = curr.sequenceIndex - prev.sequenceIndex;
+      if (gap > 1) {
+        violations.push(
+          `${chainId}: possible missing event(s) between sequence ` +
+            `${prev.sequenceIndex} and ${curr.sequenceIndex} ` +
+            `(${gap - 1} index(es) absent, between event ${prev.eventId} and ${curr.eventId}) — ` +
+            `a gap signals a dropped or not-yet-observed event; ingest the missing event(s) ` +
+            `or audit the chain observer's coverage`,
+        );
+      }
+    }
+  }
+
+  return {
+    invariant: "sequence_contiguity",
+    holds: violations.length === 0,
+    violations,
+  };
+}
+
+/**
  * Check governance consistency.
  *
  * Governance events should have valid transitions:
@@ -337,25 +394,124 @@ export function checkGovernanceConsistency(
 // =============================================================================
 
 /**
+ * A composable invariant check: a pure function from the event set to a
+ * single {@link InvariantCheckResult}. The four built-ins
+ * ({@link checkAssetConservation}, {@link checkNoDuplicateSettlement},
+ * {@link checkEventOrdering}, {@link checkGovernanceConsistency}) and the
+ * opt-in {@link checkSequenceContiguity} all satisfy this shape, so a caller
+ * can register a custom invariant without forking the package.
+ */
+export type InvariantCheck = (
+  events: readonly InvariantEvent[],
+) => InvariantCheckResult;
+
+/**
+ * The four built-in invariant checks, in canonical evaluation order. Exposed so
+ * a caller can run "all built-ins plus my custom invariant" via the
+ * `additionalChecks` option without re-listing the defaults (B-RVP-006).
+ */
+export const BUILTIN_INVARIANT_CHECKS: readonly InvariantCheck[] = [
+  checkAssetConservation,
+  checkNoDuplicateSettlement,
+  checkEventOrdering,
+  checkGovernanceConsistency,
+];
+
+/**
+ * Options for {@link auditCrossChainInvariants}. All fields are optional and
+ * additive — omitting the whole object preserves the original four-check
+ * behavior exactly.
+ */
+export interface CrossChainInvariantOptions {
+  /**
+   * Extra invariant checks to run AFTER the four built-ins (B-RVP-006). Each is
+   * a pure {@link InvariantCheck}; its result is appended to `checks` and its
+   * violations count toward the verdict. This is the extension point for adding
+   * a compliance-driven invariant — or the opt-in
+   * {@link checkSequenceContiguity} — without editing this package.
+   */
+  readonly additionalChecks?: readonly InvariantCheck[];
+
+  /**
+   * Replace the built-in checks entirely instead of appending. When provided,
+   * `additionalChecks` is ignored. Use when the caller wants full control over
+   * the invariant set (e.g. a non-EVM deployment).
+   */
+  readonly checks?: readonly InvariantCheck[];
+
+  /**
+   * Optional telemetry sink (B-RVP-001). When provided, one
+   * `"invariants.audit"` event is emitted carrying low-cardinality
+   * `{ verdict, totalViolations, checkCount }` attributes. Side-channel only:
+   * never changes the verdict, and a throwing sink is swallowed.
+   */
+  readonly telemetry?: Telemetry;
+}
+
+/**
  * Run all cross-chain invariant checks.
+ *
+ * By default runs the four built-ins. Pass {@link CrossChainInvariantOptions}
+ * to add custom invariants (`additionalChecks`) or replace the set (`checks`),
+ * and to wire telemetry. Backward compatible: called with just `events` it
+ * behaves exactly as before.
  */
 export function auditCrossChainInvariants(
   events: readonly InvariantEvent[],
+  options: CrossChainInvariantOptions = {},
 ): InvariantAuditResult {
-  const checks = [
-    checkAssetConservation(events),
-    checkNoDuplicateSettlement(events),
-    checkEventOrdering(events),
-    checkGovernanceConsistency(events),
-  ];
+  const telemetry = options.telemetry ?? NOOP_TELEMETRY;
+
+  const checkFns: readonly InvariantCheck[] =
+    options.checks ??
+    [...BUILTIN_INVARIANT_CHECKS, ...(options.additionalChecks ?? [])];
+
+  const checks = checkFns.map((fn) => fn(events));
 
   const totalViolations = checks.reduce(
     (sum, c) => sum + c.violations.length,
     0,
   );
 
+  const verdict: "PASS" | "FAIL" = totalViolations === 0 ? "PASS" : "FAIL";
+
+  // Observability (B-RVP-001): one structured event per audit. Per-invariant
+  // holds and counts are low-cardinality; raw violation strings stay out of
+  // attributes (they belong in the result). Defensively guarded so a throwing
+  // sink can never alter or abort an invariant verdict.
+  try {
+    const attributes: Record<string, string | number | boolean> = {
+      verdict,
+      totalViolations,
+      checkCount: checks.length,
+    };
+    // Per-invariant holds as low-cardinality booleans (invariant names are a
+    // small, bounded set), so an operator can alert on a specific breach.
+    for (const c of checks) {
+      attributes[`holds.${c.invariant}`] = c.holds;
+    }
+    telemetry.record({
+      package: "@attestia/verify",
+      op: "invariants.audit",
+      level: verdict === "PASS" ? "info" : "warn",
+      outcome: verdict === "PASS" ? "ok" : "failed",
+      attributes,
+      message:
+        `cross-chain invariant audit ${verdict.toLowerCase()}: ` +
+        `${totalViolations} violation(s) across ${checks.length} check(s)` +
+        (verdict === "FAIL"
+          ? ` — breached: ${checks
+              .filter((c) => !c.holds)
+              .map((c) => c.invariant)
+              .join(", ")}`
+          : ""),
+    });
+  } catch {
+    /* a sink must not break the audit — see NOOP_TELEMETRY contract */
+  }
+
   return {
-    verdict: totalViolations === 0 ? "PASS" : "FAIL",
+    verdict,
     checks,
     totalViolations,
     auditedAt: new Date().toISOString(),

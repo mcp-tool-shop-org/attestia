@@ -112,7 +112,22 @@ async function main(): Promise<void> {
   // are configured (fail closed — A-NODE-001).
   const authConfig = buildAuthConfig(config, logger);
 
-  const { app, tenantRegistry } = createApp({
+  // Witness diagnostics (B-NODE-004): the WITNESS_* block is parsed but no
+  // witness is wired into the app yet. If an operator turns it on, say so
+  // plainly so they do not believe on-chain witnessing is active when it is not.
+  if (config.WITNESS_ENABLED) {
+    logger.warn(
+      {
+        witnessUrl: config.WITNESS_URL,
+        witnessAddress: config.WITNESS_ADDRESS,
+      },
+      "WITNESS_ENABLED=true but no witness is wired in this build — on-chain " +
+        "witnessing is INACTIVE and attestia_witness_total will stay empty. " +
+        "Do not rely on external witnessing until a witness backend is configured.",
+    );
+  }
+
+  const { app, tenantRegistry, dispose } = createApp({
     serviceConfig: {
       ownerId: "default",
       defaultCurrency: config.DEFAULT_CURRENCY,
@@ -130,6 +145,9 @@ async function main(): Promise<void> {
     // posture does not leak Prometheus metrics for reconnaissance (A-NODE-002).
     metricsAuth: authConfig,
     rateLimit: { rpm: config.RATE_LIMIT_RPM, burst: config.RATE_LIMIT_BURST },
+    // Real server: run the in-memory store sweepers (B-NODE-001/002). They are
+    // unref'd and released by dispose() on shutdown.
+    enableStoreSweepers: true,
   });
 
   const server = serve({
@@ -143,13 +161,52 @@ async function main(): Promise<void> {
     "Attestia node started",
   );
 
-  // Graceful shutdown
+  // ─── Graceful shutdown (B-NODE-003) ─────────────────────────────────
+  // Order matters: stop accepting/await draining connections, stop the store
+  // sweepers, stop tenant services, then exit. A double signal is ignored, and
+  // a bounded force-exit timer guarantees termination even if a drain hangs.
+  let shuttingDown = false;
+  const SHUTDOWN_DEADLINE_MS = 10_000;
+
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) {
+      // Orchestrators often escalate signals (SIGTERM → SIGINT). The first one
+      // owns shutdown; subsequent signals are no-ops, not a second exit race.
+      logger.warn({ signal }, "Shutdown already in progress — ignoring signal");
+      return;
+    }
+    shuttingDown = true;
     logger.info({ signal }, "Shutdown signal received");
-    server.close();
-    await tenantRegistry.stopAll();
-    logger.info("Shutdown complete");
-    process.exit(0);
+
+    // Hard deadline: if draining hangs, still terminate. Unref'd so the timer
+    // itself never keeps the process alive once everything else has settled.
+    const forceExit = setTimeout(() => {
+      logger.error(
+        { deadlineMs: SHUTDOWN_DEADLINE_MS },
+        "Graceful shutdown exceeded deadline — forcing exit",
+      );
+      process.exit(1);
+    }, SHUTDOWN_DEADLINE_MS);
+    forceExit.unref?.();
+
+    try {
+      // Await server close so in-flight requests (e.g. a ledger append) finish
+      // before we tear down the services they depend on. @hono/node-server's
+      // close() is callback-based; promisify it.
+      await new Promise<void>((resolve, reject) => {
+        server.close((err?: Error) => (err ? reject(err) : resolve()));
+      });
+      // Stop background sweepers, then tenant services.
+      dispose();
+      await tenantRegistry.stopAll();
+      logger.info("Shutdown complete");
+      clearTimeout(forceExit);
+      process.exit(0);
+    } catch (err) {
+      logger.error({ err }, "Error during graceful shutdown");
+      clearTimeout(forceExit);
+      process.exit(1);
+    }
   };
 
   process.on("SIGTERM", () => void shutdown("SIGTERM"));

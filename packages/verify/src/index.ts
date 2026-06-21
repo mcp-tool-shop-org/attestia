@@ -54,8 +54,10 @@ export {
   checkAssetConservation,
   checkNoDuplicateSettlement,
   checkEventOrdering,
+  checkSequenceContiguity,
   checkGovernanceConsistency,
   auditCrossChainInvariants,
+  BUILTIN_INVARIANT_CHECKS,
 } from "./cross-chain-invariants.js";
 
 // Types
@@ -78,12 +80,15 @@ export type {
   ChainEvent,
   ChainReplayResult,
   MultiChainAuditResult,
+  MultiChainAuditOptions,
 } from "./multi-chain-replay.js";
 
 export type {
   InvariantEvent,
   InvariantCheckResult,
   InvariantAuditResult,
+  InvariantCheck,
+  CrossChainInvariantOptions,
 } from "./cross-chain-invariants.js";
 
 // Compliance

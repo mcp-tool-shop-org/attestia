@@ -135,7 +135,13 @@ describe("Snapshot Schema Validation (E.1)", () => {
 
     it("rejects wrong version", () => {
       const snapshot = { ...createValidSnapshot(), version: "2.0" };
-      expect(() => validateSnapshot(snapshot)).toThrow(/Unsupported version/);
+      // Fail-closed for an unsupported version; the message is humanized in
+      // Stage C (RT-B-002/009) — it names the version and carries an actionable
+      // hint (migrate / replay / upgrade) rather than a bare rejection.
+      expect(() => validateSnapshot(snapshot)).toThrow(
+        /Unsupported snapshot version/
+      );
+      expect(() => validateSnapshot(snapshot)).toThrow(/Hint:/);
     });
 
     it("rejects empty registry_hash", () => {

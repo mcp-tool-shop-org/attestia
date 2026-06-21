@@ -360,4 +360,71 @@ describe("MultiSigWitness", () => {
       expect(typeof result).toBe("boolean");
     });
   });
+
+  describe("bounded record retention (PB-WCO-007)", () => {
+    it("evicts oldest records (FIFO) once the cap is reached", async () => {
+      const config: MultiSigWitnessConfig = {
+        singleSignerConfig: makeSingleConfig(),
+        maxRecords: 3,
+      };
+      const witness = new MultiSigWitness(config);
+      await witness.connect();
+
+      for (let i = 0; i < 5; i++) {
+        await witness.witnessPayload(makePayload(`hash-${i}`));
+      }
+
+      const records = witness.getRecords();
+      // Never exceeds the cap...
+      expect(records.length).toBe(3);
+      // ...and retains the MOST RECENT three (oldest two evicted).
+      expect(records.map((r) => r.payload.hash)).toEqual(["hash-2", "hash-3", "hash-4"]);
+
+      await witness.disconnect();
+    });
+
+    it("maxRecords=0 disables in-memory retention entirely", async () => {
+      const config: MultiSigWitnessConfig = {
+        singleSignerConfig: makeSingleConfig(),
+        maxRecords: 0,
+      };
+      const witness = new MultiSigWitness(config);
+      await witness.connect();
+
+      await witness.witnessPayload(makePayload("a"));
+      await witness.witnessPayload(makePayload("b"));
+
+      expect(witness.getRecords().length).toBe(0);
+
+      await witness.disconnect();
+    });
+  });
+
+  describe("connect partial-failure compensation (PB-WCO-008)", () => {
+    it("rolls back the already-connected submitter when the verifier connect fails", async () => {
+      // Single mode → a submitter + a verifier are both constructed. Make the
+      // verifier's connect fail AFTER the submitter's succeeds, and assert
+      // connect() rejects AND tears the submitter back down (no orphan socket).
+      const config: MultiSigWitnessConfig = {
+        singleSignerConfig: makeSingleConfig(),
+      };
+      const witness = new MultiSigWitness(config);
+
+      const submitter = (witness as unknown as { singleSubmitter: { connect: () => Promise<void>; disconnect: () => Promise<void> } }).singleSubmitter;
+      const verifier = (witness as unknown as { verifier: { connect: () => Promise<void>; disconnect: () => Promise<void> } }).verifier;
+
+      const submitterConnect = vi.spyOn(submitter, "connect").mockResolvedValue(undefined);
+      const submitterDisconnect = vi.spyOn(submitter, "disconnect").mockResolvedValue(undefined);
+      vi.spyOn(verifier, "connect").mockRejectedValue(new Error("verifier endpoint down"));
+      const verifierDisconnect = vi.spyOn(verifier, "disconnect").mockResolvedValue(undefined);
+
+      await expect(witness.connect()).rejects.toThrow("verifier endpoint down");
+
+      // The submitter connected, then was rolled back; the verifier was also
+      // best-effort disconnected. No dangling live connection remains.
+      expect(submitterConnect).toHaveBeenCalledTimes(1);
+      expect(submitterDisconnect).toHaveBeenCalledTimes(1);
+      expect(verifierDisconnect).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -42,9 +42,13 @@ import type {
   TransferQuery,
   TransferEvent,
   ConnectionStatus,
+  RpcRetryConfig,
+  EvmChainDescriptor,
 } from "../observer.js";
+import { DEFAULT_RPC_RETRY } from "../observer.js";
 import type { ChainProfile } from "../finality.js";
 import { ObserverError, classifyRpcError, toObserverError } from "../errors.js";
+import { withRetry } from "../retry.js";
 import { type Telemetry, NOOP_TELEMETRY } from "@attestia/types";
 
 // =============================================================================
@@ -116,6 +120,7 @@ export class EvmObserver implements ChainObserver {
   private readonly profile: ChainProfile | undefined;
   private readonly nativeToken: { symbol: string; decimals: number };
   private readonly telemetry: Telemetry;
+  private readonly retryConfig: RpcRetryConfig;
 
   /**
    * Maximum block span for a filterless (all-tokens) Transfer scan.
@@ -144,6 +149,7 @@ export class EvmObserver implements ChainObserver {
     this.config = config;
     this.profile = config.profile;
     this.telemetry = config.telemetry ?? NOOP_TELEMETRY;
+    this.retryConfig = config.retry ?? DEFAULT_RPC_RETRY;
 
     // Resolve native token metadata: profile > static map > default
     this.nativeToken =
@@ -153,19 +159,7 @@ export class EvmObserver implements ChainObserver {
   }
 
   async connect(): Promise<void> {
-    const viemChain = VIEM_CHAINS[this.chainId];
-    if (!viemChain) {
-      throw new ObserverError({
-        code: "UNSUPPORTED_CHAIN",
-        chainId: this.chainId,
-        message:
-          `EvmObserver: unsupported chain '${this.chainId}'. ` +
-          `Supported: ${Object.keys(VIEM_CHAINS).join(", ")}`,
-        hint:
-          `Use one of the supported EVM chain IDs (${Object.keys(VIEM_CHAINS).join(", ")}), ` +
-          `or register the chain before connecting.`,
-      });
-    }
+    const viemChain = this.resolveViemChain();
 
     this.client = createPublicClient({
       chain: viemChain,
@@ -173,6 +167,63 @@ export class EvmObserver implements ChainObserver {
         timeout: this.config.timeoutMs ?? 30_000,
       }),
     });
+  }
+
+  /**
+   * Resolve the viem Chain to connect with (PB-WCO-006).
+   *
+   * Resolution order:
+   *   1. Built-in {@link VIEM_CHAINS} map (the well-known chains).
+   *   2. A config-supplied {@link EvmChainDescriptor} (`config.evmChain`).
+   *   3. A minimal chain synthesized from the eip155 chain id + `rpcUrl`.
+   *
+   * viem only strictly needs `id` + `rpcUrls` for read calls, so an unknown but
+   * valid EVM chain degrades to "works with defaults" instead of hard-failing
+   * with UNSUPPORTED_CHAIN — supporting a new L2/sidechain becomes configuration,
+   * not a source edit + release. UNSUPPORTED_CHAIN is now only thrown when the
+   * eip155 chain id cannot be parsed (a structurally invalid chain ref).
+   */
+  private resolveViemChain(): Chain {
+    const builtin = VIEM_CHAINS[this.chainId];
+    if (builtin) return builtin;
+
+    // Parse the numeric id from the eip155:<id> chain ref (constructor already
+    // guaranteed the eip155: prefix).
+    const numericId = Number(this.chainId.slice("eip155:".length));
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      throw new ObserverError({
+        code: "UNSUPPORTED_CHAIN",
+        chainId: this.chainId,
+        message:
+          `EvmObserver: cannot derive a numeric EVM chain id from '${this.chainId}'. ` +
+          `Built-in: ${Object.keys(VIEM_CHAINS).join(", ")}`,
+        hint:
+          `Use a valid eip155:<id> chain ref, supply config.evmChain for a custom chain, ` +
+          `or use one of the built-in chains (${Object.keys(VIEM_CHAINS).join(", ")}).`,
+      });
+    }
+
+    const descriptor: EvmChainDescriptor = this.config.evmChain ?? { id: numericId };
+    return EvmObserver.synthesizeChain(descriptor, numericId, this.config.rpcUrl);
+  }
+
+  /**
+   * Build a minimal viem {@link Chain} for an EVM chain not in the built-in map
+   * (PB-WCO-006). viem needs only `id` + `rpcUrls` for read calls; name and
+   * native-currency default sensibly so labeling stays reasonable.
+   */
+  private static synthesizeChain(
+    descriptor: EvmChainDescriptor,
+    fallbackId: number,
+    rpcUrl: string,
+  ): Chain {
+    const id = descriptor.id || fallbackId;
+    return {
+      id,
+      name: descriptor.name ?? `EVM Chain ${id}`,
+      nativeCurrency: descriptor.nativeCurrency ?? { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: rpcUrl ? [rpcUrl] : [] } },
+    } as const satisfies Chain;
   }
 
   async disconnect(): Promise<void> {
@@ -427,13 +478,17 @@ export class EvmObserver implements ChainObserver {
     );
     const tokenMetaMap = new Map(
       metaResults
-        .filter((r): r is PromiseFulfilledResult<readonly [string, { symbol: string; decimals: number }]> => r.status === "fulfilled")
+        .filter((r): r is PromiseFulfilledResult<readonly [string, { symbol: string; decimals: number; resolved: boolean }]> => r.status === "fulfilled")
         .map((r) => r.value),
     );
 
-    // Convert logs to TransferEvents with resolved metadata
+    // Convert logs to TransferEvents with resolved metadata. A token whose meta
+    // entry is missing (its resolve promise itself rejected) is treated as an
+    // explicit unresolved guess (PB-WCO-005) — never a confident default.
     const events: TransferEvent[] = allLogs.map((log) => {
-      const meta = tokenMetaMap.get((log.address as string).toLowerCase()) ?? { symbol: "ERC20", decimals: 18 };
+      const meta =
+        tokenMetaMap.get((log.address as string).toLowerCase()) ??
+        { symbol: "UNKNOWN", decimals: 18, resolved: false };
       return this.logToTransferEvent(log, now, meta);
     });
 
@@ -469,6 +524,12 @@ export class EvmObserver implements ChainObserver {
 
   /** Per-token metadata cache to avoid repeated on-chain queries. Max 1000 entries. */
   private static readonly MAX_TOKEN_CACHE = 1000;
+  /**
+   * Cache of SUCCESSFULLY-resolved token metadata only. Fallback (guessed)
+   * metadata is NEVER cached (PB-WCO-005), so a transient decimals-query failure
+   * does not poison every subsequent transfer for that token — a later
+   * successful resolve corrects it.
+   */
   private readonly tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 
   private requireClient(): PublicClient<HttpTransport, Chain> {
@@ -506,16 +567,47 @@ export class EvmObserver implements ChainObserver {
   }
 
   /**
-   * Run an RPC operation, classifying and re-throwing any failure as a
-   * structured {@link ObserverError} and emitting a `rpc` failure event
-   * (D3-B-003). The original error is preserved as `cause`.
+   * Emit a structured `rpc.retry` event (outcome `"degraded"`, level `warn`)
+   * when a transient RPC failure is about to be retried (PB-WCO-004). This gives
+   * operators the early-warning window that silent retries removed: a rising
+   * retry rate per chain reveals a degrading endpoint BEFORE it tips into hard
+   * failures. Low-cardinality attributes only (`chainId`, `code`, `attempt`).
+   * Never throws.
+   */
+  private emitRpcRetry(code: string, attempt: number): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "rpc.retry",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { chainId: this.chainId, code, attempt },
+        message: `EvmObserver: retrying transient RPC failure (${code}) on ${this.chainId}, attempt ${attempt}`,
+      });
+    } catch {
+      /* observability must never throw into the caller */
+    }
+  }
+
+  /**
+   * Run an RPC operation under the shared retry-with-backoff discipline
+   * (PB-WCO-001): transient classified failures (RATE_LIMITED / RPC_TIMEOUT /
+   * RPC_UNREACHABLE) are retried, all other classes fail closed immediately.
+   * The FINAL failure (after retries) is classified and re-thrown as a
+   * structured {@link ObserverError} with a `rpc` failure event (D3-B-003); each
+   * retry emits an `rpc.retry` event (PB-WCO-004). The original error is
+   * preserved as `cause`.
    *
    * @param context Operation name for the error message (e.g. "getBalance").
    * @param fn The RPC call to execute.
    */
   private async runRpc<T>(context: string, fn: () => Promise<T>): Promise<T> {
     try {
-      return await fn();
+      return await withRetry(fn, {
+        maxRetries: this.retryConfig.maxRetries,
+        delayMs: this.retryConfig.delayMs,
+        onRetry: ({ attempt, code }) => this.emitRpcRetry(code, attempt),
+      });
     } catch (err) {
       const observerError = toObserverError(err, `EvmObserver.${context}`, this.chainId);
       this.emitRpcFailure(observerError.code);
@@ -555,14 +647,19 @@ export class EvmObserver implements ChainObserver {
 
   /**
    * Resolve token metadata (symbol + decimals) for an ERC-20 contract.
-   * Results are cached per token address for the lifetime of this observer.
-   * Falls back to sensible defaults if on-chain queries fail.
+   *
+   * On success the result is cached and returned with `resolved: true`. On
+   * failure (PB-WCO-005) we do NOT fail the whole transfer scan, but we also do
+   * NOT pretend the guess is ground truth: we emit a `token_meta_fallback`
+   * telemetry warn, return `resolved: false` with a non-confident `"UNKNOWN"`
+   * symbol, and DO NOT cache the fallback — so a transient failure cannot poison
+   * the token for the observer's lifetime, and a later successful resolve wins.
    */
   private async resolveTokenMeta(
     tokenAddress: `0x${string}`,
-  ): Promise<{ symbol: string; decimals: number }> {
+  ): Promise<{ symbol: string; decimals: number; resolved: boolean }> {
     const cached = this.tokenMetaCache.get(tokenAddress);
-    if (cached) return cached;
+    if (cached) return { ...cached, resolved: true };
 
     const client = this.requireClient();
     try {
@@ -581,13 +678,39 @@ export class EvmObserver implements ChainObserver {
       const meta = { symbol: symbol as string, decimals: Number(decimals) };
       this.evictOldestIfFull();
       this.tokenMetaCache.set(tokenAddress, meta);
-      return meta;
+      return { ...meta, resolved: true };
     } catch {
-      // If metadata query fails, use defaults rather than failing the transfer scan.
-      const fallback = { symbol: "ERC20", decimals: 18 };
-      this.evictOldestIfFull();
-      this.tokenMetaCache.set(tokenAddress, fallback);
-      return fallback;
+      // Metadata query failed. Degrade WITHOUT lying: flag the guess, warn, and
+      // refuse to cache it so it doesn't misstate amounts for the process
+      // lifetime (PB-WCO-005). `decimals: 18` is a structural necessity (amount
+      // must carry SOME scale) but `resolved: false` + `symbol: "UNKNOWN"` make
+      // the guess explicit on the resulting TransferEvent.
+      this.emitTokenMetaFallback();
+      return { symbol: "UNKNOWN", decimals: 18, resolved: false };
+    }
+  }
+
+  /**
+   * Emit a `token_meta_fallback` telemetry warn (outcome `"degraded"`) when an
+   * ERC-20 symbol/decimals query fails and a guessed default is used. Low-
+   * cardinality attributes only (`chainId`). Never throws. This surfaces a
+   * previously-silent degradation operators must be able to meter (PB-WCO-005).
+   */
+  private emitTokenMetaFallback(): void {
+    try {
+      this.telemetry.record({
+        package: "@attestia/chain-observer",
+        op: "token_meta_fallback",
+        level: "warn",
+        outcome: "degraded",
+        attributes: { chainId: this.chainId },
+        message:
+          `EvmObserver: ERC-20 metadata (symbol/decimals) query failed on ${this.chainId}; ` +
+          `using guessed defaults (symbol=UNKNOWN, decimals=18). Reported amounts for ` +
+          `non-18-decimal tokens may be misstated until metadata resolves — see TransferEvent.metaResolved.`,
+      });
+    } catch {
+      /* observability must never throw into the caller */
     }
   }
 
@@ -605,7 +728,7 @@ export class EvmObserver implements ChainObserver {
   private logToTransferEvent(
     log: any,
     observedAt: string,
-    tokenMeta: { symbol: string; decimals: number },
+    tokenMeta: { symbol: string; decimals: number; resolved: boolean },
   ): TransferEvent {
     return {
       chainId: this.chainId,
@@ -619,6 +742,8 @@ export class EvmObserver implements ChainObserver {
       token: log.address,
       timestamp: new Date().toISOString(), // Block timestamp requires extra query
       observedAt,
+      // PB-WCO-005: expose whether symbol/decimals are ground truth or guessed.
+      metaResolved: tokenMeta.resolved,
     };
   }
 }

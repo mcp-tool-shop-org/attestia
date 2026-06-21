@@ -988,6 +988,152 @@ describe("HttpClient POST retry safety (D6-A-004)", () => {
 });
 
 // =============================================================================
+// B-SDK-001 [degradation]: honour Retry-After on 429 (and 503)
+// =============================================================================
+
+describe("HttpClient Retry-After handling (B-SDK-001)", () => {
+  it("retries a GET on 429 when Retry-After is present, then succeeds", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 429,
+        headers: { "retry-after": "0" }, // 0s → immediate retry
+        body: { error: { code: "RATE_LIMITED", message: "Too many requests" } },
+      },
+      { status: 200, body: { data: { ok: true } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 3,
+    });
+
+    const result = await client.get<{ ok: boolean }>("/test");
+    expect(result.data).toEqual({ ok: true });
+    // The 429 was retried (not surfaced immediately) because the server told us
+    // how to recover via Retry-After.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry a 429 without a Retry-After header (surfaces RATE_LIMITED)", async () => {
+    // Preserves the prior behaviour: a bare 429 with no recovery hint is a
+    // hard client error, not a silent retry loop.
+    const mockFetch = createMockFetch([
+      { status: 429, body: { error: { code: "RATE_LIMITED", message: "Too many requests" } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 3,
+    });
+
+    await expect(client.get("/test")).rejects.toThrow(AttestiaError);
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces 429 (does not loop forever) when the deadline cannot fit the wait", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 429,
+        headers: { "retry-after": "60" }, // 60s wait
+        body: { error: { code: "RATE_LIMITED", message: "Too many requests" } },
+      },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      timeout: 1000, // deadline far shorter than the 60s Retry-After
+      retries: 3,
+    });
+
+    // The wait would exceed the deadline, so we surface the 429 instead of
+    // sleeping past the budget.
+    try {
+      await client.get("/test");
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AttestiaError);
+      expect((error as AttestiaError).code).toBe("RATE_LIMITED");
+    }
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it("retries a GET on 429 with an HTTP-date Retry-After in the near past/now", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 429,
+        headers: { "retry-after": new Date(Date.now() - 1000).toUTCString() },
+        body: { error: { code: "RATE_LIMITED", message: "slow down" } },
+      },
+      { status: 200, body: { data: { recovered: true } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 2,
+    });
+
+    const result = await client.get<{ recovered: boolean }>("/test");
+    expect(result.data).toEqual({ recovered: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("honours Retry-After on a retryable 503", async () => {
+    const mockFetch = createMockFetch([
+      {
+        status: 503,
+        headers: { "retry-after": "0" },
+        body: { error: { code: "UNAVAILABLE", message: "Try again" } },
+      },
+      { status: 200, body: { data: { up: true } } },
+    ]);
+
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: mockFetch,
+      retries: 2,
+    });
+
+    const result = await client.get<{ up: boolean }>("/test");
+    expect(result.data).toEqual({ up: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a 429 on a POST only when retryMutations is enabled", async () => {
+    // Default: a POST is NOT retried even on 429 (mutation-retry opt-in).
+    const noRetry = createMockFetch([
+      { status: 429, headers: { "retry-after": "0" }, body: { error: { code: "RATE_LIMITED", message: "x" } } },
+      { status: 201, body: { data: { id: "unreached" } } },
+    ]);
+    const client1 = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: noRetry,
+      retries: 3,
+    });
+    await expect(client1.post("/api/v1/intents", { id: "x" })).rejects.toThrow(AttestiaError);
+    expect(noRetry).toHaveBeenCalledOnce();
+
+    // Opt-in: the POST is retried, carrying a stable Idempotency-Key.
+    const withRetry = createMockFetch([
+      { status: 429, headers: { "retry-after": "0" }, body: { error: { code: "RATE_LIMITED", message: "x" } } },
+      { status: 201, body: { data: { id: "ok" } } },
+    ]);
+    const client2 = new HttpClient({
+      baseUrl: "https://api.example.com",
+      fetchFn: withRetry,
+      retries: 3,
+      retryMutations: true,
+    });
+    const result = await client2.post<{ id: string }>("/api/v1/intents", { id: "x" });
+    expect(result.data).toEqual({ id: "ok" });
+    expect(withRetry).toHaveBeenCalledTimes(2);
+  });
+});
+
+// =============================================================================
 // Config Defaults
 // =============================================================================
 

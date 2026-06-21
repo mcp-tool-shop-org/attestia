@@ -33,10 +33,31 @@ import type {
 // =============================================================================
 
 /**
- * The canonical snapshot schema version.
- * This is the only supported version.
+ * The canonical (latest) snapshot schema version. New snapshots are always
+ * written at this version; older supported versions are upgraded to it on read
+ * by {@link migrateToLatest}.
  */
 export const SNAPSHOT_VERSION = "1.0" as const;
+
+/**
+ * The set of schema versions this build can READ. Always includes
+ * {@link SNAPSHOT_VERSION}; older versions remain here only while a migration
+ * step to the latest exists (see {@link migrateToLatest}).
+ *
+ * Why a set rather than a single equality check: Attestia's whole value
+ * proposition is durable, replayable append-only truth. The first time the
+ * schema evolves, every snapshot written under the prior version must still be
+ * rehydratable — a flat "unsupported version" rejection would strand the
+ * historical record on the one system where losing the ability to restore is
+ * the worst outcome. This set, paired with {@link migrateToLatest}, is the
+ * defined extension point so a schema change is additive, not breaking.
+ *
+ * Fail-closed is preserved: a version NOT in this set is still rejected
+ * outright (it predates this contract or comes from a newer build).
+ */
+export const SUPPORTED_SNAPSHOT_VERSIONS: ReadonlySet<string> = new Set([
+  SNAPSHOT_VERSION,
+]);
 
 /**
  * Registrar state snapshot.
@@ -155,9 +176,23 @@ export function validateSnapshot(raw: unknown): asserts raw is RegistrarSnapshot
   }
 
   // version
-  if (snapshot.version !== SNAPSHOT_VERSION) {
+  //
+  // Accept any version in SUPPORTED_SNAPSHOT_VERSIONS (currently only the
+  // latest), not just an exact equality with SNAPSHOT_VERSION, so the migration
+  // seam (migrateToLatest) has a defined set to dispatch on as the schema
+  // evolves. Genuinely unknown versions are still rejected fail-closed — the
+  // hint tells an operator staring at a failed restore exactly what to do.
+  if (
+    typeof snapshot.version !== "string" ||
+    !SUPPORTED_SNAPSHOT_VERSIONS.has(snapshot.version)
+  ) {
     throw new SnapshotValidationError(
-      `Unsupported version '${snapshot.version}' (expected '${SNAPSHOT_VERSION}')`,
+      `Unsupported snapshot version '${snapshot.version}' ` +
+        `(this build reads: ${[...SUPPORTED_SNAPSHOT_VERSIONS].join(", ")}). ` +
+        `Hint: a newer version means this snapshot was written by a newer ` +
+        `registrum — upgrade this build; an older, unlisted version predates ` +
+        `the supported schema — run the migration tool for that version, or ` +
+        `replay the transition log under the current constitution.`,
       "version"
     );
   }
@@ -237,6 +272,52 @@ export function validateSnapshot(raw: unknown): asserts raw is RegistrarSnapshot
       assigned: assigned as Record<string, number>,
     }
   );
+}
+
+// =============================================================================
+// Schema Migration Seam
+// =============================================================================
+
+/**
+ * Upgrade a validated snapshot of any SUPPORTED version to the latest schema.
+ *
+ * This is the versioned migration seam. Today there is exactly one version, so
+ * the dispatcher is the IDENTITY for "1.0" — but the seam exists now so the
+ * first schema evolution is additive rather than breaking:
+ *
+ * Contract for future versions:
+ * - Add the new version string to {@link SUPPORTED_SNAPSHOT_VERSIONS}.
+ * - Add a `case` here that transforms the prior shape into the latest shape.
+ * - NEVER silently reinterpret an old field's meaning — a migration is an
+ *   explicit, lossless transformation, not a re-read under new assumptions.
+ * - Keep fail-closed behavior for versions outside the supported set (that
+ *   rejection happens in {@link validateSnapshot}, before this is reached).
+ *
+ * @param raw - A snapshot already accepted by {@link validateSnapshot}, so its
+ *   `version` is guaranteed to be in {@link SUPPORTED_SNAPSHOT_VERSIONS}.
+ * @returns The snapshot expressed in the latest ({@link SNAPSHOT_VERSION})
+ *   schema.
+ */
+export function migrateToLatest(
+  raw: RegistrarSnapshotV1
+): RegistrarSnapshotV1 {
+  switch (raw.version) {
+    case SNAPSHOT_VERSION:
+      // Already latest — identity. No transformation needed.
+      return raw;
+    default:
+      // Unreachable for a validated snapshot (validateSnapshot rejects any
+      // version not in SUPPORTED_SNAPSHOT_VERSIONS first), but kept explicit so
+      // adding a version to the set without a migration case fails loudly here
+      // rather than silently passing an old shape through as if it were latest.
+      throw new SnapshotValidationError(
+        `No migration path from snapshot version '${raw.version}' to ` +
+          `'${SNAPSHOT_VERSION}'. Hint: this version is listed as supported ` +
+          `but has no migration step — a migration case must be added to ` +
+          `migrateToLatest().`,
+        "version"
+      );
+  }
 }
 
 /**
@@ -348,8 +429,20 @@ function validateSnapshotConsistency(
       );
     }
   } else {
-    // max_index should equal the highest order index
-    const maxAssigned = Math.max(...Object.values(ordering.assigned));
+    // max_index should equal the highest order index.
+    //
+    // Computed with an explicit O(n) scan, NOT `Math.max(...values)`: the spread
+    // expands every assigned index into a function argument, and a long-lived
+    // financial ledger can hold more states than the engine's argument-count
+    // ceiling (~65k–120k depending on runtime). Past that limit the spread form
+    // throws a cryptic engine RangeError BEFORE this consistency check runs, so
+    // a perfectly valid large snapshot fails to rehydrate with a misleading
+    // error indistinguishable from corruption. The loop has no such ceiling and
+    // preserves the fail-closed SnapshotValidationError path below.
+    let maxAssigned = -Infinity;
+    for (const v of Object.values(ordering.assigned)) {
+      if (v > maxAssigned) maxAssigned = v;
+    }
     if (ordering.max_index !== maxAssigned) {
       throw new SnapshotValidationError(
         `max_index (${ordering.max_index}) should equal highest assigned index (${maxAssigned})`,

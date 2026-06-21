@@ -653,6 +653,39 @@ describe("Ledger", () => {
         ]),
       ).not.toThrow();
     });
+
+    it("rejects a snapshot with an unsupported version (B-LES-003)", () => {
+      ledger.append([
+        makeEntry("e1", "cash", "debit", usdc("100.000000"), "tx1"),
+        makeEntry("e2", "revenue", "credit", usdc("100.000000"), "tx1"),
+      ]);
+
+      const snap = ledger.snapshot();
+      // Simulate a snapshot produced by a future, incompatible schema.
+      const futureSnap = { ...snap, version: 2 } as unknown as typeof snap;
+
+      let thrown: unknown;
+      try {
+        Ledger.fromSnapshot(futureSnap);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(LedgerError);
+      expect((thrown as LedgerError).code).toBe("UNSUPPORTED_SNAPSHOT_VERSION");
+      // Message names both the found and supported versions for operability.
+      expect((thrown as Error).message).toContain("2");
+      expect((thrown as Error).message).toContain("1");
+    });
+
+    it("accepts a snapshot at the supported version", () => {
+      ledger.append([
+        makeEntry("e1", "cash", "debit", usdc("100.000000"), "tx1"),
+        makeEntry("e2", "revenue", "credit", usdc("100.000000"), "tx1"),
+      ]);
+      const snap = ledger.snapshot();
+      expect(snap.version).toBe(1);
+      expect(() => Ledger.fromSnapshot(snap)).not.toThrow();
+    });
   });
 
   // ─── Determinism ─────────────────────────────────────────────────────

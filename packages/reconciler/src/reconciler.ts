@@ -138,21 +138,33 @@ export class Reconciler {
     // Emit one structured event per reconciliation. Counts are low-cardinality
     // and safe as metric labels; the report id (high-cardinality) goes in
     // `message`. Outcome degrades when anything failed to reconcile.
-    this.telemetry.record({
-      package: "@attestia/reconciler",
-      op: "reconcile",
-      level: summary.allReconciled ? "info" : "warn",
-      outcome: summary.allReconciled ? "ok" : "degraded",
-      durationMs: Date.now() - startedAt,
-      attributes: {
-        matched: summary.matchedCount,
-        mismatched: summary.mismatchCount,
-        missing: summary.missingCount,
-      },
-      message:
-        `reconciliation '${id}' ${summary.allReconciled ? "clean" : "found discrepancies"}: ` +
-        `${summary.matchedCount} matched, ${summary.mismatchCount} mismatched, ${summary.missingCount} missing`,
-    });
+    //
+    // Defensively guarded (B-RVP-002): observability must never break the
+    // operation it observes. The matchers have already run and the (correct,
+    // completed) report is computed; a host-injected sink that throws — e.g. a
+    // pushgateway client failing on network loss — must NOT turn a successful
+    // reconciliation into a thrown exception that drops the report. The
+    // Telemetry contract forbids throwing, but we do not trust a host to honor
+    // it (mirrors verifier-node.ts emitPhase).
+    try {
+      this.telemetry.record({
+        package: "@attestia/reconciler",
+        op: "reconcile",
+        level: summary.allReconciled ? "info" : "warn",
+        outcome: summary.allReconciled ? "ok" : "degraded",
+        durationMs: Date.now() - startedAt,
+        attributes: {
+          matched: summary.matchedCount,
+          mismatched: summary.mismatchCount,
+          missing: summary.missingCount,
+        },
+        message:
+          `reconciliation '${id}' ${summary.allReconciled ? "clean" : "found discrepancies"}: ` +
+          `${summary.matchedCount} matched, ${summary.mismatchCount} mismatched, ${summary.missingCount} missing`,
+      });
+    } catch {
+      /* a sink must not break reconciliation — see NOOP_TELEMETRY contract */
+    }
 
     return {
       id,

@@ -48,7 +48,26 @@ export interface MultiSigWitnessConfig {
 
   /** Verifier config (uses multi-sig or single-signer rpcUrl/chainId) */
   readonly verifierConfig?: WitnessConfig;
+
+  /**
+   * Maximum number of in-memory witness records to retain (PB-WCO-007).
+   *
+   * A long-lived witness process attests continuously; an unbounded record array
+   * is a slow memory leak that survives all tests (which submit a handful) and
+   * only manifests as gradual growth over days/weeks. This caps the in-memory
+   * history with FIFO eviction (oldest dropped first) — callers that need the
+   * full history should persist records themselves. Defaults to
+   * {@link DEFAULT_MAX_RECORDS}; set `0` for no in-memory retention.
+   */
+  readonly maxRecords?: number;
 }
+
+/**
+ * Default in-memory witness-record retention cap (PB-WCO-007). Bounds memory in
+ * a continuously-running witness while keeping a useful recent window for
+ * {@link MultiSigWitness.getRecords}.
+ */
+export const DEFAULT_MAX_RECORDS = 10_000;
 
 // =============================================================================
 // MultiSigWitness
@@ -60,9 +79,11 @@ export class MultiSigWitness {
   private readonly verifier: XrplVerifier | null;
   private readonly governanceStore: GovernanceStore | null;
   private readonly records: WitnessRecord[] = [];
+  private readonly maxRecords: number;
   private readonly mode: "multisig" | "single";
 
   constructor(config: MultiSigWitnessConfig) {
+    this.maxRecords = config.maxRecords ?? DEFAULT_MAX_RECORDS;
     if (config.governance) {
       // Multi-sig mode
       this.mode = "multisig";
@@ -107,17 +128,47 @@ export class MultiSigWitness {
 
   /**
    * Connect to XRPL.
+   *
+   * PB-WCO-008: connecting the submitter and verifier is a two-step operation
+   * with an irreversible side effect per step (a live WebSocket). If the second
+   * step fails after the first succeeded, we MUST roll back the already-opened
+   * connection — otherwise connect() rejects but leaves an orphaned live socket,
+   * isConnected() reports an inconsistent view, and every connect() retry leaks
+   * another socket. So on ANY sub-connect failure, best-effort disconnect every
+   * component before re-throwing, leaving the witness cleanly disconnected and
+   * retry-safe (a named compensator for the connect saga).
    */
   async connect(): Promise<void> {
-    if (this.multiSigSubmitter) {
-      await this.multiSigSubmitter.connect();
+    try {
+      if (this.multiSigSubmitter) {
+        await this.multiSigSubmitter.connect();
+      }
+      if (this.singleSubmitter) {
+        await this.singleSubmitter.connect();
+      }
+      if (this.verifier) {
+        await this.verifier.connect();
+      }
+    } catch (err) {
+      // Compensate: tear down any already-opened connections so we don't leak a
+      // dangling socket or present a half-connected state. Best-effort — a
+      // disconnect failure must not mask the original connect error.
+      await this._rollbackConnect();
+      throw err;
     }
-    if (this.singleSubmitter) {
-      await this.singleSubmitter.connect();
-    }
-    if (this.verifier) {
-      await this.verifier.connect();
-    }
+  }
+
+  /**
+   * Best-effort teardown of all components, used to compensate a partially-
+   * successful {@link connect} (PB-WCO-008). Each disconnect is isolated so one
+   * failure cannot prevent tearing down the others.
+   */
+  private async _rollbackConnect(): Promise<void> {
+    await Promise.allSettled([
+      this.multiSigSubmitter?.disconnect(),
+      this.singleSubmitter?.disconnect(),
+      this.verifier?.disconnect(),
+    ]);
   }
 
   /**
@@ -222,7 +273,23 @@ export class MultiSigWitness {
       throw new Error("MultiSigWitness: no submitter available");
     }
 
-    this.records.push(record);
+    this._retainRecord(record);
     return record;
+  }
+
+  /**
+   * Append a record to the bounded in-memory history (PB-WCO-007). When at the
+   * configured cap, evict oldest-first (FIFO) so memory stays bounded in a
+   * continuously-running witness. A cap of 0 disables in-memory retention.
+   */
+  private _retainRecord(record: WitnessRecord): void {
+    if (this.maxRecords <= 0) {
+      return;
+    }
+    this.records.push(record);
+    // Evict from the front until within the cap (handles a lowered cap too).
+    while (this.records.length > this.maxRecords) {
+      this.records.shift();
+    }
   }
 }

@@ -20,6 +20,30 @@ import { RegistryError, InvariantDefinitionError } from "./errors.js";
 import { parsePredicate, ParseError } from "./predicate/parser.js";
 import { validatePredicate, ValidationError } from "./predicate/validator.js";
 import type { ASTNode } from "./predicate/ast.js";
+import {
+  type Telemetry,
+  type ObservabilityEvent,
+  NOOP_TELEMETRY,
+} from "@attestia/types";
+
+// =============================================================================
+// Telemetry helper
+// =============================================================================
+
+/**
+ * Emit a telemetry event, guarding against a misbehaving sink.
+ *
+ * The {@link Telemetry} contract says `record` MUST NOT throw, but a buggy host
+ * sink might. Loading the constitution must never be broken by observability,
+ * so a sink error is swallowed — the fail-closed load contract is preserved.
+ */
+function emit(telemetry: Telemetry, event: ObservabilityEvent): void {
+  try {
+    telemetry.record(event);
+  } catch {
+    /* a misbehaving sink must never affect the load verdict — ignored */
+  }
+}
 
 // =============================================================================
 // Types
@@ -85,51 +109,140 @@ export interface CompiledInvariant {
  * 1. Validates the registry schema
  * 2. Parses each predicate expression into an AST
  * 3. Validates each AST for safety
- * 4. Returns a compiled, immutable registry
+ * 4. Rejects duplicate invariant ids (constitutional identity is one-id-one-rule)
+ * 5. Returns a compiled, immutable registry
  *
  * Throws on any validation error. Does not return partial results.
+ *
+ * This is the constitutional gatekeeper, so the load event is exactly the kind
+ * of operationally-critical point that must be observable: an optional
+ * {@link Telemetry} sink (default {@link NOOP_TELEMETRY}) records an `ok` event
+ * with the compiled invariant count on success and a `failed` event with the
+ * rejected-invariant count on failure. Telemetry NEVER changes the fail-closed
+ * load contract — the throw is preserved; the sink only adds a record.
+ *
+ * @param raw - Raw registry data (typically parsed JSON).
+ * @param telemetry - Optional observability sink. Defaults to no-op (silent).
  */
 export function loadInvariantRegistry(
-  raw: unknown
+  raw: unknown,
+  telemetry: Telemetry = NOOP_TELEMETRY
 ): Readonly<CompiledInvariantRegistry> {
-  // Step 1: Validate top-level schema
-  const registry = validateRegistryShape(raw);
+  try {
+    // Step 1: Validate top-level schema
+    const registry = validateRegistryShape(raw);
 
-  // Step 2: Compile each invariant (parse + validate)
-  const compiled: CompiledInvariant[] = [];
-  const errors: string[] = [];
+    // Step 2: Compile each invariant (parse + validate)
+    const compiled: CompiledInvariant[] = [];
+    const errors: string[] = [];
 
-  for (const inv of registry.invariants) {
-    try {
-      const compiledInv = compileInvariant(inv);
-      compiled.push(compiledInv);
-    } catch (e) {
-      if (
-        e instanceof ParseError ||
-        e instanceof ValidationError ||
-        e instanceof InvariantDefinitionError
-      ) {
-        errors.push(`[${inv.id}] ${e.message}`);
-      } else {
-        throw e;
+    for (const inv of registry.invariants) {
+      try {
+        const compiledInv = compileInvariant(inv);
+        compiled.push(compiledInv);
+      } catch (e) {
+        if (
+          e instanceof ParseError ||
+          e instanceof ValidationError ||
+          e instanceof InvariantDefinitionError
+        ) {
+          errors.push(`[${inv.id}] ${e.message}`);
+        } else {
+          throw e;
+        }
       }
     }
-  }
 
-  // Step 3: Fail if any invariants failed to compile
-  if (errors.length > 0) {
-    throw new RegistryError(
-      `Registry contains invalid invariants:\n${errors.join("\n")}`
-    );
-  }
+    // Step 3: Fail if any invariants failed to compile
+    if (errors.length > 0) {
+      throw new RegistryError(
+        `Registry contains invalid invariants:\n${errors.join("\n")}`
+      );
+    }
 
-  // Step 4: Return frozen registry
-  return Object.freeze({
-    version: registry.version,
-    registry_id: registry.registry_id,
-    status: registry.status ?? "unknown",
-    invariants: Object.freeze(compiled),
-  });
+    // Step 4: Reject duplicate invariant ids.
+    //
+    // The constitution's identity contract is one id = one invariant: a
+    // violation's invariantId must uniquely name which rule fired, and the
+    // content-addressed registry hash must encode the constitution the author
+    // intended. A copy-paste that double-registers an id would silently corrupt
+    // all of that (listInvariants returns duplicates, parity compares an id
+    // twice, an audit gets an ambiguous "which rule rejected this"). The
+    // per-field schema validator never checks the SET of ids, so close that gap
+    // here, fail-closed, before freezing.
+    const seenIds = new Set<string>();
+    const duplicateIds: string[] = [];
+    for (const inv of compiled) {
+      if (seenIds.has(inv.id)) {
+        duplicateIds.push(inv.id);
+      } else {
+        seenIds.add(inv.id);
+      }
+    }
+    if (duplicateIds.length > 0) {
+      // Deduplicate the report itself (an id repeated 3× appears once) and sort
+      // for a deterministic, replayable message.
+      const reported = [...new Set(duplicateIds)].sort();
+      throw new RegistryError(
+        `Registry contains duplicate invariant id(s): ${reported.join(", ")}. ` +
+          `Each invariant id must be unique — one id identifies exactly one ` +
+          `rule. Hint: check registry.json for a copy-pasted invariant whose ` +
+          `'id' was not changed.`
+      );
+    }
+
+    // Step 5: Return frozen registry
+    const result = Object.freeze({
+      version: registry.version,
+      registry_id: registry.registry_id,
+      status: registry.status ?? "unknown",
+      invariants: Object.freeze(compiled),
+    });
+
+    // The constitution loaded: record an ok event with a low-cardinality count
+    // so an operator has a metric series for "constitution compiled" (and how
+    // many invariants), distinct from any other startup signal.
+    emit(telemetry, {
+      package: "@attestia/registrum",
+      op: "registry.load",
+      level: "info",
+      outcome: "ok",
+      attributes: { invariantCount: result.invariants.length },
+    });
+
+    return result;
+  } catch (e) {
+    // The constitution was REJECTED at load. Emit a failed event so an incident
+    // can distinguish "constitution rejected at load" from any other startup
+    // crash. errorCount carries the number of rejected invariants when the
+    // error reports them (the human detail stays in `message`, never in a
+    // low-cardinality attribute). `record` never throws, so this cannot mask
+    // the original error, and the throw is re-raised to preserve fail-closed.
+    emit(telemetry, {
+      package: "@attestia/registrum",
+      op: "registry.load",
+      level: "error",
+      outcome: "failed",
+      attributes: { errorCount: countRejectedInvariants(e) },
+      message: e instanceof Error ? e.message : String(e),
+    });
+    throw e;
+  }
+}
+
+/**
+ * Count how many invariants an aggregated RegistryError rejected, for a
+ * low-cardinality telemetry attribute. The aggregated "invalid invariants"
+ * message lists one rejection per line after a header; any other error
+ * contributes 1 (a single load-level failure). Returns 1 as a safe default.
+ */
+function countRejectedInvariants(e: unknown): number {
+  if (e instanceof RegistryError && e.message.includes("invalid invariants")) {
+    // Lines after the first (the header) are the per-invariant rejections.
+    const lines = e.message.split("\n");
+    return Math.max(1, lines.length - 1);
+  }
+  return 1;
 }
 
 // =============================================================================

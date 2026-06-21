@@ -300,6 +300,15 @@ export interface ConsensusResult {
   /** Verifier IDs that dissented from the majority */
   readonly dissenters: readonly string[];
 
+  /**
+   * Human-readable explanation of the verdict, mirroring the SLA /
+   * tenant-governance convention (B-RVP-009). For a PASS it states the margin;
+   * for a FAIL it names the SPECIFIC cause — no reports, quorum not reached,
+   * bundle disagreement, or majority-not-PASS — so an on-call engineer gets an
+   * actionable next step without decoding the numeric fields. Always present.
+   */
+  readonly reason: string;
+
   /** ISO 8601 timestamp */
   readonly consensusAt: string;
 }

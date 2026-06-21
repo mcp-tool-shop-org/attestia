@@ -405,14 +405,20 @@ export class StructuralRegistrar implements Registrar {
     snapshot: unknown,
     options: RehydrationOptions
   ): StructuralRegistrar {
-    // Rehydrate state (validates and throws on error)
+    // Rehydrate state (validates and throws on error). rehydrate() emits the
+    // ok/failed restore-boundary telemetry on the same sink passed here, so a
+    // constitution-drift halt or corrupt-snapshot rejection at startup is an
+    // alertable metric series, not just an uncaught exception in a log.
     const rehydratedState = rehydrate(snapshot, options);
 
-    // Create registrar with same options
+    // Create registrar with same options. The telemetry sink (if any) is also
+    // propagated so the restored registrar's subsequent register()/validate()/
+    // snapshot() operations are observable on the same sink as the restore.
     const registrar = new StructuralRegistrar({
       mode: options.mode,
       ...(options.invariants !== undefined ? { invariants: options.invariants } : {}),
       ...(options.compiledRegistry !== undefined ? { compiledRegistry: options.compiledRegistry } : {}),
+      ...(options.telemetry !== undefined ? { telemetry: options.telemetry } : {}),
     });
 
     // Inject rehydrated state
@@ -1304,7 +1310,7 @@ export class StructuralRegistrar implements Registrar {
         ? computeRegistryHash(this.compiledRegistry!)
         : computeLegacyRegistryHash(this.invariants.map((i) => i.id));
 
-    return {
+    const snapshot: RegistrarSnapshotV1 = {
       version: SNAPSHOT_VERSION,
       registry_hash: registryHash,
       mode: this.mode,
@@ -1315,6 +1321,24 @@ export class StructuralRegistrar implements Registrar {
         assigned,
       },
     };
+
+    // Producing a snapshot is the operationally-critical act that gates
+    // persistence and attestation. Emit an info event with low-cardinality
+    // mode + stateCount so "snapshot produced" is a first-class metric series
+    // alongside register/validate — an operator can detect snapshot cadence and
+    // catch a stalled producer (e.g. a broken cron) before a restart needs one.
+    // This pairs with the rehydrate event to make the whole persistence
+    // lifecycle observable. Emit AFTER building the snapshot so telemetry can
+    // never alter the returned value.
+    this.emit({
+      package: "@attestia/registrum",
+      op: "snapshot",
+      level: "info",
+      outcome: "ok",
+      attributes: { mode: this.mode, stateCount: stateIds.length },
+    });
+
+    return snapshot;
   }
 
   // =========================================================================

@@ -55,7 +55,10 @@ export type DistributionErrorCode =
   | "INVALID_SHARES"
   | "DUPLICATE_RECIPIENT"
   | "POOL_EXCEEDED"
-  | "NO_RECIPIENTS";
+  | "NO_RECIPIENTS"
+  | "UNKNOWN_STRATEGY"
+  | "IMPORT_NOT_EMPTY"
+  | "DUPLICATE_IMPORT_ID";
 
 // =============================================================================
 // Distribution Engine
@@ -365,13 +368,19 @@ export class DistributionEngine {
       payouts: writable,
     };
 
+    // Integer division drops fractional 'dust' into `remainder` (the leftover
+    // that stays in the pool). Surface whether dust was trapped — otherwise it
+    // accrues silently and forces manual ledger reconciliation to explain a
+    // pool balance that doesn't match expectations. `remainderNonZero` is a
+    // low-cardinality boolean; the exact dust amount goes in `message`.
+    const remainderNonZero = !this.isZeroAmount(result.remainder);
     this.telemetry.record({
       package: "@attestia/treasury",
       op: "distribution.execute",
       level: "info",
       outcome: "ok",
-      attributes: { recipientCount: writable.length },
-      message: `distribution '${plan.id}' (${plan.strategy}) executed: ${result.totalDistributed.amount} ${result.totalDistributed.currency} to ${writable.length} recipient(s)`,
+      attributes: { recipientCount: writable.length, remainderNonZero },
+      message: `distribution '${plan.id}' (${plan.strategy}) executed: ${result.totalDistributed.amount} ${result.totalDistributed.currency} to ${writable.length} recipient(s); remainder (dust) ${result.remainder.amount} ${result.remainder.currency}`,
     });
 
     return writtenResult;
@@ -386,7 +395,23 @@ export class DistributionEngine {
   }
 
   importPlans(plans: readonly DistributionPlan[]): void {
+    // Restore is into a FRESH engine: importing over existing state would
+    // silently overwrite live plans by id. Fail closed (caller bug).
+    if (this.plans.size > 0) {
+      throw new DistributionError(
+        "IMPORT_NOT_EMPTY",
+        `Cannot import plans into a non-empty engine (${this.plans.size} already present) — restore into a fresh DistributionEngine`,
+      );
+    }
+    const seen = new Set<string>();
     for (const p of plans) {
+      if (seen.has(p.id)) {
+        throw new DistributionError(
+          "DUPLICATE_IMPORT_ID",
+          `Duplicate plan id '${p.id}' in imported snapshot`,
+        );
+      }
+      seen.add(p.id);
       this.plans.set(p.id, p);
     }
   }
@@ -403,6 +428,17 @@ export class DistributionEngine {
         return this.resolveFixed(plan);
       case "milestone":
         return this.resolveMilestone(plan);
+      default: {
+        // Exhaustiveness guard: adding a fourth DistributionStrategy to the
+        // union now fails at COMPILE time (the `never` assignment errors) and,
+        // if that is ever bypassed, fails cleanly at runtime here instead of
+        // returning undefined and crashing on `result.payouts` downstream.
+        const _exhaustive: never = plan.strategy;
+        throw new DistributionError(
+          "UNKNOWN_STRATEGY",
+          `Unknown distribution strategy '${String(_exhaustive)}' on plan '${plan.id}'`,
+        );
+      }
     }
   }
 
