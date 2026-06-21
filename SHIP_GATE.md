@@ -48,7 +48,7 @@
 - [x] `[all]` Dependency scanning runs in CI (ecosystem-appropriate) (2026-05-28) — `pnpm audit --audit-level=high` step in ci.yml (Node 22 job); fails CI on high/critical advisories, non-blocking on registry outage
 - [ ] `[all]` SKIP: automated dependency-update mechanism — dependabot.yml prohibited by org CI rules unless explicitly requested
 - [ ] `[npm]` SKIP: private monorepo, not published to npm
-- [x] `[npm]` `engines.node` set · `[pypi]` `python_requires` set (2026-02-27) — >=18
+- [x] `[npm]` `engines.node` set · `[pypi]` `python_requires` set (2026-02-27) — >=22
 - [x] `[npm]` Lockfile committed · `[pypi]` Clean wheel + sdist build (2026-02-27)
 - [ ] `[vsix]` SKIP: not a VS Code extension
 - [ ] `[desktop]` SKIP: not a desktop application

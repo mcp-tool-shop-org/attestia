@@ -5,7 +5,7 @@
   "description": "Financial truth infrastructure for the decentralized world",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "build": "pnpm -r build",
