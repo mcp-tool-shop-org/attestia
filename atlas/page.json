@@ -1,0 +1,1083 @@
+{
+  "authored": [
+    ".github/",
+    "assets/",
+    "docs/",
+    "resources/",
+    "root",
+    "site/",
+    "specs/"
+  ],
+  "breaks": [
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "chain-observer",
+        "demo",
+        "event-store",
+        "ledger",
+        "node",
+        "proof",
+        "reconciler",
+        "registrum",
+        "treasury",
+        "vault",
+        "verify",
+        "witness"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "types",
+      "partLabel": "types"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "reconciler",
+        "treasury",
+        "vault",
+        "verify"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "ledger",
+      "partLabel": "ledger"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "reconciler",
+        "verify"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "registrum",
+      "partLabel": "registrum"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "vault"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "chain-observer",
+      "partLabel": "chain-observer"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "witness"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "reconciler",
+      "partLabel": "reconciler"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "event-store",
+      "partLabel": "event-store"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "proof",
+      "partLabel": "proof"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "vault",
+      "partLabel": "vault"
+    }
+  ],
+  "changes": {
+    "fileCounts": {
+      "added": 0,
+      "changed": 1,
+      "moved": 0,
+      "parts": 1,
+      "removed": 0
+    },
+    "items": [
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports chain-observer.",
+        "subjects": [
+          "attestia",
+          "chain-observer"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports event-store.",
+        "subjects": [
+          "attestia",
+          "event-store"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports ledger.",
+        "subjects": [
+          "attestia",
+          "ledger"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "And 49 more new imports between parts.",
+        "subjects": []
+      },
+      {
+        "kind": "door",
+        "sentence": "Publish to GHCR now also runs packages/node/src/main.ts.",
+        "subjects": [
+          ".github/workflows/docker.yml",
+          "packages/node/src/main.ts"
+        ]
+      },
+      {
+        "kind": "door",
+        "sentence": "attestia-demo (packages/demo/package.json) is a new command. It runs packages/demo/src/index.ts.",
+        "subjects": [
+          "packages/demo/package.json",
+          "packages/demo/src/index.ts"
+        ]
+      },
+      {
+        "kind": "counts",
+        "sentence": "1 file changed content, across 1 part.",
+        "subjects": []
+      }
+    ],
+    "since": {
+      "commit": "f0d4cf2e8a8d2c530f9e07bf6cd4c6f14c5d18a7",
+      "generatedAt": "2026-09-24T02:15:10.442Z"
+    },
+    "unchanged": false
+  },
+  "changesTogether": [],
+  "changesTogetherNote": [
+    "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
+  ],
+  "changesTogetherWithTests": 0,
+  "commit": "245af305ebae9d405b74c4bbcd86c93f489c0261",
+  "defaultBranch": "main",
+  "derived": "23 parts, mostly TypeScript (407 files). Work enters through 5 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes @mcptoolshop/attestia (packages/attestia) to npm and a container image. People run attestia-demo.",
+  "doors": [
+    {
+      "checks": [
+        "package.json",
+        "packages/",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "tsconfig.json"
+      ],
+      "checksCount": 5,
+      "file": ".github/workflows/docker.yml",
+      "id": ".github/workflows/docker.yml",
+      "landings": [],
+      "name": "Publish to GHCR",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "attestia",
+          "depth": 0,
+          "files": 16
+        },
+        {
+          "boundary": "chain-observer",
+          "depth": 0,
+          "files": 44
+        },
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 3
+        },
+        {
+          "boundary": "event-store",
+          "depth": 0,
+          "files": 23
+        },
+        {
+          "boundary": "ledger",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "node",
+          "depth": 0,
+          "files": 92
+        },
+        {
+          "boundary": "proof",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 0,
+          "files": 20
+        },
+        {
+          "boundary": "registrum",
+          "depth": 0,
+          "files": 51
+        },
+        {
+          "boundary": "root",
+          "depth": 0,
+          "files": 4
+        },
+        {
+          "boundary": "sdk",
+          "depth": 0,
+          "files": 10
+        },
+        {
+          "boundary": "treasury",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "types",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "vault",
+          "depth": 0,
+          "files": 16
+        },
+        {
+          "boundary": "verify",
+          "depth": 0,
+          "files": 44
+        },
+        {
+          "boundary": "witness",
+          "depth": 0,
+          "files": 46
+        }
+      ],
+      "runs": [
+        "packages/node/src/main.ts"
+      ],
+      "runsCount": 1,
+      "sends": [
+        "publishes a container image"
+      ],
+      "stages": [],
+      "triggers": [
+        "when a release is published",
+        "or by hand"
+      ]
+    },
+    {
+      "checks": [
+        "packages/chain-observer/src/",
+        "packages/demo/src/",
+        "packages/event-store/src/",
+        "packages/ledger/src/",
+        "packages/node/src/",
+        "packages/proof/src/",
+        "packages/reconciler/src/",
+        "packages/registrum/src/",
+        "packages/sdk/src/",
+        "packages/treasury/src/",
+        "packages/types/src/",
+        "packages/vault/src/",
+        "packages/verify/src/",
+        "packages/witness/src/"
+      ],
+      "checksCount": 14,
+      "file": ".github/workflows/release.yml",
+      "id": ".github/workflows/release.yml",
+      "landings": [],
+      "name": "Release",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "attestia",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "chain-observer",
+          "depth": 0,
+          "files": 41
+        },
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 2
+        },
+        {
+          "boundary": "event-store",
+          "depth": 0,
+          "files": 20
+        },
+        {
+          "boundary": "ledger",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "node",
+          "depth": 0,
+          "files": 89
+        },
+        {
+          "boundary": "proof",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 0,
+          "files": 18
+        },
+        {
+          "boundary": "registrum",
+          "depth": 0,
+          "files": 48
+        },
+        {
+          "boundary": "sdk",
+          "depth": 0,
+          "files": 8
+        },
+        {
+          "boundary": "treasury",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "types",
+          "depth": 0,
+          "files": 10
+        },
+        {
+          "boundary": "vault",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "verify",
+          "depth": 0,
+          "files": 40
+        },
+        {
+          "boundary": "witness",
+          "depth": 0,
+          "files": 42
+        }
+      ],
+      "runs": [
+        "packages/attestia/tests/",
+        "packages/chain-observer/tests/chains.test.ts",
+        "packages/chain-observer/tests/error-ux.test.ts",
+        "packages/chain-observer/tests/evm/",
+        "packages/chain-observer/tests/finality.test.ts",
+        "packages/chain-observer/tests/profiles.test.ts",
+        "packages/chain-observer/tests/registry.test.ts",
+        "packages/chain-observer/tests/retry.test.ts",
+        "packages/chain-observer/tests/solana/",
+        "packages/chain-observer/tests/xrpl-evm/",
+        "packages/chain-observer/tests/xrpl/",
+        "packages/event-store/tests/catalog.test.ts",
+        "packages/event-store/tests/corruption-recovery.test.ts",
+        "packages/event-store/tests/hash-chain-property.test.ts",
+        "packages/event-store/tests/hash-chain.test.ts",
+        "packages/event-store/tests/in-memory-store.test.ts",
+        "packages/event-store/tests/jsonl-recovery-hardening.test.ts",
+        "packages/event-store/tests/jsonl-store.test.ts",
+        "packages/event-store/tests/migration-roundtrip.test.ts",
+        "packages/event-store/tests/snapshot-integrity.test.ts",
+        "packages/event-store/tests/snapshot-store-hardening.test.ts",
+        "packages/event-store/tests/snapshot-store.test.ts",
+        "packages/event-store/tests/telemetry.test.ts",
+        "packages/ledger/tests/",
+        "packages/node/tests/app-lifecycle.test.ts",
+        "packages/node/tests/attestation.test.ts",
+        "packages/node/tests/audit-log.test.ts",
+        "packages/node/tests/body-limit.test.ts",
+        "packages/node/tests/config.test.ts",
+        "packages/node/tests/edge-cases/",
+        "packages/node/tests/events.test.ts",
+        "packages/node/tests/export.test.ts",
+        "packages/node/tests/health-deep.test.ts",
+        "packages/node/tests/health.test.ts",
+        "packages/node/tests/idempotency-store.test.ts",
+        "packages/node/tests/intents.test.ts",
+        "packages/node/tests/main-auth-posture.test.ts",
+        "packages/node/tests/metrics-collector.test.ts",
+        "packages/node/tests/middleware/",
+        "packages/node/tests/pagination.test.ts",
+        "packages/node/tests/persistence/",
+        "packages/node/tests/pilot/",
+        "packages/node/tests/routes/",
+        "packages/node/tests/tenant-registry.test.ts",
+        "packages/node/tests/verify.test.ts",
+        "packages/proof/tests/",
+        "packages/reconciler/tests/",
+        "packages/registrum/tests/attestation/",
+        "packages/registrum/tests/dual-witness.test.ts",
+        "packages/registrum/tests/error-ux.test.ts",
+        "packages/registrum/tests/invariants.test.ts",
+        "packages/registrum/tests/observability.test.ts",
+        "packages/registrum/tests/parity/identity.parity.test.ts",
+        "packages/registrum/tests/parity/lineage.parity.test.ts",
+        "packages/registrum/tests/parity/metadata.parity.test.ts",
+        "packages/registrum/tests/parity/ordering.parity.test.ts",
+        "packages/registrum/tests/parity/persistence.parity.test.ts",
+        "packages/registrum/tests/parity/registry-mode.parity.test.ts",
+        "packages/registrum/tests/persistence/",
+        "packages/registrum/tests/property.test.ts",
+        "packages/registrum/tests/registry.test.ts",
+        "packages/registrum/tests/stage-c-hardening.test.ts",
+        "packages/sdk/tests/",
+        "packages/treasury/tests/",
+        "packages/types/tests/",
+        "packages/vault/tests/",
+        "packages/verify/tests/compliance/",
+        "packages/verify/tests/consensus-distinct-identity.test.ts",
+        "packages/verify/tests/consensus-weak-quorum.test.ts",
+        "packages/verify/tests/cross-chain-conservation-decimals.test.ts",
+        "packages/verify/tests/cross-chain-invariants.test.ts",
+        "packages/verify/tests/global-state-hash.test.ts",
+        "packages/verify/tests/multi-chain-replay.test.ts",
+        "packages/verify/tests/observability-and-degradation.test.ts",
+        "packages/verify/tests/replay.test.ts",
+        "packages/verify/tests/report-formatter.test.ts",
+        "packages/verify/tests/sla/",
+        "packages/verify/tests/state-bundle.test.ts",
+        "packages/verify/tests/verification-consensus.test.ts",
+        "packages/verify/tests/verifier-node.test.ts",
+        "packages/verify/tests/verifier-telemetry.test.ts",
+        "packages/witness/tests/canonicalization.test.ts",
+        "packages/witness/tests/governance/",
+        "packages/witness/tests/memo-encoder.test.ts",
+        "packages/witness/tests/payload.test.ts",
+        "packages/witness/tests/retry.test.ts",
+        "packages/witness/tests/secret-provider.test.ts",
+        "packages/witness/tests/submitter-idempotency.test.ts",
+        "packages/witness/tests/submitter-mocked.test.ts",
+        "packages/witness/tests/submitter-resilience.test.ts",
+        "packages/witness/tests/submitter-telemetry.test.ts",
+        "packages/witness/tests/submitter.test.ts",
+        "packages/witness/tests/timeout.test.ts",
+        "packages/witness/tests/verifier-mocked.test.ts",
+        "packages/witness/tests/verifier.test.ts",
+        "packages/witness/tests/witness-mocked.test.ts",
+        "packages/witness/tests/witness.test.ts"
+      ],
+      "runsCount": 97,
+      "sends": [
+        "publishes @mcptoolshop/attestia (packages/attestia) to npm",
+        "creates a GitHub release"
+      ],
+      "stages": [],
+      "triggers": [
+        "when a tag matching `v*` is pushed"
+      ]
+    },
+    {
+      "checks": [
+        "packages/chain-observer/src/",
+        "packages/demo/src/",
+        "packages/event-store/src/",
+        "packages/ledger/src/",
+        "packages/node/src/",
+        "packages/proof/src/",
+        "packages/reconciler/src/",
+        "packages/registrum/src/",
+        "packages/sdk/src/",
+        "packages/treasury/src/",
+        "packages/types/src/",
+        "packages/vault/src/",
+        "packages/verify/src/",
+        "packages/witness/src/"
+      ],
+      "checksCount": 14,
+      "file": ".github/workflows/ci.yml",
+      "id": ".github/workflows/ci.yml",
+      "landings": [],
+      "name": "CI",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "chain-observer",
+          "depth": 0,
+          "files": 41
+        },
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 2
+        },
+        {
+          "boundary": "event-store",
+          "depth": 0,
+          "files": 20
+        },
+        {
+          "boundary": "ledger",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "node",
+          "depth": 0,
+          "files": 89
+        },
+        {
+          "boundary": "proof",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 0,
+          "files": 18
+        },
+        {
+          "boundary": "registrum",
+          "depth": 0,
+          "files": 48
+        },
+        {
+          "boundary": "sdk",
+          "depth": 0,
+          "files": 8
+        },
+        {
+          "boundary": "treasury",
+          "depth": 0,
+          "files": 12
+        },
+        {
+          "boundary": "types",
+          "depth": 0,
+          "files": 10
+        },
+        {
+          "boundary": "vault",
+          "depth": 0,
+          "files": 14
+        },
+        {
+          "boundary": "verify",
+          "depth": 0,
+          "files": 40
+        },
+        {
+          "boundary": "witness",
+          "depth": 0,
+          "files": 42
+        }
+      ],
+      "runs": [
+        "packages/chain-observer/tests/chains.test.ts",
+        "packages/chain-observer/tests/error-ux.test.ts",
+        "packages/chain-observer/tests/evm/",
+        "packages/chain-observer/tests/finality.test.ts",
+        "packages/chain-observer/tests/profiles.test.ts",
+        "packages/chain-observer/tests/registry.test.ts",
+        "packages/chain-observer/tests/retry.test.ts",
+        "packages/chain-observer/tests/solana/",
+        "packages/chain-observer/tests/xrpl-evm/",
+        "packages/chain-observer/tests/xrpl/",
+        "packages/event-store/tests/catalog.test.ts",
+        "packages/event-store/tests/corruption-recovery.test.ts",
+        "packages/event-store/tests/hash-chain-property.test.ts",
+        "packages/event-store/tests/hash-chain.test.ts",
+        "packages/event-store/tests/in-memory-store.test.ts",
+        "packages/event-store/tests/jsonl-recovery-hardening.test.ts",
+        "packages/event-store/tests/jsonl-store.test.ts",
+        "packages/event-store/tests/migration-roundtrip.test.ts",
+        "packages/event-store/tests/snapshot-integrity.test.ts",
+        "packages/event-store/tests/snapshot-store-hardening.test.ts",
+        "packages/event-store/tests/snapshot-store.test.ts",
+        "packages/event-store/tests/telemetry.test.ts",
+        "packages/ledger/tests/",
+        "packages/node/tests/app-lifecycle.test.ts",
+        "packages/node/tests/attestation.test.ts",
+        "packages/node/tests/audit-log.test.ts",
+        "packages/node/tests/body-limit.test.ts",
+        "packages/node/tests/config.test.ts",
+        "packages/node/tests/edge-cases/",
+        "packages/node/tests/events.test.ts",
+        "packages/node/tests/export.test.ts",
+        "packages/node/tests/health-deep.test.ts",
+        "packages/node/tests/health.test.ts",
+        "packages/node/tests/idempotency-store.test.ts",
+        "packages/node/tests/intents.test.ts",
+        "packages/node/tests/main-auth-posture.test.ts",
+        "packages/node/tests/metrics-collector.test.ts",
+        "packages/node/tests/middleware/",
+        "packages/node/tests/pagination.test.ts",
+        "packages/node/tests/persistence/",
+        "packages/node/tests/pilot/",
+        "packages/node/tests/routes/",
+        "packages/node/tests/tenant-registry.test.ts",
+        "packages/node/tests/verify.test.ts",
+        "packages/proof/tests/",
+        "packages/reconciler/tests/",
+        "packages/registrum/tests/attestation/",
+        "packages/registrum/tests/dual-witness.test.ts",
+        "packages/registrum/tests/error-ux.test.ts",
+        "packages/registrum/tests/invariants.test.ts",
+        "packages/registrum/tests/observability.test.ts",
+        "packages/registrum/tests/parity/identity.parity.test.ts",
+        "packages/registrum/tests/parity/lineage.parity.test.ts",
+        "packages/registrum/tests/parity/metadata.parity.test.ts",
+        "packages/registrum/tests/parity/ordering.parity.test.ts",
+        "packages/registrum/tests/parity/persistence.parity.test.ts",
+        "packages/registrum/tests/parity/registry-mode.parity.test.ts",
+        "packages/registrum/tests/persistence/",
+        "packages/registrum/tests/property.test.ts",
+        "packages/registrum/tests/registry.test.ts",
+        "packages/registrum/tests/stage-c-hardening.test.ts",
+        "packages/sdk/tests/",
+        "packages/treasury/tests/",
+        "packages/types/tests/",
+        "packages/vault/tests/",
+        "packages/verify/tests/compliance/",
+        "packages/verify/tests/consensus-distinct-identity.test.ts",
+        "packages/verify/tests/consensus-weak-quorum.test.ts",
+        "packages/verify/tests/cross-chain-conservation-decimals.test.ts",
+        "packages/verify/tests/cross-chain-invariants.test.ts",
+        "packages/verify/tests/global-state-hash.test.ts",
+        "packages/verify/tests/multi-chain-replay.test.ts",
+        "packages/verify/tests/observability-and-degradation.test.ts",
+        "packages/verify/tests/replay.test.ts",
+        "packages/verify/tests/report-formatter.test.ts",
+        "packages/verify/tests/sla/",
+        "packages/verify/tests/state-bundle.test.ts",
+        "packages/verify/tests/verification-consensus.test.ts",
+        "packages/verify/tests/verifier-node.test.ts",
+        "packages/verify/tests/verifier-telemetry.test.ts",
+        "packages/witness/tests/canonicalization.test.ts",
+        "packages/witness/tests/governance/",
+        "packages/witness/tests/memo-encoder.test.ts",
+        "packages/witness/tests/payload.test.ts",
+        "packages/witness/tests/retry.test.ts",
+        "packages/witness/tests/secret-provider.test.ts",
+        "packages/witness/tests/submitter-idempotency.test.ts",
+        "packages/witness/tests/submitter-mocked.test.ts",
+        "packages/witness/tests/submitter-resilience.test.ts",
+        "packages/witness/tests/submitter-telemetry.test.ts",
+        "packages/witness/tests/submitter.test.ts",
+        "packages/witness/tests/timeout.test.ts",
+        "packages/witness/tests/verifier-mocked.test.ts",
+        "packages/witness/tests/verifier.test.ts",
+        "packages/witness/tests/witness-mocked.test.ts",
+        "packages/witness/tests/witness.test.ts"
+      ],
+      "runsCount": 96,
+      "sends": [],
+      "stages": [],
+      "triggers": [
+        "on a pull request touching 12 paths",
+        "on a push to main touching 12 paths",
+        "or by hand"
+      ]
+    },
+    {
+      "checks": [],
+      "checksCount": 0,
+      "file": ".github/workflows/pages.yml",
+      "id": ".github/workflows/pages.yml",
+      "landings": [],
+      "name": "Deploy site to GitHub Pages",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "site",
+          "depth": 0,
+          "files": 3
+        }
+      ],
+      "runs": [
+        "site/astro.config.mjs",
+        "site/src/"
+      ],
+      "runsCount": 2,
+      "sends": [
+        "deploys the site"
+      ],
+      "stages": [],
+      "triggers": [
+        "on a push to main touching 2 paths",
+        "or by hand"
+      ]
+    },
+    {
+      "checks": [],
+      "checksCount": 0,
+      "file": "packages/demo/package.json",
+      "id": "packages/demo/package.json#attestia-demo",
+      "kind": "command",
+      "landings": [],
+      "name": "attestia-demo",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 2
+        },
+        {
+          "boundary": "chain-observer",
+          "depth": 2,
+          "files": 21
+        },
+        {
+          "boundary": "event-store",
+          "depth": 2,
+          "files": 8
+        },
+        {
+          "boundary": "ledger",
+          "depth": 2,
+          "files": 6
+        },
+        {
+          "boundary": "proof",
+          "depth": 2,
+          "files": 4
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 2,
+          "files": 9
+        },
+        {
+          "boundary": "registrum",
+          "depth": 2,
+          "files": 15
+        },
+        {
+          "boundary": "types",
+          "depth": 2,
+          "files": 8
+        },
+        {
+          "boundary": "vault",
+          "depth": 2,
+          "files": 6
+        },
+        {
+          "boundary": "verify",
+          "depth": 2,
+          "files": 19
+        }
+      ],
+      "runs": [
+        "packages/demo/src/index.ts"
+      ],
+      "runsCount": 1,
+      "sends": [],
+      "stages": [],
+      "triggers": []
+    }
+  ],
+  "duplicates": [
+    {
+      "files": [
+        "packages/chain-observer/src/retry.ts",
+        "packages/witness/src/retry.ts"
+      ],
+      "name": "withRetry",
+      "partLabels": [
+        "chain-observer",
+        "witness"
+      ],
+      "parts": [
+        "chain-observer",
+        "witness"
+      ]
+    }
+  ],
+  "duplicatesLead": "These are candidates from names and call order, not a judgement.",
+  "duplicatesNote": [],
+  "edges": [
+    {
+      "from": "chain-observer",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "event-store",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "ledger",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "proof",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "ledger"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "registrum"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "registrum",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "chain-observer"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "ledger"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "types"
+    }
+  ],
+  "generated": [],
+  "generatedAt": "2026-09-24T08:27:57.726Z",
+  "limits": [
+    "5 writes and 7 reads use paths built at run time and are not named here.",
+    "6 writes and 66 reads go to the directory the command is run in, the home directory or a path its caller passes, not to this repository.",
+    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
+  ],
+  "mainDoor": ".github/workflows/docker.yml",
+  "partLabels": {
+    ".github": ".github",
+    "assets": "assets",
+    "attestia": "attestia",
+    "chain-observer": "chain-observer",
+    "demo": "demo",
+    "docs": "docs",
+    "event-store": "event-store",
+    "ledger": "ledger",
+    "node": "node",
+    "proof": "proof",
+    "reconciler": "reconciler",
+    "registrum": "registrum",
+    "resources": "resources",
+    "root": "the repository root",
+    "scripts": "scripts",
+    "sdk": "sdk",
+    "site": "the site",
+    "specs": "specs",
+    "treasury": "treasury",
+    "types": "types",
+    "vault": "vault",
+    "verify": "verify",
+    "witness": "witness"
+  },
+  "parts": 23,
+  "readers": [],
+  "repo": "mcp-tool-shop-org/attestia",
+  "sequences": [
+    {
+      "entry": "main",
+      "file": "packages/node/src/main.ts",
+      "inner": [
+        {
+          "file": "packages/node/src/app.ts",
+          "name": "createApp",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "create app",
+          "steps": [
+            {
+              "name": "requestIdMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "request id middleware"
+            },
+            {
+              "name": "loggerMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "logger middleware"
+            },
+            {
+              "name": "metricsMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "metrics middleware"
+            },
+            {
+              "name": "createErrorHandler",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create error handler"
+            },
+            {
+              "name": "createHealthRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create health routes"
+            },
+            {
+              "name": "authMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "auth middleware"
+            },
+            {
+              "name": "createMetricsRoute",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create metrics route"
+            },
+            {
+              "name": "createPublicVerifyRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public verify routes"
+            },
+            {
+              "name": "createPublicProofRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public proof routes"
+            },
+            {
+              "name": "createPublicComplianceRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public compliance routes"
+            },
+            {
+              "name": "createPublicOpenApiRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public open api routes"
+            }
+          ]
+        }
+      ],
+      "part": "node",
+      "partLabel": "node",
+      "phrase": "main",
+      "steps": [
+        {
+          "name": "loadConfig",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "load config"
+        },
+        {
+          "name": "parseApiKeys",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "parse api keys"
+        },
+        {
+          "name": "createApp",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "create app"
+        }
+      ]
+    }
+  ],
+  "startDoor": ".github/workflows/ci.yml",
+  "startHere": [
+    ".github/workflows/ci.yml",
+    "packages/node/src/main.ts"
+  ],
+  "summary": null,
+  "summaryFrom": null,
+  "testFiles": 192,
+  "testedBy": {
+    "attestia": 9,
+    "chain-observer": 30,
+    "demo": 0,
+    "event-store": 16,
+    "ledger": 40,
+    "node": 45,
+    "proof": 10,
+    "reconciler": 25,
+    "registrum": 43,
+    "scripts": 0,
+    "sdk": 6,
+    "treasury": 10,
+    "types": 120,
+    "vault": 11,
+    "verify": 30,
+    "witness": 34
+  },
+  "unnamedWrites": 5,
+  "unread": [],
+  "unreadFiles": 0,
+  "unreadNote": [],
+  "untested": [
+    {
+      "part": "demo",
+      "partLabel": "demo",
+      "testedBy": 0
+    },
+    {
+      "part": "scripts",
+      "partLabel": "scripts",
+      "testedBy": 0
+    }
+  ],
+  "untestedNote": [],
+  "written": 0
+}
