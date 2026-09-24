@@ -10,81 +10,194 @@
   ],
   "breaks": [
     {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "chain-observer",
+        "demo",
+        "event-store",
+        "ledger",
+        "node",
+        "proof",
+        "reconciler",
+        "registrum",
+        "treasury",
+        "vault",
+        "verify",
+        "witness"
+      ],
       "importedByTests": [],
       "kind": "part",
-      "name": "chain-observer",
-      "partLabel": "chain-observer"
+      "name": "types",
+      "partLabel": "types"
     },
     {
-      "doors": 3,
-      "importedBy": [],
-      "importedByTests": [],
-      "kind": "part",
-      "name": "demo",
-      "partLabel": "demo"
-    },
-    {
-      "doors": 3,
-      "importedBy": [],
-      "importedByTests": [],
-      "kind": "part",
-      "name": "event-store",
-      "partLabel": "event-store"
-    },
-    {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "reconciler",
+        "treasury",
+        "vault",
+        "verify"
+      ],
       "importedByTests": [],
       "kind": "part",
       "name": "ledger",
       "partLabel": "ledger"
     },
     {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "reconciler",
+        "verify"
+      ],
       "importedByTests": [],
       "kind": "part",
-      "name": "node",
-      "partLabel": "node"
+      "name": "registrum",
+      "partLabel": "registrum"
     },
     {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "vault"
+      ],
       "importedByTests": [],
       "kind": "part",
-      "name": "proof",
-      "partLabel": "proof"
+      "name": "chain-observer",
+      "partLabel": "chain-observer"
     },
     {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node",
+        "witness"
+      ],
       "importedByTests": [],
       "kind": "part",
       "name": "reconciler",
       "partLabel": "reconciler"
     },
     {
-      "doors": 3,
-      "importedBy": [],
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
       "importedByTests": [],
       "kind": "part",
-      "name": "registrum",
-      "partLabel": "registrum"
+      "name": "event-store",
+      "partLabel": "event-store"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "proof",
+      "partLabel": "proof"
+    },
+    {
+      "doors": 4,
+      "importedBy": [
+        "attestia",
+        "demo",
+        "node"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "vault",
+      "partLabel": "vault"
     }
   ],
   "changes": {
-    "first": true
+    "fileCounts": {
+      "added": 0,
+      "changed": 1,
+      "moved": 0,
+      "parts": 1,
+      "removed": 0
+    },
+    "items": [
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports chain-observer.",
+        "subjects": [
+          "attestia",
+          "chain-observer"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports event-store.",
+        "subjects": [
+          "attestia",
+          "event-store"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "attestia now imports ledger.",
+        "subjects": [
+          "attestia",
+          "ledger"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "And 49 more new imports between parts.",
+        "subjects": []
+      },
+      {
+        "kind": "door",
+        "sentence": "Publish to GHCR now also runs packages/node/src/main.ts.",
+        "subjects": [
+          ".github/workflows/docker.yml",
+          "packages/node/src/main.ts"
+        ]
+      },
+      {
+        "kind": "door",
+        "sentence": "attestia-demo (packages/demo/package.json) is a new command. It runs packages/demo/src/index.ts.",
+        "subjects": [
+          "packages/demo/package.json",
+          "packages/demo/src/index.ts"
+        ]
+      },
+      {
+        "kind": "counts",
+        "sentence": "1 file changed content, across 1 part.",
+        "subjects": []
+      }
+    ],
+    "since": {
+      "commit": "f0d4cf2e8a8d2c530f9e07bf6cd4c6f14c5d18a7",
+      "generatedAt": "2026-09-24T02:15:10.442Z"
+    },
+    "unchanged": false
   },
   "changesTogether": [],
   "changesTogetherNote": [
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "f0d4cf2e8a8d2c530f9e07bf6cd4c6f14c5d18a7",
+  "commit": "245af305ebae9d405b74c4bbcd86c93f489c0261",
   "defaultBranch": "main",
-  "derived": "23 parts, mostly TypeScript (407 files). Work enters through 4 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes to npm and a container image.",
+  "derived": "23 parts, mostly TypeScript (407 files). Work enters through 5 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes @mcptoolshop/attestia (packages/attestia) to npm and a container image. People run attestia-demo.",
   "doors": [
     {
       "checks": [
@@ -182,8 +295,10 @@
           "files": 46
         }
       ],
-      "runs": [],
-      "runsCount": 0,
+      "runs": [
+        "packages/node/src/main.ts"
+      ],
+      "runsCount": 1,
       "sends": [
         "publishes a container image"
       ],
@@ -394,7 +509,7 @@
       ],
       "runsCount": 97,
       "sends": [
-        "publishes to npm",
+        "publishes @mcptoolshop/attestia (packages/attestia) to npm",
         "creates a GitHub release"
       ],
       "stages": [],
@@ -632,6 +747,75 @@
         "on a push to main touching 2 paths",
         "or by hand"
       ]
+    },
+    {
+      "checks": [],
+      "checksCount": 0,
+      "file": "packages/demo/package.json",
+      "id": "packages/demo/package.json#attestia-demo",
+      "kind": "command",
+      "landings": [],
+      "name": "attestia-demo",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 2
+        },
+        {
+          "boundary": "chain-observer",
+          "depth": 2,
+          "files": 21
+        },
+        {
+          "boundary": "event-store",
+          "depth": 2,
+          "files": 8
+        },
+        {
+          "boundary": "ledger",
+          "depth": 2,
+          "files": 6
+        },
+        {
+          "boundary": "proof",
+          "depth": 2,
+          "files": 4
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 2,
+          "files": 9
+        },
+        {
+          "boundary": "registrum",
+          "depth": 2,
+          "files": 15
+        },
+        {
+          "boundary": "types",
+          "depth": 2,
+          "files": 8
+        },
+        {
+          "boundary": "vault",
+          "depth": 2,
+          "files": 6
+        },
+        {
+          "boundary": "verify",
+          "depth": 2,
+          "files": 19
+        }
+      ],
+      "runs": [
+        "packages/demo/src/index.ts"
+      ],
+      "runsCount": 1,
+      "sends": [],
+      "stages": [],
+      "triggers": []
     }
   ],
   "duplicates": [
@@ -653,13 +837,69 @@
   ],
   "duplicatesLead": "These are candidates from names and call order, not a judgement.",
   "duplicatesNote": [],
-  "edges": [],
+  "edges": [
+    {
+      "from": "chain-observer",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "event-store",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "ledger",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "proof",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "ledger"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "registrum"
+    },
+    {
+      "from": "reconciler",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "registrum",
+      "fromTests": false,
+      "to": "types"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "chain-observer"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "ledger"
+    },
+    {
+      "from": "vault",
+      "fromTests": false,
+      "to": "types"
+    }
+  ],
   "generated": [],
-  "generatedAt": "2026-09-24T02:15:10.442Z",
+  "generatedAt": "2026-09-24T08:27:57.726Z",
   "limits": [
-    "10 writes and 13 reads use paths built at run time and are not named here.",
-    "1 write and 2 reads go to the directory the command is run in, the home directory or a path its caller passes, not to this repository.",
-    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions."
+    "5 writes and 7 reads use paths built at run time and are not named here.",
+    "6 writes and 66 reads go to the directory the command is run in, the home directory or a path its caller passes, not to this repository.",
+    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
   "mainDoor": ".github/workflows/docker.yml",
   "partLabels": {
@@ -690,33 +930,141 @@
   "parts": 23,
   "readers": [],
   "repo": "mcp-tool-shop-org/attestia",
-  "sequences": [],
-  "startDoor": ".github/workflows/docker.yml",
-  "startHere": [],
-  "startNote": "Publish to GHCR runs no code this map can follow; it only checks code, so there is no path of files to read in order.",
+  "sequences": [
+    {
+      "entry": "main",
+      "file": "packages/node/src/main.ts",
+      "inner": [
+        {
+          "file": "packages/node/src/app.ts",
+          "name": "createApp",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "create app",
+          "steps": [
+            {
+              "name": "requestIdMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "request id middleware"
+            },
+            {
+              "name": "loggerMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "logger middleware"
+            },
+            {
+              "name": "metricsMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "metrics middleware"
+            },
+            {
+              "name": "createErrorHandler",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create error handler"
+            },
+            {
+              "name": "createHealthRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create health routes"
+            },
+            {
+              "name": "authMiddleware",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "auth middleware"
+            },
+            {
+              "name": "createMetricsRoute",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create metrics route"
+            },
+            {
+              "name": "createPublicVerifyRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public verify routes"
+            },
+            {
+              "name": "createPublicProofRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public proof routes"
+            },
+            {
+              "name": "createPublicComplianceRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public compliance routes"
+            },
+            {
+              "name": "createPublicOpenApiRoutes",
+              "part": "node",
+              "partLabel": "node",
+              "phrase": "create public open api routes"
+            }
+          ]
+        }
+      ],
+      "part": "node",
+      "partLabel": "node",
+      "phrase": "main",
+      "steps": [
+        {
+          "name": "loadConfig",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "load config"
+        },
+        {
+          "name": "parseApiKeys",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "parse api keys"
+        },
+        {
+          "name": "createApp",
+          "part": "node",
+          "partLabel": "node",
+          "phrase": "create app"
+        }
+      ]
+    }
+  ],
+  "startDoor": ".github/workflows/ci.yml",
+  "startHere": [
+    ".github/workflows/ci.yml",
+    "packages/node/src/main.ts"
+  ],
   "summary": null,
   "summaryFrom": null,
   "testFiles": 192,
   "testedBy": {
     "attestia": 9,
-    "chain-observer": 23,
+    "chain-observer": 30,
     "demo": 0,
-    "event-store": 14,
-    "ledger": 7,
-    "node": 44,
-    "proof": 9,
-    "reconciler": 10,
-    "registrum": 24,
+    "event-store": 16,
+    "ledger": 40,
+    "node": 45,
+    "proof": 10,
+    "reconciler": 25,
+    "registrum": 43,
     "scripts": 0,
-    "sdk": 5,
-    "treasury": 8,
-    "types": 6,
-    "vault": 9,
-    "verify": 26,
-    "witness": 30
+    "sdk": 6,
+    "treasury": 10,
+    "types": 120,
+    "vault": 11,
+    "verify": 30,
+    "witness": 34
   },
-  "unnamedWrites": 10,
+  "unnamedWrites": 5,
   "unread": [],
+  "unreadFiles": 0,
   "unreadNote": [],
   "untested": [
     {

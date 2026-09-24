@@ -58,7 +58,12 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node",
+          "vault"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -106,7 +111,11 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -122,7 +131,15 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node",
+          "reconciler",
+          "treasury",
+          "vault",
+          "verify"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -138,7 +155,9 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "sdk"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -154,7 +173,11 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -170,7 +193,12 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node",
+          "witness"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -186,7 +214,13 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node",
+          "reconciler",
+          "verify"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -241,7 +275,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "scripts",
-      "qualifyingSourceCommits": 2,
+      "qualifyingSourceCommits": 1,
       "rebaseline": null
     },
     {
@@ -250,7 +284,9 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -298,7 +334,10 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "node"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -314,7 +353,21 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "chain-observer",
+          "demo",
+          "event-store",
+          "ledger",
+          "node",
+          "proof",
+          "reconciler",
+          "registrum",
+          "treasury",
+          "vault",
+          "verify",
+          "witness"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -330,7 +383,11 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -346,7 +403,11 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "demo",
+          "node"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -362,7 +423,11 @@
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "attestia",
+          "node",
+          "verify"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -377,8 +442,8 @@
     "definition": "commits is how many commits in the window touch the file, including merges and commits dropped from coupling. lines is added plus deleted in those commits.",
     "files": [
       {
-        "commits": 8,
-        "lines": 62,
+        "commits": 9,
+        "lines": 70,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -447,8 +512,8 @@
         "path": "README.ja.md"
       },
       {
-        "commits": 10,
-        "lines": 202,
+        "commits": 8,
+        "lines": 177,
         "path": "README.md"
       },
       {
@@ -482,6 +547,31 @@
         "path": "VERIFICATION_GUIDE.md"
       },
       {
+        "commits": 1,
+        "lines": 87,
+        "path": "atlas/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 94,
+        "path": "atlas/boundaries.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 735,
+        "path": "atlas/page.json"
+      },
+      {
+        "commits": 1,
+        "lines": 1913,
+        "path": "atlas/statistics.json"
+      },
+      {
+        "commits": 1,
+        "lines": 7299,
+        "path": "atlas/structure.json"
+      },
+      {
         "commits": 3,
         "lines": 16,
         "path": "codecov.yml"
@@ -502,8 +592,8 @@
         "path": "docs/index.md"
       },
       {
-        "commits": 13,
-        "lines": 32,
+        "commits": 12,
+        "lines": 31,
         "path": "package.json"
       },
       {
@@ -1792,8 +1882,8 @@
         "path": "pnpm-workspace.yaml"
       },
       {
-        "commits": 4,
-        "lines": 470,
+        "commits": 3,
+        "lines": 390,
         "path": "scripts/status.js"
       },
       {
@@ -1822,33 +1912,33 @@
         "path": "site/public/og-image.png"
       },
       {
-        "commits": 2,
-        "lines": 28,
+        "commits": 1,
+        "lines": 14,
         "path": "site/src/content/docs/handbook/architecture.md"
       },
       {
-        "commits": 6,
-        "lines": 298,
+        "commits": 5,
+        "lines": 155,
         "path": "site/src/content/docs/handbook/beginners.md"
       },
       {
-        "commits": 6,
-        "lines": 48,
+        "commits": 5,
+        "lines": 34,
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 6,
-        "lines": 22,
+        "commits": 5,
+        "lines": 17,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
-        "commits": 2,
-        "lines": 4,
+        "commits": 1,
+        "lines": 2,
         "path": "site/src/content/docs/handbook/principles.md"
       },
       {
-        "commits": 6,
-        "lines": 102,
+        "commits": 5,
+        "lines": 81,
         "path": "site/src/content/docs/handbook/reference.md"
       },
       {
@@ -1865,11 +1955,11 @@
   },
   "confidence": {
     "level": "low",
-    "reason": "fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions"
+    "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
   },
-  "generatedAt": "2026-09-24T02:15:10.442Z",
+  "generatedAt": "2026-09-24T08:27:57.726Z",
   "generatedFrom": {
-    "commit": "f0d4cf2e8a8d2c530f9e07bf6cd4c6f14c5d18a7"
+    "commit": "245af305ebae9d405b74c4bbcd86c93f489c0261"
   },
   "pairs": [],
   "parameters": {
@@ -1882,16 +1972,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "both",
-    "headDate": "2026-09-17T18:54:32-07:00",
-    "inScopeFiles": 591,
+    "headDate": "2026-09-23T22:16:39-04:00",
+    "inScopeFiles": 596,
     "pinnedStart": null,
-    "priorFloor": null,
-    "qualifyingCommits": 23,
+    "priorFloor": "fallen",
+    "qualifyingCommits": 22,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-03-22T01:54:32.000Z",
+    "since": "2026-03-28T02:16:39.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

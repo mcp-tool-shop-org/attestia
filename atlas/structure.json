@@ -21,7 +21,7 @@
           "path": ".github/pull_request_template.md"
         },
         {
-          "hash": "1f370fdd82211cc3f6dfd037ba840be08d8b4e7ca85db0b06e9e48debb15f0eb",
+          "hash": "6c4e45ab1ebc568c31005a8d3ad4e114176d484de2ad085024c3e539c3c7e016",
           "path": ".github/workflows/ci.yml"
         },
         {
@@ -120,55 +120,141 @@
         },
         {
           "hash": "7f9f67d4efcc511e93ffa0afda528309a0a122671e6e5133f63306ade07a7736",
-          "path": "packages/attestia/src/chain-observer.ts"
+          "importsFiles": [
+            "packages/chain-observer/src/index.ts"
+          ],
+          "path": "packages/attestia/src/chain-observer.ts",
+          "reexportsAll": [
+            "packages/chain-observer/src/index.ts"
+          ]
         },
         {
           "hash": "fdf74ffe28ebb414e2924b77b61f8212fd6d87ece3e48d99553fa1cffaad3bd9",
-          "path": "packages/attestia/src/event-store.ts"
+          "importsFiles": [
+            "packages/event-store/src/index.ts"
+          ],
+          "path": "packages/attestia/src/event-store.ts",
+          "reexportsAll": [
+            "packages/event-store/src/index.ts"
+          ]
         },
         {
           "hash": "7532b786c5ec61897d606013b3d4ded2be85dc27f88d66dcef79338995ac2ce1",
+          "importsFiles": [
+            "packages/chain-observer/src/index.ts",
+            "packages/event-store/src/index.ts",
+            "packages/ledger/src/index.ts",
+            "packages/proof/src/index.ts",
+            "packages/reconciler/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/sdk/src/index.ts",
+            "packages/treasury/src/index.ts",
+            "packages/types/src/index.ts",
+            "packages/vault/src/index.ts",
+            "packages/verify/src/index.ts",
+            "packages/witness/src/index.ts"
+          ],
           "path": "packages/attestia/src/index.ts"
         },
         {
           "hash": "7acfa254aed25806268228c7a71da4427167e26500adf08e0e366cb415e7e91d",
-          "path": "packages/attestia/src/ledger.ts"
+          "importsFiles": [
+            "packages/ledger/src/index.ts"
+          ],
+          "path": "packages/attestia/src/ledger.ts",
+          "reexportsAll": [
+            "packages/ledger/src/index.ts"
+          ]
         },
         {
           "hash": "e77b22c1569672359f634e4abe198728adfb97783109e3efb35f410bb3aba663",
-          "path": "packages/attestia/src/proof.ts"
+          "importsFiles": [
+            "packages/proof/src/index.ts"
+          ],
+          "path": "packages/attestia/src/proof.ts",
+          "reexportsAll": [
+            "packages/proof/src/index.ts"
+          ]
         },
         {
           "hash": "3f902389f2789e487cf7e8402c486e17b2e3e5ff143d3158095f472ddb5097f1",
-          "path": "packages/attestia/src/reconciler.ts"
+          "importsFiles": [
+            "packages/reconciler/src/index.ts"
+          ],
+          "path": "packages/attestia/src/reconciler.ts",
+          "reexportsAll": [
+            "packages/reconciler/src/index.ts"
+          ]
         },
         {
           "hash": "f81220ba2fd9427fb482f1147cf9ca208e6066440c7f9f52c13defa81abb0f05",
-          "path": "packages/attestia/src/registrum.ts"
+          "importsFiles": [
+            "packages/registrum/src/index.ts"
+          ],
+          "path": "packages/attestia/src/registrum.ts",
+          "reexportsAll": [
+            "packages/registrum/src/index.ts"
+          ]
         },
         {
           "hash": "fe6f3280b9bd3e1f6ef35768f71db0b04ba1610b9f94ed1e251c8bb63d0ccb4e",
-          "path": "packages/attestia/src/sdk.ts"
+          "importsFiles": [
+            "packages/sdk/src/index.ts"
+          ],
+          "path": "packages/attestia/src/sdk.ts",
+          "reexportsAll": [
+            "packages/sdk/src/index.ts"
+          ]
         },
         {
           "hash": "905660ec1e2c81e8a3e74630e65f34b6ba16aea9b799c079086c8a774712b0bd",
-          "path": "packages/attestia/src/treasury.ts"
+          "importsFiles": [
+            "packages/treasury/src/index.ts"
+          ],
+          "path": "packages/attestia/src/treasury.ts",
+          "reexportsAll": [
+            "packages/treasury/src/index.ts"
+          ]
         },
         {
           "hash": "b25091652a37d6ee253abe0ef514b2d55aa66b94db81275c73f6346ef4d2db90",
-          "path": "packages/attestia/src/types.ts"
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
+          "path": "packages/attestia/src/types.ts",
+          "reexportsAll": [
+            "packages/types/src/index.ts"
+          ]
         },
         {
           "hash": "406f38079760a3f1dac3df569f0488261eaa8954b4390884ee8121c1b9955563",
-          "path": "packages/attestia/src/vault.ts"
+          "importsFiles": [
+            "packages/vault/src/index.ts"
+          ],
+          "path": "packages/attestia/src/vault.ts",
+          "reexportsAll": [
+            "packages/vault/src/index.ts"
+          ]
         },
         {
           "hash": "231b3e83c91fd4c2d71d6fd5fcfbdabb343e0e235284054c3c24d24003cea0fc",
-          "path": "packages/attestia/src/verify.ts"
+          "importsFiles": [
+            "packages/verify/src/index.ts"
+          ],
+          "path": "packages/attestia/src/verify.ts",
+          "reexportsAll": [
+            "packages/verify/src/index.ts"
+          ]
         },
         {
           "hash": "c8f9ec59100fa5bb0845fd85bd8982b9751b6f0c5bc3f55a5658bae46e57c092",
-          "path": "packages/attestia/src/witness.ts"
+          "importsFiles": [
+            "packages/witness/src/index.ts"
+          ],
+          "path": "packages/attestia/src/witness.ts",
+          "reexportsAll": [
+            "packages/witness/src/index.ts"
+          ]
         },
         {
           "hash": "08b68b7bd2a2a955fe37623fbbb1b0277794e7e81c8a7db41d91647aa05ff388",
@@ -238,6 +324,9 @@
             "isXrplChain"
           ],
           "hash": "007ff26d913c9e785d68b4dfd83d6bcc8c0302622e09ab65fbc821be719d6643",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/chain-observer/src/chains.ts"
         },
         {
@@ -258,7 +347,8 @@
             "packages/chain-observer/src/errors.ts",
             "packages/chain-observer/src/finality.ts",
             "packages/chain-observer/src/observer.ts",
-            "packages/chain-observer/src/retry.ts"
+            "packages/chain-observer/src/retry.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/evm/evm-observer.ts"
         },
@@ -291,6 +381,9 @@
         },
         {
           "hash": "e4c1ea7d7273a4263e70b9e323a485487b4e13f5fc9b30c2a51d025def7f8a01",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/chain-observer/src/finality.ts"
         },
         {
@@ -305,14 +398,16 @@
             "packages/chain-observer/src/registry.ts",
             "packages/chain-observer/src/solana/index.ts",
             "packages/chain-observer/src/xrpl-evm/index.ts",
-            "packages/chain-observer/src/xrpl/index.ts"
+            "packages/chain-observer/src/xrpl/index.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/index.ts"
         },
         {
           "hash": "4cc29c362ba30b7d842de27cbe32853d9f9039f8d4fb96a1f52f53bc213f6d8e",
           "importsFiles": [
-            "packages/chain-observer/src/finality.ts"
+            "packages/chain-observer/src/finality.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/observer.ts"
         },
@@ -330,7 +425,8 @@
         {
           "hash": "bd528f1124754fb4fcd2c644fd47e4e38f7387746684da2282eb562a661112e5",
           "importsFiles": [
-            "packages/chain-observer/src/observer.ts"
+            "packages/chain-observer/src/observer.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/registry.ts"
         },
@@ -363,6 +459,9 @@
         },
         {
           "hash": "606926e20da673c686b2561c6801c6956718098377e52b744386d9cfb7f5e087",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/chain-observer/src/solana/rpc-config.ts"
         },
         {
@@ -372,7 +471,8 @@
             "packages/chain-observer/src/finality.ts",
             "packages/chain-observer/src/observer.ts",
             "packages/chain-observer/src/retry.ts",
-            "packages/chain-observer/src/solana/rpc-config.ts"
+            "packages/chain-observer/src/solana/rpc-config.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/solana/solana-observer.ts"
         },
@@ -414,7 +514,8 @@
           "importsFiles": [
             "packages/chain-observer/src/errors.ts",
             "packages/chain-observer/src/observer.ts",
-            "packages/chain-observer/src/retry.ts"
+            "packages/chain-observer/src/retry.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/src/xrpl/xrpl-observer.ts"
         },
@@ -441,7 +542,8 @@
             "packages/chain-observer/src/observer.ts",
             "packages/chain-observer/src/profiles.ts",
             "packages/chain-observer/src/solana/solana-observer.ts",
-            "packages/chain-observer/src/xrpl/xrpl-observer.ts"
+            "packages/chain-observer/src/xrpl/xrpl-observer.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/chain-observer/tests/error-ux.test.ts"
         },
@@ -615,8 +717,9 @@
       "importConfidence": "full",
       "name": "chain-observer",
       "origin": "authored",
+      "outsideReads": 8,
       "role": "code",
-      "testedBy": 23,
+      "testedBy": 30,
       "unresolvedSites": 0
     },
     {
@@ -634,18 +737,351 @@
           "path": "packages/demo/package.json"
         },
         {
+          "entry": "main",
+          "entryRule": 1,
           "hash": "da7f6e8bd18f2db7ab973e83b85adf1d98281c50a566d95cda2ae69fd79eb7f0",
           "importsFiles": [
             "packages/demo/src/pipeline.ts"
           ],
-          "path": "packages/demo/src/index.ts"
+          "path": "packages/demo/src/index.ts",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "inner": [
+                    {
+                      "line": 246,
+                      "name": "registerAccount",
+                      "receiver": "Ledger",
+                      "target": {
+                        "file": "packages/ledger/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 272,
+                      "name": "declareIntent",
+                      "receiver": "Vault",
+                      "target": {
+                        "file": "packages/vault/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 286,
+                      "name": "append",
+                      "receiver": "InMemoryEventStore",
+                      "target": {
+                        "file": "packages/event-store/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 296,
+                      "name": "approveIntent",
+                      "receiver": "Vault",
+                      "target": {
+                        "file": "packages/vault/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 301,
+                      "name": "append",
+                      "receiver": "InMemoryEventStore",
+                      "target": {
+                        "file": "packages/event-store/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 311,
+                      "name": "markIntentExecuting",
+                      "receiver": "Vault",
+                      "target": {
+                        "file": "packages/vault/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 312,
+                      "name": "recordIntentExecution",
+                      "receiver": "Vault",
+                      "target": {
+                        "file": "packages/vault/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 317,
+                      "name": "append",
+                      "receiver": "InMemoryEventStore",
+                      "target": {
+                        "file": "packages/event-store/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 351,
+                      "name": "append",
+                      "receiver": "Ledger",
+                      "target": {
+                        "file": "packages/ledger/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 357,
+                      "name": "append",
+                      "receiver": "InMemoryEventStore",
+                      "target": {
+                        "file": "packages/event-store/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 372,
+                      "name": "verifyIntent",
+                      "receiver": "Vault",
+                      "target": {
+                        "file": "packages/vault/src/index.ts"
+                      }
+                    },
+                    {
+                      "line": 377,
+                      "name": "append",
+                      "receiver": "InMemoryEventStore",
+                      "target": {
+                        "file": "packages/event-store/src/index.ts"
+                      }
+                    }
+                  ],
+                  "innerTruncated": true,
+                  "line": 74,
+                  "name": "run",
+                  "target": {
+                    "file": "packages/demo/src/pipeline.ts"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": true,
+              "isDefaultExport": false,
+              "name": "main"
+            }
+          ]
         },
         {
+          "entry": "run",
+          "entryRule": 3,
           "exports": [
             "run"
           ],
           "hash": "8e2d36947d052650b8724a4d81d2ae202abe48e2192eaf5c4a5458d99d719ae5",
-          "path": "packages/demo/src/pipeline.ts"
+          "importsFiles": [
+            "packages/chain-observer/src/index.ts",
+            "packages/event-store/src/index.ts",
+            "packages/ledger/src/index.ts",
+            "packages/proof/src/index.ts",
+            "packages/reconciler/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
+            "packages/vault/src/index.ts",
+            "packages/verify/src/index.ts"
+          ],
+          "path": "packages/demo/src/pipeline.ts",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 246,
+                  "name": "registerAccount",
+                  "receiver": "Ledger",
+                  "target": {
+                    "file": "packages/ledger/src/index.ts"
+                  }
+                },
+                {
+                  "line": 272,
+                  "name": "declareIntent",
+                  "receiver": "Vault",
+                  "target": {
+                    "file": "packages/vault/src/index.ts"
+                  }
+                },
+                {
+                  "line": 286,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 296,
+                  "name": "approveIntent",
+                  "receiver": "Vault",
+                  "target": {
+                    "file": "packages/vault/src/index.ts"
+                  }
+                },
+                {
+                  "line": 301,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 311,
+                  "name": "markIntentExecuting",
+                  "receiver": "Vault",
+                  "target": {
+                    "file": "packages/vault/src/index.ts"
+                  }
+                },
+                {
+                  "line": 312,
+                  "name": "recordIntentExecution",
+                  "receiver": "Vault",
+                  "target": {
+                    "file": "packages/vault/src/index.ts"
+                  }
+                },
+                {
+                  "line": 317,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 351,
+                  "name": "append",
+                  "receiver": "Ledger",
+                  "target": {
+                    "file": "packages/ledger/src/index.ts"
+                  }
+                },
+                {
+                  "line": 357,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 372,
+                  "name": "verifyIntent",
+                  "receiver": "Vault",
+                  "target": {
+                    "file": "packages/vault/src/index.ts"
+                  }
+                },
+                {
+                  "line": 377,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 433,
+                  "name": "register",
+                  "receiver": "ObserverRegistry",
+                  "target": {
+                    "file": "packages/chain-observer/src/index.ts"
+                  }
+                },
+                {
+                  "line": 437,
+                  "name": "connectAll",
+                  "receiver": "ObserverRegistry",
+                  "target": {
+                    "file": "packages/chain-observer/src/index.ts"
+                  }
+                },
+                {
+                  "line": 440,
+                  "name": "get",
+                  "receiver": "ObserverRegistry",
+                  "target": {
+                    "file": "packages/chain-observer/src/index.ts"
+                  }
+                },
+                {
+                  "line": 457,
+                  "name": "reconcile",
+                  "receiver": "Reconciler",
+                  "target": {
+                    "file": "packages/reconciler/src/index.ts"
+                  }
+                },
+                {
+                  "line": 476,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 486,
+                  "name": "attest",
+                  "receiver": "Reconciler",
+                  "target": {
+                    "file": "packages/reconciler/src/index.ts"
+                  }
+                },
+                {
+                  "line": 492,
+                  "name": "append",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 502,
+                  "name": "snapshot",
+                  "receiver": "Ledger",
+                  "target": {
+                    "file": "packages/ledger/src/index.ts"
+                  }
+                },
+                {
+                  "line": 503,
+                  "name": "snapshot",
+                  "receiver": "StructuralRegistrar",
+                  "target": {
+                    "file": "packages/registrum/src/index.ts"
+                  }
+                },
+                {
+                  "line": 504,
+                  "name": "computeGlobalStateHash",
+                  "target": {
+                    "file": "packages/verify/src/index.ts"
+                  }
+                },
+                {
+                  "line": 519,
+                  "name": "readAll",
+                  "receiver": "InMemoryEventStore",
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                },
+                {
+                  "line": 521,
+                  "name": "isHashedEvent",
+                  "passed": true,
+                  "target": {
+                    "file": "packages/event-store/src/index.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run",
+              "truncated": true
+            }
+          ]
         },
         {
           "hash": "cb59c6d69437fd62bb6d765337dbf3a686f04a46d4088ae9df88b6d9fc10ad86",
@@ -692,10 +1128,10 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 11,
+      "dynamicReads": 6,
       "dynamicSpawns": 0,
       "dynamicSpawnsInTests": 0,
-      "dynamicWrites": 9,
+      "dynamicWrites": 4,
       "entryPoints": [
         "packages/event-store/src/index.ts"
       ],
@@ -725,6 +1161,9 @@
             "getSchemaVersion"
           ],
           "hash": "7e5420b141bc7737c1642d5dbf61dc23a5781f69fed8694f052f9f8d39a80b19",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/event-store/src/catalog.ts"
         },
         {
@@ -742,7 +1181,8 @@
           "hash": "6c14d9a0f0f7722e4a4b6937613bf1fa395f30e240702cdf375e4640794f5b2e",
           "importsFiles": [
             "packages/event-store/src/hash-chain.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/src/in-memory-store.ts"
         },
@@ -763,7 +1203,8 @@
           "hash": "89a6f48ea23406167b07e979d67f34b72c993e22533ce6f578d01d8d328fe13d",
           "importsFiles": [
             "packages/event-store/src/hash-chain.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/src/jsonl-store.ts"
         },
@@ -773,6 +1214,9 @@
             "verifySnapshotIntegrity"
           ],
           "hash": "09f2bc0756d3a78c5cb20f61fce9a2bcd015c9d038759139ef55acbe6bf01789",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/event-store/src/snapshot-store.ts"
         },
         {
@@ -780,6 +1224,9 @@
             "isHashedEvent"
           ],
           "hash": "bb2342c39fb83f1eab9e3e5c0a6431ceeda2d4d985c597e287a327aa7558eb3b",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/event-store/src/types.ts"
         },
         {
@@ -787,7 +1234,8 @@
           "importsFiles": [
             "packages/event-store/src/hash-chain.ts",
             "packages/event-store/src/in-memory-store.ts",
-            "packages/event-store/src/jsonl-store.ts"
+            "packages/event-store/src/jsonl-store.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/bench/event-store.bench.ts"
         },
@@ -795,14 +1243,16 @@
           "hash": "8c1913528a25f66768c5a8da1c730dab9a9e20fcc1abe8cce007bcac31dae368",
           "importsFiles": [
             "packages/event-store/src/attestia-events.ts",
-            "packages/event-store/src/catalog.ts"
+            "packages/event-store/src/catalog.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/catalog.test.ts"
         },
         {
           "hash": "cea31235b30af0a230dd4405d03b3d6060ab5b168569428fa550a52bc3837464",
           "importsFiles": [
-            "packages/event-store/src/jsonl-store.ts"
+            "packages/event-store/src/jsonl-store.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/corruption-recovery.test.ts"
         },
@@ -811,7 +1261,8 @@
           "importsFiles": [
             "packages/event-store/src/hash-chain.ts",
             "packages/event-store/src/in-memory-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/hash-chain-property.test.ts"
         },
@@ -821,7 +1272,8 @@
             "packages/event-store/src/hash-chain.ts",
             "packages/event-store/src/in-memory-store.ts",
             "packages/event-store/src/jsonl-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/hash-chain.test.ts"
         },
@@ -829,7 +1281,8 @@
           "hash": "7cd92004e579028d668a9561845465b9922edb6009f66af590b1e6cad502fcb9",
           "importsFiles": [
             "packages/event-store/src/in-memory-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/in-memory-store.test.ts"
         },
@@ -837,7 +1290,8 @@
           "hash": "10802bee7c1a1c1e66a56604affee8f601962c9633f81d57614cb8930685aab4",
           "importsFiles": [
             "packages/event-store/src/jsonl-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/jsonl-recovery-hardening.test.ts"
         },
@@ -845,14 +1299,16 @@
           "hash": "6fbf047739e58c15c427d50d59a76d2e4dfd10717949f29dac5ab2bd754654fa",
           "importsFiles": [
             "packages/event-store/src/jsonl-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/jsonl-store.test.ts"
         },
         {
           "hash": "b5c51204890379479f0e79b807fe9f681dc53cfc39ee60319152730a7d3884f3",
           "importsFiles": [
-            "packages/event-store/src/attestia-events.ts"
+            "packages/event-store/src/attestia-events.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/migration-roundtrip.test.ts"
         },
@@ -866,7 +1322,8 @@
         {
           "hash": "308a4db3a4fc1b9d727b8f12104e79bf3aea85e8646ffd366e42f30eba653801",
           "importsFiles": [
-            "packages/event-store/src/snapshot-store.ts"
+            "packages/event-store/src/snapshot-store.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/snapshot-store-hardening.test.ts"
         },
@@ -882,7 +1339,8 @@
           "importsFiles": [
             "packages/event-store/src/in-memory-store.ts",
             "packages/event-store/src/jsonl-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/tests/telemetry.test.ts"
         },
@@ -901,9 +1359,10 @@
       "importConfidence": "full",
       "name": "event-store",
       "origin": "authored",
-      "outsideReads": 1,
+      "outsideReads": 28,
+      "outsideWrites": 5,
       "role": "code",
-      "testedBy": 14,
+      "testedBy": 16,
       "unresolvedSites": 0
     },
     {
@@ -927,7 +1386,8 @@
         {
           "hash": "910fbc669640914bda18f7ec992e4a147e250aa3ec97a706d7a33fa9921e9e15",
           "importsFiles": [
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/src/accounts.ts"
         },
@@ -941,7 +1401,8 @@
           "importsFiles": [
             "packages/ledger/src/accounts.ts",
             "packages/ledger/src/money-math.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/src/balance-calculator.ts"
         },
@@ -962,7 +1423,8 @@
             "packages/ledger/src/accounts.ts",
             "packages/ledger/src/balance-calculator.ts",
             "packages/ledger/src/money-math.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/src/ledger.ts"
         },
@@ -983,19 +1445,24 @@
           ],
           "hash": "90be25aa1bbc7681cfaa55850d86edfbcd387946b48dcea815d4140e6a379702",
           "importsFiles": [
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/src/money-math.ts"
         },
         {
           "hash": "4f739388ab8b7194cf02f88d15a35327197ca24e5553724917edbbc235d4472e",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/ledger/src/types.ts"
         },
         {
           "hash": "4e34a6d2d7d25226c9786de01bf2ad913e88c4d2cba9179845019b1c4d9ce2b7",
           "importsFiles": [
             "packages/ledger/src/accounts.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/accounts.test.ts"
         },
@@ -1004,7 +1471,8 @@
           "importsFiles": [
             "packages/ledger/src/accounts.ts",
             "packages/ledger/src/balance-calculator.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/balance-calculator.test.ts"
         },
@@ -1012,7 +1480,8 @@
           "hash": "5eaa199b4fa87666e1870b9462c2ff21f3d683578b7483c1ba241eee4442eb8f",
           "importsFiles": [
             "packages/ledger/src/ledger.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/ledger.test.ts"
         },
@@ -1020,7 +1489,8 @@
           "hash": "699ffe353811c936983e19307c9b30ca60cc6829fe5edce2fb1753e287d330fb",
           "importsFiles": [
             "packages/ledger/src/money-math.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/money-math.test.ts"
         },
@@ -1028,7 +1498,8 @@
           "hash": "c97ea7a4ad2c88064561d934437900b118547a2175b71a9acf36b1f8d3f79f93",
           "importsFiles": [
             "packages/ledger/src/ledger.ts",
-            "packages/ledger/src/money-math.ts"
+            "packages/ledger/src/money-math.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/property.test.ts"
         },
@@ -1036,7 +1507,8 @@
           "hash": "e0254e7389cae23228cd3753ac4bd45c135ff34ba3a0c4c8e0f932a4de259228",
           "importsFiles": [
             "packages/ledger/src/ledger.ts",
-            "packages/ledger/src/types.ts"
+            "packages/ledger/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/ledger/tests/telemetry.test.ts"
         },
@@ -1055,8 +1527,9 @@
       "importConfidence": "full",
       "name": "ledger",
       "origin": "authored",
+      "outsideReads": 3,
       "role": "code",
-      "testedBy": 7,
+      "testedBy": 40,
       "unresolvedSites": 0
     },
     {
@@ -1098,6 +1571,8 @@
           "path": "packages/node/package.json"
         },
         {
+          "entry": "createApp",
+          "entryRule": 4,
           "exports": [
             "createApp"
           ],
@@ -1134,7 +1609,187 @@
             "packages/node/src/types/api-contract.ts",
             "packages/node/src/types/error.ts"
           ],
-          "path": "packages/node/src/app.ts"
+          "path": "packages/node/src/app.ts",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 181,
+                  "name": "requestIdMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/request-id.ts"
+                  }
+                },
+                {
+                  "line": 193,
+                  "name": "loggerMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/logger.ts"
+                  }
+                },
+                {
+                  "line": 197,
+                  "name": "metricsMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/metrics.ts"
+                  }
+                },
+                {
+                  "line": 226,
+                  "name": "createErrorHandler",
+                  "target": {
+                    "file": "packages/node/src/middleware/error-handler.ts"
+                  }
+                },
+                {
+                  "line": 230,
+                  "name": "createHealthRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/health.ts"
+                  }
+                },
+                {
+                  "line": 244,
+                  "name": "authMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/auth.ts"
+                  }
+                },
+                {
+                  "line": 245,
+                  "name": "createMetricsRoute",
+                  "target": {
+                    "file": "packages/node/src/routes/metrics.ts"
+                  }
+                },
+                {
+                  "line": 254,
+                  "name": "createPublicVerifyRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/public-verify.ts"
+                  }
+                },
+                {
+                  "line": 254,
+                  "name": "DEFAULT_SWEEP_INTERVAL_MS",
+                  "passed": true,
+                  "target": {
+                    "file": "packages/node/src/middleware/idempotency.ts"
+                  }
+                },
+                {
+                  "line": 256,
+                  "name": "createPublicProofRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/proofs.ts"
+                  }
+                },
+                {
+                  "line": 257,
+                  "name": "createPublicComplianceRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/compliance.ts"
+                  }
+                },
+                {
+                  "line": 258,
+                  "name": "createPublicOpenApiRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/public-openapi.ts"
+                  }
+                },
+                {
+                  "line": 263,
+                  "name": "authMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/auth.ts"
+                  }
+                },
+                {
+                  "line": 264,
+                  "name": "tenantMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/tenant.ts"
+                  }
+                },
+                {
+                  "line": 267,
+                  "name": "rateLimitMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/rate-limit.ts"
+                  }
+                },
+                {
+                  "line": 287,
+                  "name": "idempotencyMiddleware",
+                  "target": {
+                    "file": "packages/node/src/middleware/idempotency.ts"
+                  }
+                },
+                {
+                  "line": 291,
+                  "name": "createIntentRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/intents.ts"
+                  }
+                },
+                {
+                  "line": 292,
+                  "name": "createEventRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/events.ts"
+                  }
+                },
+                {
+                  "line": 293,
+                  "name": "createVerifyRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/verify.ts"
+                  }
+                },
+                {
+                  "line": 294,
+                  "name": "createAttestationRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/attestation.ts"
+                  }
+                },
+                {
+                  "line": 295,
+                  "name": "createExportRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/export.ts"
+                  }
+                },
+                {
+                  "line": 296,
+                  "name": "createProofRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/proofs.ts"
+                  }
+                },
+                {
+                  "line": 297,
+                  "name": "createComplianceRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/compliance.ts"
+                  }
+                },
+                {
+                  "line": 298,
+                  "name": "createAuditLogRoutes",
+                  "target": {
+                    "file": "packages/node/src/routes/audit-log.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "createApp",
+              "truncated": true
+            }
+          ]
         },
         {
           "exports": [
@@ -1145,6 +1800,8 @@
           "path": "packages/node/src/config.ts"
         },
         {
+          "entry": "main",
+          "entryRule": 1,
           "exports": [
             "buildAuthConfig"
           ],
@@ -1161,6 +1818,141 @@
           "path": "packages/node/src/main.ts",
           "reexportsAll": [
             "packages/node/src/types/index.ts"
+          ],
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 71,
+                  "name": "parseApiKeys",
+                  "target": {
+                    "file": "packages/node/src/config.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "buildAuthConfig"
+            },
+            {
+              "calls": [
+                {
+                  "line": 103,
+                  "name": "loadConfig",
+                  "target": {
+                    "file": "packages/node/src/config.ts"
+                  }
+                },
+                {
+                  "line": 71,
+                  "name": "parseApiKeys",
+                  "target": {
+                    "file": "packages/node/src/config.ts"
+                  },
+                  "via": "buildAuthConfig"
+                },
+                {
+                  "inner": [
+                    {
+                      "line": 181,
+                      "name": "requestIdMiddleware",
+                      "target": {
+                        "file": "packages/node/src/middleware/request-id.ts"
+                      }
+                    },
+                    {
+                      "line": 193,
+                      "name": "loggerMiddleware",
+                      "target": {
+                        "file": "packages/node/src/middleware/logger.ts"
+                      }
+                    },
+                    {
+                      "line": 197,
+                      "name": "metricsMiddleware",
+                      "target": {
+                        "file": "packages/node/src/middleware/metrics.ts"
+                      }
+                    },
+                    {
+                      "line": 226,
+                      "name": "createErrorHandler",
+                      "target": {
+                        "file": "packages/node/src/middleware/error-handler.ts"
+                      }
+                    },
+                    {
+                      "line": 230,
+                      "name": "createHealthRoutes",
+                      "target": {
+                        "file": "packages/node/src/routes/health.ts"
+                      }
+                    },
+                    {
+                      "line": 244,
+                      "name": "authMiddleware",
+                      "target": {
+                        "file": "packages/node/src/middleware/auth.ts"
+                      }
+                    },
+                    {
+                      "line": 245,
+                      "name": "createMetricsRoute",
+                      "target": {
+                        "file": "packages/node/src/routes/metrics.ts"
+                      }
+                    },
+                    {
+                      "line": 254,
+                      "name": "createPublicVerifyRoutes",
+                      "target": {
+                        "file": "packages/node/src/routes/public-verify.ts"
+                      }
+                    },
+                    {
+                      "line": 254,
+                      "name": "DEFAULT_SWEEP_INTERVAL_MS",
+                      "passed": true,
+                      "target": {
+                        "file": "packages/node/src/middleware/idempotency.ts"
+                      }
+                    },
+                    {
+                      "line": 256,
+                      "name": "createPublicProofRoutes",
+                      "target": {
+                        "file": "packages/node/src/routes/proofs.ts"
+                      }
+                    },
+                    {
+                      "line": 257,
+                      "name": "createPublicComplianceRoutes",
+                      "target": {
+                        "file": "packages/node/src/routes/compliance.ts"
+                      }
+                    },
+                    {
+                      "line": 258,
+                      "name": "createPublicOpenApiRoutes",
+                      "target": {
+                        "file": "packages/node/src/routes/public-openapi.ts"
+                      }
+                    }
+                  ],
+                  "innerTruncated": true,
+                  "line": 130,
+                  "name": "createApp",
+                  "target": {
+                    "file": "packages/node/src/app.ts"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": true,
+              "isDefaultExport": false,
+              "name": "main"
+            }
           ]
         },
         {
@@ -1306,7 +2098,8 @@
         {
           "hash": "686fe8d1ae2ec2fb67eedddb3d8f1d5b53e3291f055c5a52805739b12ecb33b6",
           "importsFiles": [
-            "packages/node/src/middleware/metrics.ts"
+            "packages/node/src/middleware/metrics.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/node/src/observability/telemetry-bridge.ts"
         },
@@ -1323,7 +2116,8 @@
             "packages/node/src/types/api-contract.ts",
             "packages/node/src/types/dto.ts",
             "packages/node/src/types/error.ts",
-            "packages/node/src/types/pagination.ts"
+            "packages/node/src/types/pagination.ts",
+            "packages/reconciler/src/index.ts"
           ],
           "path": "packages/node/src/routes/attestation.ts"
         },
@@ -1348,7 +2142,8 @@
           "importsFiles": [
             "packages/node/src/middleware/auth.ts",
             "packages/node/src/types/api-contract.ts",
-            "packages/node/src/types/error.ts"
+            "packages/node/src/types/error.ts",
+            "packages/verify/src/index.ts"
           ],
           "path": "packages/node/src/routes/compliance.ts"
         },
@@ -1465,7 +2260,9 @@
             "packages/node/src/middleware/auth.ts",
             "packages/node/src/middleware/validate.ts",
             "packages/node/src/types/api-contract.ts",
-            "packages/node/src/types/error.ts"
+            "packages/node/src/types/error.ts",
+            "packages/proof/src/index.ts",
+            "packages/reconciler/src/index.ts"
           ],
           "path": "packages/node/src/routes/proofs.ts"
         },
@@ -1489,7 +2286,8 @@
             "packages/node/src/middleware/rate-limit.ts",
             "packages/node/src/middleware/validate.ts",
             "packages/node/src/types/api-contract.ts",
-            "packages/node/src/types/error.ts"
+            "packages/node/src/types/error.ts",
+            "packages/verify/src/index.ts"
           ],
           "path": "packages/node/src/routes/public-verify.ts"
         },
@@ -1545,7 +2343,17 @@
         {
           "hash": "d2b150e7254fbd878c0687021caa7a7cca39664b61c0418f769a176e634e29fb",
           "importsFiles": [
-            "packages/node/src/services/persistence-paths.ts"
+            "packages/chain-observer/src/index.ts",
+            "packages/event-store/src/index.ts",
+            "packages/ledger/src/index.ts",
+            "packages/node/src/services/persistence-paths.ts",
+            "packages/reconciler/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/treasury/src/index.ts",
+            "packages/types/src/index.ts",
+            "packages/vault/src/index.ts",
+            "packages/verify/src/index.ts",
+            "packages/witness/src/index.ts"
           ],
           "path": "packages/node/src/services/attestia-service.ts"
         },
@@ -1877,8 +2685,10 @@
         {
           "hash": "145acab0856de73279f1296c978d686dd74a67d193a8193e2270c48de4d15ff4",
           "importsFiles": [
+            "packages/event-store/src/index.ts",
             "packages/node/src/services/attestia-service.ts",
-            "packages/node/src/services/persistence-paths.ts"
+            "packages/node/src/services/persistence-paths.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/node/tests/persistence/durability.test.ts"
         },
@@ -1979,8 +2789,10 @@
         {
           "hash": "db4fab739692afa50bc37e7842aba6f606189153878ac6c99054bf1d005f6b97",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/node/src/app.ts",
-            "packages/node/tests/setup.ts"
+            "packages/node/tests/setup.ts",
+            "packages/registrum/src/index.ts"
           ],
           "path": "packages/node/tests/verify.test.ts"
         },
@@ -1999,8 +2811,9 @@
       "importConfidence": "full",
       "name": "node",
       "origin": "authored",
+      "outsideReads": 6,
       "role": "code",
-      "testedBy": 44,
+      "testedBy": 45,
       "unresolvedSites": 0
     },
     {
@@ -2032,7 +2845,8 @@
           "hash": "9070022b7e3847a4a7bda559eca046fab42b3840ae763670b20b02f022d2c6c9",
           "importsFiles": [
             "packages/proof/src/merkle-tree.ts",
-            "packages/proof/src/types.ts"
+            "packages/proof/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/proof/src/attestation-proof.ts"
         },
@@ -2115,7 +2929,8 @@
         {
           "hash": "b88863b402c5b3072c527fd735d3cf108ef9278c11899cf0d8113f5124a8f8f1",
           "importsFiles": [
-            "packages/proof/src/index.ts"
+            "packages/proof/src/index.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/proof/tests/observability-and-packaging.test.ts"
         },
@@ -2135,7 +2950,7 @@
       "name": "proof",
       "origin": "authored",
       "role": "code",
-      "testedBy": 9,
+      "testedBy": 10,
       "unresolvedSites": 0
     },
     {
@@ -2159,7 +2974,8 @@
         {
           "hash": "61314409e1866330446704f1214ac7fc29fc73dec6f4640c90d41d716c1bec12",
           "importsFiles": [
-            "packages/reconciler/src/types.ts"
+            "packages/reconciler/src/types.ts",
+            "packages/registrum/src/index.ts"
           ],
           "path": "packages/reconciler/src/attestor.ts"
         },
@@ -2171,6 +2987,9 @@
             "preventDoubleCounting"
           ],
           "hash": "76a4375c4b1a9053a54cc20aee04145160149a01c594542294f1a249a7ea9f2f",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/reconciler/src/cross-chain-rules.ts"
         },
         {
@@ -2198,6 +3017,7 @@
         {
           "hash": "cf5ac01e5d0bac55142da3751b6d098d9c4ea16504f1f956775e1ab45dcb11fe",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/reconciler/src/discrepancy.ts",
             "packages/reconciler/src/types.ts"
           ],
@@ -2206,6 +3026,7 @@
         {
           "hash": "9ebfcbd40c5e6eb5500adefc028bfea4c7fd2b6541440e793b33aeb76757a981",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/reconciler/src/discrepancy.ts",
             "packages/reconciler/src/types.ts"
           ],
@@ -2214,6 +3035,7 @@
         {
           "hash": "4506247a04c8403e7b40eabc0b6d92d9f47de59c28ad68f2bba5502c81cbe1ff",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/reconciler/src/cross-chain-rules.ts",
             "packages/reconciler/src/discrepancy.ts",
             "packages/reconciler/src/types.ts"
@@ -2228,14 +3050,17 @@
             "packages/reconciler/src/intent-chain-matcher.ts",
             "packages/reconciler/src/intent-ledger-matcher.ts",
             "packages/reconciler/src/ledger-chain-matcher.ts",
-            "packages/reconciler/src/types.ts"
+            "packages/reconciler/src/types.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/reconciler/src/reconciler.ts"
         },
         {
           "hash": "bfe0691c8147f703ec95fbbb9c546ba34ab336a9b1dd84e6d4fb47387760a935",
           "importsFiles": [
-            "packages/reconciler/src/discrepancy.ts"
+            "packages/reconciler/src/discrepancy.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/reconciler/src/types.ts"
         },
@@ -2243,7 +3068,8 @@
           "hash": "72de3d70e0916c9c8192eadd29d0dd50627593edf5ecfa13a91063e17a5e17a2",
           "importsFiles": [
             "packages/reconciler/src/attestor.ts",
-            "packages/reconciler/src/types.ts"
+            "packages/reconciler/src/types.ts",
+            "packages/registrum/src/index.ts"
           ],
           "path": "packages/reconciler/tests/attestor.test.ts"
         },
@@ -2251,7 +3077,8 @@
           "hash": "7be8e6b3c27e15b4c3771662f214e169effeff688e288a99841d3e02be06d87b",
           "importsFiles": [
             "packages/reconciler/src/cross-chain-rules.ts",
-            "packages/reconciler/src/reconciler.ts"
+            "packages/reconciler/src/reconciler.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/reconciler/tests/cross-chain-extensibility.test.ts"
         },
@@ -2290,7 +3117,8 @@
           "hash": "275aeb5dc7bd82c3c85e9ccd8d6f39297df27d57587167a2e1d62ca44cd2fd56",
           "importsFiles": [
             "packages/reconciler/src/reconciler.ts",
-            "packages/reconciler/src/types.ts"
+            "packages/reconciler/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/reconciler/tests/observability.test.ts"
         },
@@ -2298,7 +3126,8 @@
           "hash": "afc19282143a5a7ace5cd444f7d6cfbb5b003640495f51dace795f6172cca9cd",
           "importsFiles": [
             "packages/reconciler/src/reconciler.ts",
-            "packages/reconciler/src/types.ts"
+            "packages/reconciler/src/types.ts",
+            "packages/registrum/src/index.ts"
           ],
           "path": "packages/reconciler/tests/reconciler.test.ts"
         },
@@ -2329,8 +3158,9 @@
       "importConfidence": "full",
       "name": "reconciler",
       "origin": "authored",
+      "outsideReads": 3,
       "role": "code",
-      "testedBy": 10,
+      "testedBy": 25,
       "unresolvedSites": 0
     },
     {
@@ -2651,7 +3481,8 @@
           "importsFiles": [
             "packages/registrum/src/persistence/snapshot.ts",
             "packages/registrum/src/registry/loader.ts",
-            "packages/registrum/src/types.ts"
+            "packages/registrum/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/src/persistence/rehydrator.ts"
         },
@@ -2735,7 +3566,8 @@
             "packages/registrum/src/registry/errors.ts",
             "packages/registrum/src/registry/predicate/ast.ts",
             "packages/registrum/src/registry/predicate/parser.ts",
-            "packages/registrum/src/registry/predicate/validator.ts"
+            "packages/registrum/src/registry/predicate/validator.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/src/registry/loader.ts"
         },
@@ -2762,7 +3594,8 @@
           "hash": "15b5d2aa5c4d4481ae758be0814c1a12a06d0394ce6cfdb246cdf93427812d0e",
           "importsFiles": [
             "packages/registrum/src/registry/predicate/ast.ts",
-            "packages/registrum/src/types.ts"
+            "packages/registrum/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/src/registry/predicate/evaluator.ts"
         },
@@ -2805,7 +3638,8 @@
             "packages/registrum/src/registry/predicate/evaluator.ts",
             "packages/registrum/src/structural-registrar.ts",
             "packages/registrum/src/types.ts",
-            "packages/registrum/src/violation-detail.ts"
+            "packages/registrum/src/violation-detail.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/src/registry/registry-driven-registrar.ts"
         },
@@ -2819,7 +3653,8 @@
             "packages/registrum/src/registry/loader.ts",
             "packages/registrum/src/registry/predicate/evaluator.ts",
             "packages/registrum/src/types.ts",
-            "packages/registrum/src/violation-detail.ts"
+            "packages/registrum/src/violation-detail.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/src/structural-registrar.ts"
         },
@@ -2897,7 +3732,8 @@
             "packages/registrum/src/registry/loader.ts",
             "packages/registrum/src/registry/predicate/evaluator.ts",
             "packages/registrum/src/structural-registrar.ts",
-            "packages/registrum/src/types.ts"
+            "packages/registrum/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/tests/observability.test.ts"
         },
@@ -3057,7 +3893,8 @@
             "packages/registrum/src/registry/loader.ts",
             "packages/registrum/src/registry/registry-driven-registrar.ts",
             "packages/registrum/src/structural-registrar.ts",
-            "packages/registrum/src/types.ts"
+            "packages/registrum/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/registrum/tests/stage-c-hardening.test.ts"
         },
@@ -3076,10 +3913,10 @@
       "importConfidence": "full",
       "name": "registrum",
       "origin": "authored",
-      "outsideReads": 1,
+      "outsideReads": 5,
       "outsideWrites": 1,
       "role": "code",
-      "testedBy": 24,
+      "testedBy": 43,
       "unresolvedSites": 0
     },
     {
@@ -3297,7 +4134,7 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 2,
+      "dynamicReads": 1,
       "dynamicSpawns": 0,
       "dynamicSpawnsInTests": 0,
       "dynamicWrites": 0,
@@ -3394,6 +4231,7 @@
         {
           "hash": "f37388bbd92ce5e06ff4a64fb89300c089b3556e8c0c83f6ac1235219439ba04",
           "importsFiles": [
+            "packages/node/src/main.ts",
             "packages/sdk/src/client.ts",
             "packages/sdk/src/types.ts"
           ],
@@ -3415,7 +4253,7 @@
       "name": "sdk",
       "origin": "authored",
       "role": "code",
-      "testedBy": 5,
+      "testedBy": 6,
       "unresolvedSites": 0
     },
     {
@@ -3585,14 +4423,18 @@
         {
           "hash": "6af6ab309908e397aa60e5995373dbd6f4d5d395f501f45e26e0e17700f69bd0",
           "importsFiles": [
-            "packages/treasury/src/types.ts"
+            "packages/ledger/src/index.ts",
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/src/distribution.ts"
         },
         {
           "hash": "98602d6ff51072e8d82045900d75d2c82094c103e5e5be2da6edd95c74f5ab39",
           "importsFiles": [
-            "packages/treasury/src/types.ts"
+            "packages/ledger/src/index.ts",
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/src/funding.ts"
         },
@@ -3610,64 +4452,81 @@
         {
           "hash": "040ca8bb7c065046e27ee14f3bbda019f3ecce94e21b2fef53488722b716a319",
           "importsFiles": [
-            "packages/treasury/src/types.ts"
+            "packages/ledger/src/index.ts",
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/src/payroll.ts"
         },
         {
           "hash": "5da3c9a0d8abc5ea476061a51d9cd3bdf5006d40a562da21c6b220c5d230452b",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/treasury/src/distribution.ts",
             "packages/treasury/src/funding.ts",
             "packages/treasury/src/payroll.ts",
-            "packages/treasury/src/types.ts"
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/src/treasury.ts"
         },
         {
           "hash": "e0cbd525208e920b32d6bd81ba3778c9bae7482b4f8ff5045a3b8291e070ca7d",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/treasury/src/types.ts"
         },
         {
           "hash": "d3588be7a3bfdc2e54e40ef6a7fbbaf6de1860c38687355bd12c00ac7a68709c",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/treasury/src/distribution.ts",
-            "packages/treasury/src/types.ts"
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/distribution.test.ts"
         },
         {
           "hash": "5b1c610bbe9f223894dd670f53ab2197f7b062412f8eed3f63b09ba9ea34d169",
           "importsFiles": [
-            "packages/treasury/src/funding.ts"
+            "packages/ledger/src/index.ts",
+            "packages/treasury/src/funding.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/funding.test.ts"
         },
         {
           "hash": "4b3da0b7350649092df107cbbdfa586a61618d7eef75709fe509b5315d6eaf51",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/treasury/src/distribution.ts",
             "packages/treasury/src/funding.ts",
-            "packages/treasury/src/payroll.ts"
+            "packages/treasury/src/payroll.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/observability.test.ts"
         },
         {
           "hash": "16857c0481200c3fa30f310524c5fe952daeb42c5cfce6d73f0f9a71fe54b07b",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/treasury/src/payroll.ts",
-            "packages/treasury/src/types.ts"
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/payroll.test.ts"
         },
         {
           "hash": "6c43813686199e0ba2967c5d0420100e8f44381ed97678423ef6b6a83c6cad15",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
             "packages/treasury/src/distribution.ts",
             "packages/treasury/src/funding.ts",
             "packages/treasury/src/payroll.ts",
             "packages/treasury/src/treasury.ts",
-            "packages/treasury/src/types.ts"
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/stage-c-hardening.test.ts"
         },
@@ -3675,7 +4534,8 @@
           "hash": "e8d53c1e0b1d0bd9add39fb9476a965f1e7ceb28717770da0e4fd8b593f1342b",
           "importsFiles": [
             "packages/treasury/src/treasury.ts",
-            "packages/treasury/src/types.ts"
+            "packages/treasury/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/treasury/tests/treasury.test.ts"
         },
@@ -3694,8 +4554,9 @@
       "importConfidence": "full",
       "name": "treasury",
       "origin": "authored",
+      "outsideReads": 5,
       "role": "code",
-      "testedBy": 8,
+      "testedBy": 10,
       "unresolvedSites": 0
     },
     {
@@ -3812,7 +4673,7 @@
       "name": "types",
       "origin": "authored",
       "role": "code",
-      "testedBy": 6,
+      "testedBy": 120,
       "unresolvedSites": 0
     },
     {
@@ -3836,6 +4697,8 @@
         {
           "hash": "2499550d8d1cfe6177cb8f26082a2df171cca4dfae7fea1f19e92e5a6d7977dd",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/vault/src/types.ts"
           ],
           "path": "packages/vault/src/budget.ts"
@@ -3854,6 +4717,8 @@
         {
           "hash": "74aeb971713ff6fba232b78e6f1a80038184376c1330efaf26e0c40663658eca",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts",
             "packages/vault/src/types.ts"
           ],
@@ -3862,17 +4727,25 @@
         {
           "hash": "4f865841fb17b54c1c8bc079b3398fc95a9baa1223161600b548128df8bea128",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
+            "packages/ledger/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/vault/src/types.ts"
           ],
           "path": "packages/vault/src/portfolio.ts"
         },
         {
           "hash": "590637610fe0a7c4ef499663f103bcd0ab2fa437bbc9ba2631e9dd60b24277a3",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/vault/src/types.ts"
         },
         {
           "hash": "b438e90bb188c316283c2f9ba763ff6dc155cfa20e2e5d439aebe10e1ef8b941",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts",
             "packages/vault/src/intent-manager.ts",
             "packages/vault/src/portfolio.ts",
@@ -3883,6 +4756,7 @@
         {
           "hash": "8472e5befbece15a367a8f6ce94f65c93c49567d58473905c6c6c7a0c7e888ab",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts"
           ],
           "path": "packages/vault/tests/budget.test.ts"
@@ -3890,6 +4764,7 @@
         {
           "hash": "40146c6b1d146d84fad5f02c6130509948f9168b90dec5ca919ad05f6abe1a77",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts",
             "packages/vault/src/intent-manager.ts"
           ],
@@ -3898,6 +4773,7 @@
         {
           "hash": "ddcfe18f3163545362fe0282b83da61897f0b5c62fb82aedd21f2deff2851595",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts",
             "packages/vault/src/intent-manager.ts"
           ],
@@ -3906,6 +4782,7 @@
         {
           "hash": "77535f86db7e5eeef3d74d8aacc2ba57ff2da370102e63fcbc12e093da884a6d",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
             "packages/vault/src/portfolio.ts",
             "packages/vault/src/types.ts"
           ],
@@ -3914,6 +4791,7 @@
         {
           "hash": "36c13decae112c8a3a48591127389db04c9b31b289983e25d33e433e04ae6741",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
             "packages/vault/src/portfolio.ts",
             "packages/vault/src/types.ts"
           ],
@@ -3922,6 +4800,8 @@
         {
           "hash": "01bf40b14c62a36fbc17b34ed0b323540d526192a37e4cc646520bfb03e1f7a2",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/vault/src/budget.ts",
             "packages/vault/src/intent-manager.ts",
             "packages/vault/src/portfolio.ts",
@@ -3933,6 +4813,7 @@
         {
           "hash": "ccc47aff00d1853aa4efa40172b80edd8daa670cb426c6d2a4f32fe4aa2d9fbf",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
             "packages/vault/src/types.ts",
             "packages/vault/src/vault.ts"
           ],
@@ -3941,6 +4822,7 @@
         {
           "hash": "a7854fd9b9cf9846ad3e3065e1cc7ed1f8b76958c8d63fcaf09171b5203c6205",
           "importsFiles": [
+            "packages/chain-observer/src/index.ts",
             "packages/vault/src/types.ts",
             "packages/vault/src/vault.ts"
           ],
@@ -3961,8 +4843,9 @@
       "importConfidence": "full",
       "name": "vault",
       "origin": "authored",
+      "outsideReads": 5,
       "role": "code",
-      "testedBy": 9,
+      "testedBy": 11,
       "unresolvedSites": 0
     },
     {
@@ -4033,6 +4916,10 @@
             "checkSequenceContiguity"
           ],
           "hash": "aa383284feea67fd5edd473ccefc544e0c16179ab4cb7d58ce5fb1c8413e6ac1",
+          "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/verify/src/cross-chain-invariants.ts"
         },
         {
@@ -4043,6 +4930,8 @@
           ],
           "hash": "5ef3c4e1844115b035b451416c7929575858ab634e50908b7af2d66a5b977e15",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
             "packages/verify/src/types.ts"
           ],
           "path": "packages/verify/src/global-state-hash.ts"
@@ -4071,6 +4960,9 @@
             "computeCombinedHash"
           ],
           "hash": "f360487fab616acf9da087495bac4b2e586ad83460f376d4a6a86e1adb002d48",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/verify/src/multi-chain-replay.ts"
         },
         {
@@ -4080,6 +4972,8 @@
           ],
           "hash": "41c6c48d23bc51519c889d8344bcd58dfcf8cb1240a7861798975dc65cf7ed03",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
             "packages/verify/src/global-state-hash.ts",
             "packages/verify/src/types.ts"
           ],
@@ -4142,6 +5036,8 @@
           ],
           "hash": "5c35a2a2d96f499d25f77e59a1227e99259ec49d6b684d0be28f252bb3fae1a0",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
             "packages/verify/src/global-state-hash.ts",
             "packages/verify/src/types.ts"
           ],
@@ -4149,6 +5045,11 @@
         },
         {
           "hash": "7996a39cafffe3683dcab35688fa8be19616e913ffbbb3d5dbb3c2a0530ce342",
+          "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/verify/src/types.ts"
         },
         {
@@ -4158,6 +5059,7 @@
           ],
           "hash": "ecf3a47e5f05291d632816505d5687e69002d49e6c7f44db706de87d71455425",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/verify/src/types.ts"
           ],
           "path": "packages/verify/src/verification-consensus.ts"
@@ -4168,6 +5070,7 @@
           ],
           "hash": "1e15dbf01d7534d70158ac53bd0d9c898c163b8177cdfce034a08c1a7d1e6137",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/verify/src/global-state-hash.ts",
             "packages/verify/src/replay.ts",
             "packages/verify/src/state-bundle.ts",
@@ -4185,6 +5088,9 @@
         {
           "hash": "a5fe67356da52e9b0eb16bbb6ced878ef66fa02bf66b19d0a6494f9264286444",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/index.ts"
           ],
           "path": "packages/verify/tests/bench/replay.bench.ts"
@@ -4201,6 +5107,9 @@
         {
           "hash": "651a834bf0b0ae694ba0c24871714062aa49430db9d61542f88fe594da847641",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/compliance/evidence-generator.ts",
             "packages/verify/src/compliance/iso27001-mapping.ts",
             "packages/verify/src/compliance/soc2-mapping.ts",
@@ -4258,6 +5167,9 @@
         {
           "hash": "63c6b6e97769fc67d2c258a40ceb580b3978ac774d7a322a0b364ac9369d48b0",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/global-state-hash.ts"
           ],
           "path": "packages/verify/tests/global-state-hash.test.ts"
@@ -4272,6 +5184,7 @@
         {
           "hash": "b4e4cca49f5707b5cefc9007afc09de0801809903232a016d37a283f909cc85e",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/verify/src/cross-chain-invariants.ts",
             "packages/verify/src/multi-chain-replay.ts",
             "packages/verify/src/types.ts",
@@ -4282,6 +5195,9 @@
         {
           "hash": "cc6eb4c634e244dd0417d5d124f2a128631c1e3c26bba6ad98894ffd1c7e48a6",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/global-state-hash.ts",
             "packages/verify/src/replay.ts"
           ],
@@ -4301,7 +5217,8 @@
           "importsFiles": [
             "packages/verify/src/sla/sla-engine.ts",
             "packages/verify/src/sla/tenant-governance.ts",
-            "packages/verify/src/sla/types.ts"
+            "packages/verify/src/sla/types.ts",
+            "packages/witness/src/index.ts"
           ],
           "path": "packages/verify/tests/sla/governance-hardening.test.ts"
         },
@@ -4325,13 +5242,17 @@
           "hash": "072a6fb4b026e8e7ff5c39a7ee37dd542552d4cddeb7a9af6b1d476e4504af28",
           "importsFiles": [
             "packages/verify/src/sla/tenant-governance.ts",
-            "packages/verify/src/sla/types.ts"
+            "packages/verify/src/sla/types.ts",
+            "packages/witness/src/index.ts"
           ],
           "path": "packages/verify/tests/sla/tenant-governance.test.ts"
         },
         {
           "hash": "86f9f97612cfb8455468843512e9d82610c1efe84058d321470e3b96a8be1f8c",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/global-state-hash.ts",
             "packages/verify/src/state-bundle.ts",
             "packages/verify/src/types.ts"
@@ -4349,6 +5270,9 @@
         {
           "hash": "50b7281d4b4efac77464f98c613e21f473b438576423673141a6b16ad4354e1e",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/state-bundle.ts",
             "packages/verify/src/types.ts",
             "packages/verify/src/verifier-node.ts"
@@ -4358,6 +5282,9 @@
         {
           "hash": "da3378d6a05dc1cf0c8a81e5d2bfa8e5d707b5fcceb0903959e56e89309d5ebf",
           "importsFiles": [
+            "packages/ledger/src/index.ts",
+            "packages/registrum/src/index.ts",
+            "packages/types/src/index.ts",
             "packages/verify/src/state-bundle.ts",
             "packages/verify/src/types.ts",
             "packages/verify/src/verifier-node.ts"
@@ -4379,8 +5306,9 @@
       "importConfidence": "full",
       "name": "verify",
       "origin": "authored",
+      "outsideReads": 1,
       "role": "code",
-      "testedBy": 26,
+      "testedBy": 30,
       "unresolvedSites": 0
     },
     {
@@ -4427,6 +5355,7 @@
           ],
           "hash": "7168cc7ab0d0798638630c41e798b93721dad7338b1682a2bdb8ef340cd29fd0",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/witness/src/governance/signing.ts",
             "packages/witness/src/governance/types.ts",
             "packages/witness/src/memo-encoder.ts",
@@ -4439,6 +5368,7 @@
         {
           "hash": "c84e8cc0e704b2b85adaf5c562361d454716e9a9f366cf86d5b4fe9eeeb79ce3",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/governance/governance-store.ts",
             "packages/witness/src/governance/multisig-submitter.ts",
             "packages/witness/src/governance/types.ts",
@@ -4529,6 +5459,7 @@
           ],
           "hash": "01a149a0edd30a60aa0a90fe6ee418060e2f384d233ed4ad15a1b849d9e17118",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/types.ts"
           ],
           "path": "packages/witness/src/payload.ts"
@@ -4556,6 +5487,9 @@
         },
         {
           "hash": "0edfb3b8891359f917ad2e81804274fc8cf1c473310b60286b4e04ffe1d77cbe",
+          "importsFiles": [
+            "packages/types/src/index.ts"
+          ],
           "path": "packages/witness/src/telemetry.ts"
         },
         {
@@ -4564,6 +5498,7 @@
           ],
           "hash": "b767ce25762e77ac71239b906028636ba3990d698873762522acbfb93ab3fbbc",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/witness/src/retry.ts"
           ],
           "path": "packages/witness/src/types.ts"
@@ -4580,6 +5515,7 @@
         {
           "hash": "1b3ae9847d960841efe7f09971efd7b89bd3340baca10dea34869bce92e866cb",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/submitter.ts",
             "packages/witness/src/types.ts",
@@ -4590,6 +5526,7 @@
         {
           "hash": "c4779a96fb36aaf5c5338c6b47cabf9f53eb3992864e8397b5cb8a064abb3460",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/payload.ts"
           ],
           "path": "packages/witness/tests/canonicalization.test.ts"
@@ -4699,6 +5636,7 @@
         {
           "hash": "13ba18ae7f0bb6b59c1fe8e00ddaa2a1ee245b13cecf679fe2f1386507979c8d",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/index.ts",
             "packages/witness/src/types.ts"
           ],
@@ -4715,6 +5653,7 @@
         {
           "hash": "d7bd08e1df52fdec9f306bd82db014f869028d1e9c302a55a29e26954bc58c4d",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/payload.ts"
           ],
           "path": "packages/witness/tests/payload.test.ts"
@@ -4745,6 +5684,7 @@
         {
           "hash": "3cfd7d5d2fa5483d45d991b3446ac5b68fd936ce34e43cb9ddd87ad08c42a50c",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/submitter.ts",
             "packages/witness/src/types.ts"
@@ -4754,6 +5694,7 @@
         {
           "hash": "88030f93ccd08deecfa4bfef1897cba56e19e89840992687c4f47083e433f88e",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/submitter.ts",
             "packages/witness/src/types.ts"
@@ -4763,6 +5704,7 @@
         {
           "hash": "b9183d616432bfc120f7911b043b64fe2a4cf2e8fa100fe07c8ba38039033d5b",
           "importsFiles": [
+            "packages/types/src/index.ts",
             "packages/witness/src/governance/multisig-submitter.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/submitter.ts",
@@ -4773,6 +5715,7 @@
         {
           "hash": "e1288cbf714098da3dc2fb8c2342cf374a6fc770ac3cd0c29e6712d304a64319",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/memo-encoder.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/submitter.ts",
@@ -4790,6 +5733,7 @@
         {
           "hash": "5d680735c1ad2fb7790f9d944894ed175bac09839af7e7fd6faee35f00d3b040",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/memo-encoder.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/types.ts",
@@ -4800,6 +5744,7 @@
         {
           "hash": "88b1a866b5959287820af1ed40ac23d0879dc197cb23079da8792d39e3986259",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/memo-encoder.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/types.ts",
@@ -4810,6 +5755,7 @@
         {
           "hash": "3db81e0dd9a6830b3d902847c96e87676686fc11057817960778cdc2d7c3f8fc",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/types.ts",
             "packages/witness/src/witness.ts"
@@ -4819,6 +5765,7 @@
         {
           "hash": "5156401e50dae60a0d435ab2829e45f91d5b7e29c339163fc012d64db0207644",
           "importsFiles": [
+            "packages/reconciler/src/index.ts",
             "packages/witness/src/memo-encoder.ts",
             "packages/witness/src/payload.ts",
             "packages/witness/src/types.ts",
@@ -4845,8 +5792,9 @@
       "importConfidence": "full",
       "name": "witness",
       "origin": "authored",
+      "outsideReads": 2,
       "role": "code",
-      "testedBy": 30,
+      "testedBy": 34,
       "unresolvedSites": 0
     }
   ],
@@ -4857,7 +5805,7 @@
         {
           "job": "build-and-test",
           "step": "Atlas check",
-          "text": "npx --yes @dogfood-lab/atlas@1.16.0 check"
+          "text": "npx --yes @dogfood-lab/atlas@1.17.0 check"
         },
         {
           "job": "build-and-test",
@@ -5988,6 +6936,12 @@
         },
         {
           "job": "build-and-push",
+          "path": "packages/node/src/main.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "job": "build-and-push",
           "path": "packages/proof/package.json",
           "runKind": "checks",
           "via": "docker build packages/node/Dockerfile"
@@ -6059,7 +7013,7 @@
           "via": "docker build packages/node/Dockerfile"
         }
       ],
-      "runsCount": 19,
+      "runsCount": 20,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -7157,6 +8111,13 @@
         "opensIssues": false,
         "opensIssuesOnFailure": false,
         "opensPullRequests": false,
+        "packages": [
+          {
+            "dir": "packages/attestia",
+            "name": "@mcptoolshop/attestia",
+            "registry": "npm"
+          }
+        ],
         "publishes": true,
         "publishesTo": [
           "npm"
@@ -7177,11 +8138,397 @@
         "actions/setup-node"
       ],
       "usesWorkflowToken": true
+    },
+    {
+      "checksCount": 0,
+      "commands": [],
+      "elsewhere": [],
+      "file": "packages/demo/package.json",
+      "kind": "command",
+      "landings": [],
+      "mentions": [],
+      "name": "attestia-demo",
+      "permissions": [],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "demo",
+          "depth": 0,
+          "files": 2
+        },
+        {
+          "boundary": "chain-observer",
+          "depth": 2,
+          "enters": {
+            "file": "packages/chain-observer/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 21
+        },
+        {
+          "boundary": "event-store",
+          "depth": 2,
+          "enters": {
+            "file": "packages/event-store/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 8
+        },
+        {
+          "boundary": "ledger",
+          "depth": 2,
+          "enters": {
+            "file": "packages/ledger/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 6
+        },
+        {
+          "boundary": "proof",
+          "depth": 2,
+          "enters": {
+            "file": "packages/proof/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 4
+        },
+        {
+          "boundary": "reconciler",
+          "depth": 2,
+          "enters": {
+            "file": "packages/reconciler/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 9
+        },
+        {
+          "boundary": "registrum",
+          "depth": 2,
+          "enters": {
+            "file": "packages/registrum/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 15
+        },
+        {
+          "boundary": "types",
+          "depth": 2,
+          "enters": {
+            "file": "packages/types/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 8
+        },
+        {
+          "boundary": "vault",
+          "depth": 2,
+          "enters": {
+            "file": "packages/vault/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 6
+        },
+        {
+          "boundary": "verify",
+          "depth": 2,
+          "enters": {
+            "file": "packages/verify/src/index.ts",
+            "from": "packages/demo/src/pipeline.ts"
+          },
+          "files": 19
+        }
+      ],
+      "readers": [],
+      "runs": [
+        {
+          "path": "packages/demo/src/index.ts",
+          "runKind": "executes"
+        }
+      ],
+      "runsCount": 1,
+      "secrets": [],
+      "sends": {
+        "deploysPages": false,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": false,
+        "publishesTo": [],
+        "releases": false
+      },
+      "stages": [],
+      "triggers": [],
+      "uses": [],
+      "usesWorkflowToken": false
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "chain-observer"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "event-store"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "proof"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "reconciler"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "registrum"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "sdk"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "treasury"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "vault"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "verify"
+    },
+    {
+      "from": "attestia",
+      "kind": "file",
+      "to": "witness"
+    },
+    {
+      "from": "chain-observer",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "chain-observer"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "event-store"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "proof"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "reconciler"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "registrum"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "vault"
+    },
+    {
+      "from": "demo",
+      "kind": "file",
+      "to": "verify"
+    },
+    {
+      "from": "event-store",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "ledger",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "chain-observer"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "event-store"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "proof"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "reconciler"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "registrum"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "treasury"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "vault"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "verify"
+    },
+    {
+      "from": "node",
+      "kind": "file",
+      "to": "witness"
+    },
+    {
+      "from": "proof",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "reconciler",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "reconciler",
+      "kind": "file",
+      "to": "registrum"
+    },
+    {
+      "from": "reconciler",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "registrum",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "sdk",
+      "fromTests": true,
+      "kind": "file",
+      "to": "node"
+    },
+    {
+      "from": "treasury",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "treasury",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "vault",
+      "kind": "file",
+      "to": "chain-observer"
+    },
+    {
+      "from": "vault",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "vault",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "verify",
+      "kind": "file",
+      "to": "ledger"
+    },
+    {
+      "from": "verify",
+      "kind": "file",
+      "to": "registrum"
+    },
+    {
+      "from": "verify",
+      "kind": "file",
+      "to": "types"
+    },
+    {
+      "from": "verify",
+      "fromTests": true,
+      "kind": "file",
+      "to": "witness"
+    },
+    {
+      "from": "witness",
+      "kind": "file",
+      "to": "reconciler"
+    },
+    {
+      "from": "witness",
+      "kind": "file",
+      "to": "types"
+    }
+  ],
   "generatedFrom": {
-    "commit": "f0d4cf2e8a8d2c530f9e07bf6cd4c6f14c5d18a7",
+    "commit": "245af305ebae9d405b74c4bbcd86c93f489c0261",
     "tracked": 591
   },
   "landings": [
@@ -7238,6 +8585,11 @@
           "by": "scripts/status.js",
           "call": "literal",
           "confidence": "ast"
+        },
+        {
+          "by": "scripts/status.js",
+          "call": "readFileSync",
+          "confidence": "ast"
         }
       ],
       "target": "package.json",
@@ -7248,6 +8600,11 @@
         {
           "by": "scripts/status.js",
           "call": "existsSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "scripts/status.js",
+          "call": "readFileSync",
           "confidence": "ast"
         },
         {
