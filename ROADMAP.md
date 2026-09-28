@@ -410,10 +410,12 @@ Typed client SDK for API consumers.
 
 ### 15.1 — npm Publishing
 
-- [ ] Publish all `@attestia/*` packages to npm
-- [ ] Semantic versioning with conventional commits
-- [ ] Changesets for coordinated multi-package releases
-- [ ] Provenance attestation on npm packages (package-lock provenance)
+- [x] Publish bundled `@mcptoolshop/attestia` to npm with subpath exports (v2.0.2, OIDC provenance)
+- [x] Semantic versioning with conventional commits
+- [ ] ~~Changesets for coordinated multi-package releases~~ — **Deferred** (bundle-only strategy; revisit if individual `@attestia/*` packages needed)
+- [x] Provenance attestation on npm packages (Sigstore OIDC via GitHub Actions)
+
+> **Decision (2026-09-28):** Bundle-only publishing is sufficient. `@mcptoolshop/attestia` exposes all subpaths (`/event-store`, `/proof`, `/verify`, etc.) and is tree-shakeable. Individual `@attestia/*` packages remain workspace-internal. The AI governance product (Cognate) will consume `@mcptoolshop/attestia` subpaths directly.
 
 ### 15.2 — Docker
 
