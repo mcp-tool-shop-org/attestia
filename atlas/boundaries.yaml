@@ -1,0 +1,94 @@
+summary: ""
+boundaries:
+  - name: .github
+    globs:
+      - .github/**
+    role: config
+  - name: assets
+    globs:
+      - assets/**
+    role: data
+  - name: attestia
+    globs:
+      - packages/attestia/**
+    role: code
+  - name: chain-observer
+    globs:
+      - packages/chain-observer/**
+    role: code
+  - name: demo
+    globs:
+      - packages/demo/**
+    role: code
+  - name: docs
+    globs:
+      - docs/**
+    role: docs
+  - name: event-store
+    globs:
+      - packages/event-store/**
+    role: code
+  - name: ledger
+    globs:
+      - packages/ledger/**
+    role: code
+  - name: node
+    globs:
+      - packages/node/**
+    role: code
+  - name: proof
+    globs:
+      - packages/proof/**
+    role: code
+  - name: reconciler
+    globs:
+      - packages/reconciler/**
+    role: code
+  - name: registrum
+    globs:
+      - packages/registrum/**
+    role: code
+  - name: resources
+    globs:
+      - resources/**
+    role: docs
+  - name: root
+    globs:
+      - "*"
+    role: config
+  - name: scripts
+    globs:
+      - scripts/**
+    role: code
+  - name: sdk
+    globs:
+      - packages/sdk/**
+    role: code
+  - name: site
+    globs:
+      - site/**
+    role: site
+  - name: specs
+    globs:
+      - specs/**
+    role: docs
+  - name: treasury
+    globs:
+      - packages/treasury/**
+    role: code
+  - name: types
+    globs:
+      - packages/types/**
+    role: code
+  - name: vault
+    globs:
+      - packages/vault/**
+    role: code
+  - name: verify
+    globs:
+      - packages/verify/**
+    role: code
+  - name: witness
+    globs:
+      - packages/witness/**
+    role: code
