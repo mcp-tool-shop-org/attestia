@@ -3,7 +3,7 @@
 # ────────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 WORKDIR /build
 
@@ -25,13 +25,16 @@ COPY packages/event-store/package.json packages/event-store/
 COPY packages/proof/package.json packages/proof/
 COPY packages/sdk/package.json packages/sdk/
 COPY packages/demo/package.json packages/demo/
+COPY packages/attestia/package.json packages/attestia/
 COPY packages/node/package.json packages/node/
+
+# Copy source before install so the workspace links point at the sources
+# that will actually be compiled. .dockerignore keeps host dist and
+# tsbuildinfo out; a stale tsbuildinfo would make tsc skip emit.
+COPY packages/ packages/
 
 # Install all dependencies (workspace-wide)
 RUN pnpm install --frozen-lockfile
-
-# Copy all source code
-COPY packages/ packages/
 
 # Build all packages (dependencies first, then node)
 RUN pnpm -r build
@@ -41,7 +44,7 @@ RUN pnpm -r build
 # ────────────────────────────────────────────────────────────
 FROM node:22-slim AS production
 
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 WORKDIR /app
 
@@ -63,10 +66,13 @@ COPY packages/event-store/package.json packages/event-store/
 COPY packages/proof/package.json packages/proof/
 COPY packages/sdk/package.json packages/sdk/
 COPY packages/demo/package.json packages/demo/
+COPY packages/attestia/package.json packages/attestia/
 COPY packages/node/package.json packages/node/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
+
+RUN mkdir -p /app/data
 
 # Copy built output from builder stage
 COPY --from=builder /build/packages/types/dist packages/types/dist

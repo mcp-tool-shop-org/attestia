@@ -24,7 +24,7 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       LOG_LEVEL: "info"
-      NODE_ENV: "production"
+      NODE_ENV: "development"
       DEFAULT_CURRENCY: "USDC"
       DEFAULT_DECIMALS: "6"
       RATE_LIMIT_RPM: "100"

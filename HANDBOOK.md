@@ -502,7 +502,6 @@ attestia/
 ├── specs/                  # 10 formal RFCs (implementation-agnostic)
 ├── resources/              # Research and reference materials
 ├── docker-compose.yml
-├── Dockerfile
 ├── DESIGN.md               # Architecture decisions
 ├── ROADMAP.md              # Full project roadmap
 ├── HANDBOOK.md             # This document

@@ -5,6 +5,7 @@
  * and handles graceful shutdown.
  */
 
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
 import pino from "pino";
@@ -14,6 +15,19 @@ import type { AppConfig } from "./config.js";
 import { createApp } from "./app.js";
 import type { AuthConfig } from "./middleware/auth.js";
 import type { ApiKeyRecord } from "./types/auth.js";
+
+const require = createRequire(import.meta.url);
+
+function devLoggerTransport():
+  | { transport: { target: string } }
+  | Record<string, never> {
+  try {
+    require.resolve("pino-pretty");
+    return { transport: { target: "pino-pretty" } };
+  } catch {
+    return {};
+  }
+}
 
 // =============================================================================
 // Re-exports (package public API)
@@ -103,9 +117,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = pino({
     level: config.LOG_LEVEL,
-    ...(config.NODE_ENV === "development"
-      ? { transport: { target: "pino-pretty" } }
-      : {}),
+    ...(config.NODE_ENV === "development" ? devLoggerTransport() : {}),
   });
 
   // Build auth config from env vars. Throws in production when no credentials

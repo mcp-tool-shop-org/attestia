@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/.astro
+.git
+.github
+site
+swarms
+atlas
+*.md
+!README.md

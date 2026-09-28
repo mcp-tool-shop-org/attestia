@@ -4,6 +4,14 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [2.0.3] - 2026-09-28
+
+Docker image fix. No library API changes.
+
+- **Node image builds again.** The builder installs dependencies after the package sources are copied, so workspace links such as `@attestia/types` survive. Package builds call `pnpm exec tsc`. pnpm inside the image is pinned to 10.28.2. The `@mcptoolshop/attestia` workspace package is included in the install set. The image creates `/app/data` for the compose volume.
+- **Compose volumes** from the previous commit stay: `attestia-data` at `/app/data`, `rippled-data` for the standalone node.
+- **Local compose stays unsecured.** `NODE_ENV` is `development`, which is the path the node accepts with no API key. Pretty logs are used only when `pino-pretty` is installed, so the production image still starts. A raw `docker run` keeps the image default `NODE_ENV=production` and still refuses to boot without `API_KEYS` or `JWT_SECRET`.
+
 ## [2.0.2] - 2026-06-21
 
 npm front-door polish for `@mcptoolshop/attestia`. No library code changes.
