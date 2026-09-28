@@ -29,10 +29,9 @@ services:
       DEFAULT_DECIMALS: "6"
       RATE_LIMIT_RPM: "100"
       RATE_LIMIT_BURST: "20"
-      # Unsecured mode (no API_KEYS or JWT_SECRET) for local dev.
-      # Set API_KEYS and/or JWT_SECRET to enable auth:
-      # API_KEYS: "my-key:admin:default"
-      # JWT_SECRET: "change-me-in-production"
+      ATTESTIA_EVENTS_FILE: "/app/data/events.jsonl"
+    volumes:
+      - attestia-data:/app/data
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1))"]
       interval: 10s
@@ -47,9 +46,17 @@ services:
     ports:
       - "6006:6006"             # WebSocket (used by integration tests)
       - "127.0.0.1:5005:5005"   # JSON-RPC admin — localhost only, never all interfaces
+    volumes:
+      - rippled-data:/var/lib/rippled
     healthcheck:
       test: ["CMD", "rippled", "--silent", "server_info"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 10s
+
+volumes:
+  attestia-data:
+    driver: local
+  rippled-data:
+    driver: local
