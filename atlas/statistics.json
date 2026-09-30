@@ -164,7 +164,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "node",
-      "qualifyingSourceCommits": 3,
+      "qualifyingSourceCommits": 4,
       "rebaseline": null
     },
     {
@@ -442,8 +442,13 @@
     "definition": "commits is how many commits in the window touch the file, including merges and commits dropped from coupling. lines is added plus deleted in those commits.",
     "files": [
       {
-        "commits": 9,
-        "lines": 70,
+        "commits": 1,
+        "lines": 12,
+        "path": ".dockerignore"
+      },
+      {
+        "commits": 13,
+        "lines": 308,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -467,13 +472,13 @@
         "path": ".gitignore"
       },
       {
-        "commits": 9,
-        "lines": 312,
+        "commits": 10,
+        "lines": 320,
         "path": "CHANGELOG.md"
       },
       {
-        "commits": 7,
-        "lines": 134,
+        "commits": 8,
+        "lines": 135,
         "path": "HANDBOOK.md"
       },
       {
@@ -527,8 +532,8 @@
         "path": "README.zh.md"
       },
       {
-        "commits": 7,
-        "lines": 70,
+        "commits": 8,
+        "lines": 80,
         "path": "ROADMAP.md"
       },
       {
@@ -547,38 +552,38 @@
         "path": "VERIFICATION_GUIDE.md"
       },
       {
-        "commits": 1,
-        "lines": 87,
+        "commits": 4,
+        "lines": 373,
         "path": "atlas/README.md"
       },
       {
-        "commits": 1,
-        "lines": 94,
+        "commits": 3,
+        "lines": 282,
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 1,
-        "lines": 735,
+        "commits": 4,
+        "lines": 3371,
         "path": "atlas/page.json"
       },
       {
-        "commits": 1,
-        "lines": 1913,
+        "commits": 4,
+        "lines": 6093,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 1,
-        "lines": 7299,
+        "commits": 4,
+        "lines": 26176,
         "path": "atlas/structure.json"
       },
       {
-        "commits": 3,
-        "lines": 16,
+        "commits": 5,
+        "lines": 52,
         "path": "codecov.yml"
       },
       {
-        "commits": 2,
-        "lines": 22,
+        "commits": 4,
+        "lines": 39,
         "path": "docker-compose.yml"
       },
       {
@@ -592,8 +597,8 @@
         "path": "docs/index.md"
       },
       {
-        "commits": 12,
-        "lines": 31,
+        "commits": 13,
+        "lines": 33,
         "path": "package.json"
       },
       {
@@ -642,8 +647,8 @@
         "path": "packages/attestia/README.zh.md"
       },
       {
-        "commits": 8,
-        "lines": 158,
+        "commits": 9,
+        "lines": 160,
         "path": "packages/attestia/package.json"
       },
       {
@@ -732,8 +737,8 @@
         "path": "packages/attestia/vitest.config.ts"
       },
       {
-        "commits": 2,
-        "lines": 4,
+        "commits": 3,
+        "lines": 6,
         "path": "packages/chain-observer/package.json"
       },
       {
@@ -817,8 +822,8 @@
         "path": "packages/chain-observer/tests/xrpl/xrpl-observer.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 10,
+        "commits": 5,
+        "lines": 12,
         "path": "packages/demo/package.json"
       },
       {
@@ -830,6 +835,11 @@
         "commits": 4,
         "lines": 1328,
         "path": "packages/demo/src/pipeline.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/event-store/package.json"
       },
       {
         "commits": 2,
@@ -902,8 +912,8 @@
         "path": "packages/event-store/tests/telemetry.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 4,
+        "commits": 3,
+        "lines": 6,
         "path": "packages/ledger/package.json"
       },
       {
@@ -942,8 +952,13 @@
         "path": "packages/ledger/tests/telemetry.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 12,
+        "commits": 1,
+        "lines": 16,
+        "path": "packages/node/Dockerfile"
+      },
+      {
+        "commits": 5,
+        "lines": 14,
         "path": "packages/node/package.json"
       },
       {
@@ -957,8 +972,8 @@
         "path": "packages/node/src/config.ts"
       },
       {
-        "commits": 5,
-        "lines": 384,
+        "commits": 6,
+        "lines": 402,
         "path": "packages/node/src/main.ts"
       },
       {
@@ -1217,8 +1232,8 @@
         "path": "packages/node/tests/tenant-registry.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 6,
+        "commits": 5,
+        "lines": 8,
         "path": "packages/proof/package.json"
       },
       {
@@ -1275,6 +1290,11 @@
         "commits": 2,
         "lines": 298,
         "path": "packages/proof/tests/observability-and-packaging.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/reconciler/package.json"
       },
       {
         "commits": 2,
@@ -1357,8 +1377,8 @@
         "path": "packages/reconciler/tests/structured-discrepancies.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 6,
+        "commits": 5,
+        "lines": 8,
         "path": "packages/registrum/package.json"
       },
       {
@@ -1492,8 +1512,8 @@
         "path": "packages/registrum/tests/stage-c-hardening.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 4,
+        "commits": 3,
+        "lines": 6,
         "path": "packages/sdk/package.json"
       },
       {
@@ -1525,6 +1545,11 @@
         "commits": 5,
         "lines": 578,
         "path": "packages/sdk/tests/http-client.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/treasury/package.json"
       },
       {
         "commits": 6,
@@ -1582,8 +1607,8 @@
         "path": "packages/treasury/tests/stage-c-hardening.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 4,
+        "commits": 3,
+        "lines": 6,
         "path": "packages/types/package.json"
       },
       {
@@ -1615,6 +1640,11 @@
         "commits": 2,
         "lines": 106,
         "path": "packages/types/tests/observability.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/vault/package.json"
       },
       {
         "commits": 5,
@@ -1660,6 +1690,11 @@
         "commits": 2,
         "lines": 844,
         "path": "packages/vault/tests/stage-c-hardening.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/verify/package.json"
       },
       {
         "commits": 2,
@@ -1757,8 +1792,8 @@
         "path": "packages/verify/tests/verifier-telemetry.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/witness/package.json"
       },
       {
@@ -1887,18 +1922,18 @@
         "path": "scripts/status.js"
       },
       {
-        "commits": 5,
-        "lines": 54,
+        "commits": 6,
+        "lines": 56,
         "path": "site/astro.config.mjs"
       },
       {
-        "commits": 1,
-        "lines": 6051,
+        "commits": 2,
+        "lines": 12102,
         "path": "site/package-lock.json"
       },
       {
-        "commits": 1,
-        "lines": 6,
+        "commits": 2,
+        "lines": 12,
         "path": "site/package.json"
       },
       {
@@ -1957,11 +1992,26 @@
     "level": "low",
     "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
   },
-  "generatedAt": "2026-09-24T08:27:57.726Z",
+  "generatedAt": "2026-09-30T20:07:20.028Z",
   "generatedFrom": {
-    "commit": "245af305ebae9d405b74c4bbcd86c93f489c0261"
+    "commit": "56da31971ea923116475b5374a6189c7e6a8158c"
   },
-  "pairs": [],
+  "pairs": [
+    {
+      "a": "CHANGELOG.md",
+      "b": "package.json",
+      "either": 6,
+      "shared": 5,
+      "strength": 0.833333
+    },
+    {
+      "a": "package.json",
+      "b": "packages/attestia/package.json",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    }
+  ],
   "parameters": {
     "appliedChangesetLimit": 50,
     "changeset": 50,
@@ -1972,16 +2022,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "both",
-    "headDate": "2026-09-23T22:16:39-04:00",
-    "inScopeFiles": 596,
+    "headDate": "2026-09-28T15:16:05-04:00",
+    "inScopeFiles": 597,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 22,
+    "qualifyingCommits": 27,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-03-28T02:16:39.000Z",
+    "since": "2026-04-01T19:16:05.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -1991,7 +2041,9 @@
       ".tsx",
       ".mts",
       ".cts",
-      ".py"
+      ".py",
+      ".rs",
+      ".gd"
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
