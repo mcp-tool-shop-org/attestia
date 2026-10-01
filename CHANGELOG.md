@@ -4,6 +4,11 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [2.0.5] - 2026-10-01
+
+### Fixed
+- `@mcptoolshop/attestia` depends on `json-canonicalize` 2.0.0 exactly. Version 2.0.1 publishes no bundle, so a fresh install could not load the package.
+
 ## [2.0.4] - 2026-10-01
 
 ### Changed
