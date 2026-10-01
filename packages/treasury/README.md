@@ -2,7 +2,7 @@
 
 # @attestia/treasury
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Organizational financial management with deterministic payroll, DAO distributions, dual-gate funding, and double-entry ledger integration.**
 

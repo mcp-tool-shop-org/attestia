@@ -12,23 +12,25 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>分散型世界の金融に関する信頼性の高い基盤—包括的なAttestiaライブラリを1つのパッケージにまとめました。</strong></p>
+<p align="center"><strong>あるイベント、トランザクション、または状態遷移が発生したことの証明であり、チェーンに紐付けられます。このライブラリ全体を1つのパッケージにまとめました。</strong></p>
 
-構造的なガバナンス、決定論的会計、そして人間による承認を得た意図——これらをチェーン、組織、個人間で統一的に運用します。Attestiaはあなたの資金を移動させるのではなく、何が起こったかを証明し、何が起こり得るかを制限し、財務記録を改ざん不可能なものにします。
+このパッケージが提供するドメインは、金融の真実です。具体的には、個人のウォレット、組織の財務、およびレジストラムです。構造的なガバナンス、決定論的な会計、およびチェーン、組織、個人を横断した人間による承認された意図を実現します。Attestiaは、あなたの資金を移動させるものではありません。何が起こったかを証明し、何が起こり得るかを制限し、金融記録を改ざんできないものにします。
 
-このパッケージは、Attestiaライブラリのすべての機能を1つのインストールファイル（ESM）にまとめて提供します。内部の`@attestia/*`ワークスペースパッケージはインライン化されているため、管理する必要のあるパッケージが分散することはありません。また、サードパーティのランタイム依存関係（xrpl、viem、@solana/web3.js、json-canonicalize、ripple-keypairs）も通常どおり解決されます。
+Cognateは、このパッケージ内のイベントストアとMerkle証明をAIガバナンスに使用します。RepoMeshは別のリリース台帳であり、このMerkleツリーは使用しません。
 
-## インストールする
+このパッケージは、完全なAttestiaライブラリを1つのインストール（ESM）にまとめます。内部の`@attestia/*`ワークスペースパッケージはインライン化されており、管理する必要があるパッケージの肥大化はありません。サードパーティのランタイム依存関係（xrpl、viem、@solana/web3.js、json-canonicalize、ripple-keypairs）は通常どおり解決されます。
+
+## インストール
 
 ```bash
 npm install @mcptoolshop/attestia
 ```
 
-> **ESMのみ対応**（Nodeバージョン22以上）。GitHub ActionsのOIDCを利用した信頼できる公開方式で、[npm provenance](https://docs.npmjs.com/generating-provenance-statements)とともに公開されます。
+> **ESMのみ**（Node ≥ 22）。GitHub Actions OIDC Trusted Publishingを介して、[npm provenance](https://docs.npmjs.com/generating-provenance-statements)として公開されます。
 
 ## 使用方法
 
-ルートからドメインをインポートし、それを**ネームスペース**として使用します。
+ドメインをルートから**名前空間**としてインポートします。
 
 ```ts
 import { ledger, proof, registrum } from "@mcptoolshop/attestia";
@@ -41,7 +43,7 @@ const total = ledger.addMoney(
 const tree = proof.MerkleTree.build([/* sha-256 leaf hashes */]);
 ```
 
-または、**サブパス**からフラットなシンボルをインポートします。
+…または、**サブパス**からフラットなシンボルをインポートします。
 
 ```ts
 import { MerkleTree, verifyAttestationProof } from "@mcptoolshop/attestia/proof";
@@ -52,34 +54,34 @@ import { AttestiaClient } from "@mcptoolshop/attestia/sdk";
 
 ## サブパス
 
-| サブパス | それは何ですか。 |
+| サブパス | 概要 |
 |---------|-----------|
-| `@mcptoolshop/attestia` | ルートディレクトリ——すべてのドメインを名前空間として扱う。 |
-| `…/types` | 共有ドメインの種類（通貨、ID、ブランド化された基本的なデータ型） |
-| `…/ledger` | 追記専用の二重帳簿システムと、決定的な金融計算手法 |
-| `…/registrum` | 憲法上の登録官——11個の不変要素、二重検証 |
-| `…/event-store` | 追記のみを許可するイベント永続化方式——JSONL、ハッシュチェーン。 |
-| `…/proof` | マークルツリー（RFC 6962）、包含証明と検証証明。 |
-| `…/vault` | 個人用保管庫——ポートフォリオ、予算、計画など。 |
-| `…/treasury` | 組織の財務部門：給与、配当金の支払い、資金調達プロセス |
-| `…/reconciler` | クロスシステム照合＋レジストラムによる認証 |
-| `…/chain-observer` | 複数のチェーンにおける読み取り専用の監視機能（EVM、XRPL、Solana、L2） |
-| `…/witness` | XRPLのオンチェーン認証、マルチシグによるガバナンス。 |
-| `…/verify` | リプレイ検証、コンプライアンス証拠、SLA（サービス品質保証） |
+| `@mcptoolshop/attestia` | ルートバレル — すべてのドメインを名前空間として |
+| `…/types` | 共有ドメイン型（Money、ID、ブランド化されたプリミティブ） |
+| `…/ledger` | 追加専用の複式仕訳エンジン + 決定論的な金融計算 |
+| `…/registrum` | 憲法上の登録者 — 11個の不変条件、デュアルウィットネス |
+| `…/event-store` | 追加専用のイベント永続化 — JSONL、ハッシュチェーン |
+| `…/proof` | Merkleツリー（RFC 6962）、包含 + 認証証明 |
+| `…/vault` | 個人のウォレット — ポートフォリオ、予算、意図 |
+| `…/treasury` | 組織の財務 — 給与、分配、資金調達ゲート |
+| `…/reconciler` | クロスシステムのマッチング + レジストラム認証 |
+| `…/chain-observer` | マルチチェーンの読み取り専用の監視（EVM、XRPL、Solana、L2） |
+| `…/witness` | XRPLのオンチェーン認証、マルチシグガバナンス |
+| `…/verify` | リプレイ検証、コンプライアンス証拠、SLA |
 | `…/sdk` | Attestia REST API用の型付きHTTPクライアント |
 
-## 基本的なパターン、主要なパターン
+## コアパターン
 
-すべての操作は、定められた手順に従って行われ、どのステップも省略することはできません。
+すべてのインタラクションは1つのフローに従い、どのステップもオプションではありません。
 
 ```
 Intent → Approve → Execute → Verify
 ```
 
-## ドキュメント、文書
+## ドキュメント
 
-完全なハンドブック、アーキテクチャ、脅威モデル、および検証ガイド：**<https://mcp-tool-shop-org.github.io/attestia/>**。ソースコード：**<https://github.com/mcp-tool-shop-org/attestia>**
+完全なハンドブック、アーキテクチャ、脅威モデル、および検証ガイド：**<https://mcp-tool-shop-org.github.io/attestia/>** · ソース：**<https://github.com/mcp-tool-shop-org/attestia>**
 
 ## ライセンス
 
-[MITライセンス] – [MCPツールショップ](https://mcp-tool-shop.github.io/)によって作成されました。
+[MIT](LICENSE) — [MCP Tool Shop](https://mcp-tool-shop.github.io/)によって作成されました。

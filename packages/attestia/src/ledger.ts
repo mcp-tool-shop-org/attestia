@@ -1,1 +1,1 @@
-export * from "@attestia/ledger";
+export * from "../../ledger/src/index";

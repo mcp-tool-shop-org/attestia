@@ -2,7 +2,7 @@
 
 # @attestia/chain-observer
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Multi-chain read-only observation layer. Unified interface for EVM, XRPL, Solana, and L2 chains. Observe balances, transfers, and finality -- never sign or submit.**
 

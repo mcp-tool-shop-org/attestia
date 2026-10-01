@@ -11,15 +11,15 @@
  *   import { MerkleTree } from "@mcptoolshop/attestia/proof";
  *   import { StructuralRegistrar } from "@mcptoolshop/attestia/registrum";
  */
-export * as types from "@attestia/types";
-export * as ledger from "@attestia/ledger";
-export * as registrum from "@attestia/registrum";
-export * as eventStore from "@attestia/event-store";
-export * as proof from "@attestia/proof";
-export * as vault from "@attestia/vault";
-export * as treasury from "@attestia/treasury";
-export * as reconciler from "@attestia/reconciler";
-export * as chainObserver from "@attestia/chain-observer";
-export * as witness from "@attestia/witness";
-export * as verify from "@attestia/verify";
-export * as sdk from "@attestia/sdk";
+export * as types from "../../types/src/index";
+export * as ledger from "../../ledger/src/index";
+export * as registrum from "../../registrum/src/index";
+export * as eventStore from "../../event-store/src/index";
+export * as proof from "../../proof/src/index";
+export * as vault from "../../vault/src/index";
+export * as treasury from "../../treasury/src/index";
+export * as reconciler from "../../reconciler/src/index";
+export * as chainObserver from "../../chain-observer/src/index";
+export * as witness from "../../witness/src/index";
+export * as verify from "../../verify/src/index";
+export * as sdk from "../../sdk/src/index";

@@ -2,7 +2,7 @@
 
 # @attestia/types
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Shared domain types for the entire Attestia stack. Zero runtime dependencies. Pure TypeScript contracts.**
 

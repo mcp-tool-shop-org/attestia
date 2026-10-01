@@ -30,6 +30,7 @@ export type {
   EventStoreIntegrityResult,
 } from "./types.js";
 export { EventStoreError, isHashedEvent } from "./types.js";
+export type { DomainEvent, EventMetadata } from "@attestia/types";
 
 // Hash chain
 export { computeEventHash, verifyHashChain, GENESIS_HASH } from "./hash-chain.js";

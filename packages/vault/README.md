@@ -2,7 +2,7 @@
 
 # @attestia/vault
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Personal financial management with multi-chain portfolio observation, envelope budgeting, and intent-based allocation.**
 

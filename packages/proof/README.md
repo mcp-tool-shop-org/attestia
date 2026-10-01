@@ -2,7 +2,7 @@
 
 # @attestia/proof
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) — financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) — proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Binary SHA-256 Merkle trees, inclusion proofs, and self-contained attestation proof packages.**
 

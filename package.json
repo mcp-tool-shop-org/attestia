@@ -1,8 +1,8 @@
 {
   "name": "attestia",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
-  "description": "Financial truth infrastructure for the decentralized world",
+  "description": "Proves an event, transaction, or state transition happened and binds that proof to a chain. Ships the financial domain: vault, treasury, and registrum.",
   "type": "module",
   "engines": {
     "node": ">=22"

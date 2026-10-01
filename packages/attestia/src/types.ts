@@ -1,1 +1,1 @@
-export * from "@attestia/types";
+export * from "../../types/src/index";

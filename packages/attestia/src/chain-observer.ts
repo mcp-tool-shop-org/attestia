@@ -1,1 +1,1 @@
-export * from "@attestia/chain-observer";
+export * from "../../chain-observer/src/index";

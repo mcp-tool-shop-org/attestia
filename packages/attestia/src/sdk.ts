@@ -1,1 +1,1 @@
-export * from "@attestia/sdk";
+export * from "../../sdk/src/index";

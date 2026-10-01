@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>Financial truth infrastructure for the decentralized world.</strong></p>
+<p align="center"><strong>Proof that an event, a transaction, or a state transition happened, bound to a chain.</strong></p>
 
 ---
 
@@ -21,7 +21,7 @@
 
 We believe that money — wherever it lives, however it moves — deserves the same rigor as the systems that created it. Smart contracts execute. Blockchains record. But no one *attests*.
 
-Attestia is the missing layer: structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals.
+Attestia ships that layer for money: structural governance, deterministic accounting, and human-approved intent, across chains, organizations, and individuals.
 
 We don't move your money. We prove what happened, constrain what can happen, and make the financial record unbreakable.
 
@@ -33,6 +33,18 @@ We don't move your money. We prove what happened, constrain what can happen, and
 - **Intent is not execution.** Declaring what you want and doing it are separate acts with separate gates. The gap between them is where trust lives.
 - **Chains are witnesses, not authorities.** XRPL attests. Ethereum settles. But authority flows from structural rules, not from any chain's consensus.
 - **Boring infrastructure wins.** The world doesn't need another DeFi protocol. It needs the accounting layer underneath — the financial plumbing that makes everything else trustworthy.
+
+## Place in the system
+
+Attestia, Cognate, and RepoMesh are three products.
+
+**Attestia** proves that an event, a transaction, or a state transition happened, and binds that proof to a chain. The domain it ships is financial truth: personal vault, org treasury, and registrum. Its proof primitives are an append-only event store and Merkle proofs.
+
+**Cognate** is the AI governance domain on those primitives: model lineage, policy decisions, agent capabilities, and prompt and output integrity. It does not keep a second event store.
+
+**RepoMesh** is the release network: signed events, node manifests, and an XRPL-anchored trust clock. It keeps its own RFC 6962 ledger. It does not use Attestia's Merkle tree.
+
+Cognate calls Attestia when it needs a proof, and RepoMesh when it needs a release checked.
 
 ---
 

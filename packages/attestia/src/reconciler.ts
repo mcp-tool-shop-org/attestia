@@ -1,1 +1,1 @@
-export * from "@attestia/reconciler";
+export * from "../../reconciler/src/index";

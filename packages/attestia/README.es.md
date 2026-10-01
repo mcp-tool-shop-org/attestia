@@ -12,11 +12,13 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>Infraestructura de verdad financiera para el mundo descentralizado: toda la biblioteca Attestia en un solo paquete.</strong></p>
+<p align="center"><strong>Prueba de que un evento, una transacción o una transición de estado tuvo lugar, vinculada a una cadena. Toda la biblioteca en un solo paquete.</strong></p>
 
-Gobernanza estructural, contabilidad determinista e intención aprobada por humanos, todo ello unificado entre cadenas, organizaciones e individuos. Attestia no mueve su dinero; demuestra lo que sucedió, restringe lo que puede suceder y hace que el registro financiero sea inalterable.
+El ámbito de este paquete es la verdad financiera: bóveda personal, tesorería de la organización y registro. Gobernanza estructural, contabilidad determinista e intención aprobada por humanos en todas las cadenas, organizaciones e individuos. Attestia no mueve su dinero. Demuestra lo que sucedió, restringe lo que puede suceder y hace que el registro financiero sea inquebrantable.
 
-Este paquete incluye toda la biblioteca Attestia en una única instalación (ESM). Los paquetes internos `@attestia/*` se incluyen directamente; no hay necesidad de gestionar múltiples paquetes; las dependencias de tiempo de ejecución de terceros (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) se resuelven normalmente.
+Cognate utiliza el almacén de eventos y las pruebas de Merkle de este paquete para la gobernanza de la IA. RepoMesh es un libro mayor independiente y no utiliza este árbol de Merkle.
+
+Este paquete incluye toda la superficie de la biblioteca Attestia en una sola instalación (ESM). Los paquetes internos del espacio de trabajo `@attestia/*` se incluyen en línea; no hay que gestionar la proliferación de paquetes; las dependencias de tiempo de ejecución de terceros (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) se resuelven normalmente.
 
 ## Instalación
 
@@ -41,7 +43,7 @@ const total = ledger.addMoney(
 const tree = proof.MerkleTree.build([/* sha-256 leaf hashes */]);
 ```
 
-…o importe símbolos individuales desde una **subruta**:
+…o importe símbolos planos desde una **subruta**:
 
 ```ts
 import { MerkleTree, verifyAttestationProof } from "@mcptoolshop/attestia/proof";
@@ -55,22 +57,22 @@ import { AttestiaClient } from "@mcptoolshop/attestia/sdk";
 | Subruta | Qué es |
 |---------|-----------|
 | `@mcptoolshop/attestia` | Archivo raíz: cada dominio como un espacio de nombres |
-| `…/types` | Tipos de dominio compartidos (dinero, identificadores, primitivas personalizadas) |
-| `…/ledger` | Motor de contabilidad de doble entrada con solo anexión + matemáticas deterministas del dinero |
-| `…/registrum` | Registro constitucional: 11 invariantes, verificación dual |
-| `…/event-store` | Persistencia de eventos con solo anexión: JSONL, cadena hash |
-| `…/proof` | Árboles de Merkle (RFC 6962), pruebas de inclusión y atestación |
+| `…/types` | Tipos de dominio compartidos (dinero, identificadores, primitivas de marca) |
+| `…/ledger` | Motor de doble entrada de solo anexión + matemáticas deterministas del dinero |
+| `…/registrum` | Registrador constitucional: 11 invariantes, testigo dual |
+| `…/event-store` | Persistencia de eventos de solo anexión: JSONL, cadena hash |
+| `…/proof` | Árboles de Merkle (RFC 6962), pruebas de inclusión + atestación |
 | `…/vault` | Bóveda personal: carteras, presupuestos, intenciones |
-| `…/treasury` | Tesorería organizacional: nómina, distribuciones, controles de financiación |
-| `…/reconciler` | Coincidencia entre sistemas + atestación Registrum |
-| `…/chain-observer` | Observación de solo lectura en múltiples cadenas (EVM, XRPL, Solana, L2) |
+| `…/treasury` | Tesorería de la organización: nómina, distribuciones, puertas de financiación |
+| `…/reconciler` | Coincidencia entre sistemas + atestación de Registrum |
+| `…/chain-observer` | Observación de solo lectura entre cadenas (EVM, XRPL, Solana, L2) |
 | `…/witness` | Atestación en cadena de XRPL, gobernanza multi-firma |
 | `…/verify` | Verificación de reproducción, evidencia de cumplimiento, SLA |
-| `…/sdk` | Cliente HTTP con tipos para la API REST de Attestia |
+| `…/sdk` | Cliente HTTP con tipo para la API REST de Attestia |
 
 ## Patrón principal
 
-Cada interacción sigue un flujo y ningún paso es opcional:
+Cada interacción sigue un flujo, y ningún paso es opcional:
 
 ```
 Intent → Approve → Execute → Verify
@@ -78,7 +80,7 @@ Intent → Approve → Execute → Verify
 
 ## Documentación
 
-Manual completo, arquitectura, modelo de amenazas y guía de verificación: **<https://mcp-tool-shop-org.github.io/attestia/>** · Código fuente: **<https://github.com/mcp-tool-shop-org/attestia>**
+Manual completo, arquitectura, modelo de amenazas y guía de verificación: **<https://mcp-tool-shop-org.github.io/attestia/>** · Fuente: **<https://github.com/mcp-tool-shop-org/attestia>**
 
 ## Licencia
 

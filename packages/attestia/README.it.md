@@ -12,23 +12,25 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>Infrastruttura per la verifica finanziaria nel mondo decentralizzato: l’intera libreria Attestia in un unico pacchetto.</strong></p>
+<p align="center"><strong>Prova che un evento, una transazione o una transizione di stato si è verificato, e che è legato a una catena. L’intera libreria in un unico pacchetto.</strong></p>
 
-Governance strutturale, contabilità deterministica e convalida umana delle intenzioni: tutto integrato tra diverse catene di blocchi, organizzazioni e singoli individui. Attestia non gestisce i vostri fondi; si limita a dimostrare cosa è successo, a definire i limiti di ciò che può accadere e a rendere inalterabile la documentazione finanziaria.
+Il dominio di questo pacchetto è la verità finanziaria: portafoglio personale, tesoreria aziendale e registro. Governance strutturale, contabilità deterministica e consenso umano tra catene, organizzazioni e individui. Attestia non sposta i tuoi fondi. Dimostra cosa è successo, limita ciò che può accadere e rende il registro finanziario inviolabile.
 
-Questo pacchetto include l’intera libreria Attestia e la integra in un’unica installazione (ESM). I pacchetti interni `@attestia/*` sono inclusi direttamente nel codice, quindi non è necessario gestire una proliferazione di pacchetti; le dipendenze esterne necessarie per l’esecuzione (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) vengono risolte normalmente.
+Cognate utilizza l’archivio eventi e le prove di Merkle in questo pacchetto per la governance dell’IA. RepoMesh è un registro separato e non utilizza questo albero di Merkle.
 
-## Installa
+Questo pacchetto include l’intera libreria Attestia in un’unica installazione (ESM). I pacchetti interni `@attestia/*` sono inclusi direttamente: non è necessario gestire la proliferazione dei pacchetti; le dipendenze di runtime di terze parti (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) vengono risolte normalmente.
+
+## Installazione
 
 ```bash
 npm install @mcptoolshop/attestia
 ```
 
-> **Solo ESM** (versione Node ≥ 22). Pubblicato tramite GitHub Actions OIDC Trusted Publishing, con l’utilizzo di [npm provenance](https://docs.npmjs.com/generating-provenance-statements).
+> **Solo ESM** (Node ≥ 22). Pubblicato con [npm provenance](https://docs.npmjs.com/generating-provenance-statements) tramite GitHub Actions OIDC Trusted Publishing.
 
 ## Utilizzo
 
-Importa un dominio come **spazio dei nomi** dalla directory principale:
+Importa un dominio come **namespace** dalla radice:
 
 ```ts
 import { ledger, proof, registrum } from "@mcptoolshop/attestia";
@@ -41,7 +43,7 @@ const total = ledger.addMoney(
 const tree = proof.MerkleTree.build([/* sha-256 leaf hashes */]);
 ```
 
-…oppure importa simboli piatti da una **sottocartella**:
+…oppure importa simboli singoli da un **sottopercorso**:
 
 ```ts
 import { MerkleTree, verifyAttestationProof } from "@mcptoolshop/attestia/proof";
@@ -50,27 +52,27 @@ import { JsonlEventStore } from "@mcptoolshop/attestia/event-store";
 import { AttestiaClient } from "@mcptoolshop/attestia/sdk";
 ```
 
-## Sottodirectory
+## Sottopercorsi
 
-| Sottodirectory | Cos’è. |
+| Sottopercorso | Cos’è |
 |---------|-----------|
-| `@mcptoolshop/attestia` | Dominio principale: ogni dominio funge da spazio dei nomi. |
-| `…/types` | Tipi di dominio condivisi (valuta, identificativi, elementi grafici personalizzati). |
-| `…/ledger` | Motore di contabilità a doppia registrazione con possibilità di aggiungere dati in modo sequenziale + calcoli monetari deterministici. |
-| `…/registrum` | Registro costituzionale – 11 invarianti, sistema a doppia verifica. |
-| `…/event-store` | Memorizzazione degli eventi con possibilità di aggiungere dati in modo sequenziale – formato JSONL, catena di hash. |
-| `…/proof` | Alberi di Merkle (RFC 6962), prove di inclusione e attestazione. |
-| `…/vault` | Archivio personale: portafogli, budget, obiettivi. |
-| `…/treasury` | Risorse finanziarie dell’organizzazione: gestione delle retribuzioni, distribuzione dei fondi, controllo degli stanziamenti. |
-| `…/reconciler` | Correlazione tra sistemi diversi + attestazione tramite Registrum |
-| `…/chain-observer` | Osservazione in sola lettura su più blockchain (EVM, XRPL, Solana, L2). |
-| `…/witness` | Attestazione sulla blockchain XRPL, sistema di governance a più firme. |
-| `…/verify` | Verifica delle registrazioni, documentazione di conformità, accordo sui livelli di servizio (SLA) |
-| `…/sdk` | Client HTTP basato su tipizzazione statica per l’API REST di Attestia. |
+| `@mcptoolshop/attestia` | Radice del pacchetto: ogni dominio come namespace |
+| `…/types` | Tipi di dominio condivisi (denaro, ID, elementi primitivi con marchio) |
+| `…/ledger` | Motore di contabilità a partita doppia con aggiunta sequenziale + matematica deterministica del denaro |
+| `…/registrum` | Registro costituzionale: 11 invarianti, doppia attestazione |
+| `…/event-store` | Archiviazione di eventi con aggiunta sequenziale: JSONL, catena di hash |
+| `…/proof` | Alberi di Merkle (RFC 6962), prove di inclusione + attestazione |
+| `…/vault` | Portafoglio personale: portafogli, budget, obiettivi |
+| `…/treasury` | Tesoreria aziendale: buste paga, distribuzioni, controlli sui finanziamenti |
+| `…/reconciler` | Corrispondenza tra sistemi + attestazione del Registrum |
+| `…/chain-observer` | Osservazione multi-catena in sola lettura (EVM, XRPL, Solana, L2) |
+| `…/witness` | Attestazione on-chain XRPL, governance multi-firma |
+| `…/verify` | Verifica della riproduzione, prove di conformità, SLA |
+| `…/sdk` | Client HTTP tipizzato per l’API REST di Attestia |
 
-## Schema di base/principale
+## Schema principale
 
-Ogni interazione segue un determinato schema e nessuna fase è facoltativa:
+Ogni interazione segue un flusso e nessuna fase è facoltativa:
 
 ```
 Intent → Approve → Execute → Verify
@@ -78,8 +80,8 @@ Intent → Approve → Execute → Verify
 
 ## Documentazione
 
-Manuale completo, descrizione dell’architettura, modello delle minacce e guida alla verifica: **<https://mcp-tool-shop-org.github.io/attestia/>** · Fonte: **<https://github.com/mcp-tool-shop-org/attestia>**
+Manuale completo, architettura, modello di minaccia e guida alla verifica: **<https://mcp-tool-shop-org.github.io/attestia/>** · Sorgente: **<https://github.com/mcp-tool-shop-org/attestia>**
 
 ## Licenza
 
-[LICENZA MIT] – sviluppato da [MCP Tool Shop](https://mcp-tool-shop.github.io/).
+[MIT](LICENSE) — sviluppato da [MCP Tool Shop](https://mcp-tool-shop.github.io/).

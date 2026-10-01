@@ -69,7 +69,7 @@ interface EventMetadata {
   readonly actor: string;
   readonly causationId?: string;
   readonly correlationId: string;
-  readonly source: "vault" | "treasury" | "registrum" | "observer";
+  readonly source: "vault" | "treasury" | "registrum" | "observer" | "external";
 }
 ```
 
@@ -78,7 +78,7 @@ interface EventMetadata {
 - `actor`: Identifier of the entity that caused this event.
 - `causationId`: OPTIONAL. Identifier of the event that directly caused this event.
 - `correlationId`: Identifier for grouping related events across subsystems.
-- `source`: The Attestia subsystem that emitted this event.
+- `source`: `vault`, `treasury`, `registrum`, or `observer` when an Attestia subsystem emitted the event. `external` when a producer outside those domains emitted it. Cognate's AI-governance events use `external`. Attestia's own emitters do not.
 
 ### 3.3 Stored Event
 

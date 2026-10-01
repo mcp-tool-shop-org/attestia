@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
 </p>
 
 <p align="center">
@@ -12,9 +12,11 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>Financial truth infrastructure for the decentralized world — the whole Attestia library in one package.</strong></p>
+<p align="center"><strong>Proof that an event, a transaction, or a state transition happened, bound to a chain. The whole library in one package.</strong></p>
 
-Structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals. Attestia doesn't move your money; it proves what happened, constrains what can happen, and makes the financial record unbreakable.
+The domain this package ships is financial truth: personal vault, org treasury, and registrum. Structural governance, deterministic accounting, and human-approved intent across chains, organizations, and individuals. Attestia does not move your money. It proves what happened, constrains what can happen, and makes the financial record unbreakable.
+
+Cognate uses the event store and Merkle proofs in this package for AI governance. RepoMesh is a separate release ledger and does not use this Merkle tree.
 
 This package bundles the full Attestia library surface into a single install (ESM). The internal `@attestia/*` workspace packages are inlined — there is no package sprawl to manage; third-party runtime deps (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) resolve normally.
 

@@ -1,1 +1,1 @@
-export * from "@attestia/event-store";
+export * from "../../event-store/src/index";

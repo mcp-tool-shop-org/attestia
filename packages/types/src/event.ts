@@ -30,8 +30,12 @@ export interface EventMetadata {
   /** ID for grouping related events across systems */
   readonly correlationId: string;
 
-  /** Which Attestia subsystem emitted this event */
-  readonly source: "vault" | "treasury" | "registrum" | "observer";
+  /**
+   * Who emitted this event.
+   * `vault`, `treasury`, `registrum`, and `observer` are Attestia's own domains.
+   * `external` is a producer outside those domains. Cognate's AI-governance events use it.
+   */
+  readonly source: "vault" | "treasury" | "registrum" | "observer" | "external";
 }
 
 /**

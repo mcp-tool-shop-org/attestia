@@ -296,7 +296,7 @@ describe("isEventMetadata", () => {
   };
 
   it("accepts valid metadata for each source", () => {
-    for (const source of ["vault", "treasury", "registrum", "observer"]) {
+    for (const source of ["vault", "treasury", "registrum", "observer", "external"]) {
       expect(isEventMetadata({ ...validMetadata, source })).toBe(true);
     }
   });

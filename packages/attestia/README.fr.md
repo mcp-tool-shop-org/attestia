@@ -12,11 +12,13 @@
   <a href="https://opensource.org/license/mit/"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>Infrastructure de vérité financière pour le monde décentralisé : l’ensemble de la bibliothèque Attestia dans un seul ensemble.</strong></p>
+<p align="center"><strong>Preuve qu’un événement, une transaction ou une transition d’état s’est produit, et qui est liée à une chaîne. L’ensemble de la bibliothèque est regroupé dans un seul paquet.</strong></p>
 
-Gouvernance structurelle, comptabilité déterministe et validation humaine des intentions – unifiées entre les chaînes, les organisations et les individus. Attestia ne manipule pas votre argent ; elle prouve ce qui s’est passé, limite ce qui peut se produire et rend le registre financier inviolable.
+Le domaine couvert par ce paquet est la vérité financière : coffre-fort personnel, trésorerie d’entreprise et registre. Gouvernance structurée, comptabilité déterministe et validation humaine des intentions sur plusieurs chaînes, organisations et individus. Attestia ne déplace pas votre argent. Il prouve ce qui s’est passé, limite ce qui peut se produire et rend les données financières inviolables.
 
-Cet ensemble regroupe l’ensemble de la bibliothèque Attestia dans une seule installation (ESM). Les packages internes `@attestia/*` sont intégrés ; il n’y a donc pas de prolifération de packages à gérer ; les dépendances d’exécution tierces (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) se résolvent normalement.
+Cognate utilise le magasin d’événements et les preuves de Merkle de ce paquet pour la gouvernance de l’IA. RepoMesh est un registre distinct et n’utilise pas cet arbre de Merkle.
+
+Ce paquet regroupe l’ensemble des fonctionnalités de la bibliothèque Attestia dans une seule installation (ESM). Les paquets de l’espace de travail interne `@attestia/*` sont intégrés ; il n’y a donc pas de prolifération de paquets à gérer ; les dépendances d’exécution tierces (xrpl, viem, @solana/web3.js, json-canonicalize, ripple-keypairs) se résolvent normalement.
 
 ## Installation
 
@@ -28,7 +30,7 @@ npm install @mcptoolshop/attestia
 
 ## Utilisation
 
-Importez un domaine en tant que **espace de noms** à partir du répertoire racine :
+Importer un domaine en tant que **namespace** à partir de la racine :
 
 ```ts
 import { ledger, proof, registrum } from "@mcptoolshop/attestia";
@@ -41,7 +43,7 @@ const total = ledger.addMoney(
 const tree = proof.MerkleTree.build([/* sha-256 leaf hashes */]);
 ```
 
-…ou importez des symboles plats à partir d’un **sous-répertoire** :
+…ou importer des symboles plats à partir d’un **sous-chemin** :
 
 ```ts
 import { MerkleTree, verifyAttestationProof } from "@mcptoolshop/attestia/proof";
@@ -50,25 +52,25 @@ import { JsonlEventStore } from "@mcptoolshop/attestia/event-store";
 import { AttestiaClient } from "@mcptoolshop/attestia/sdk";
 ```
 
-## Sous-répertoires
+## Sous-chemins
 
-| Sous-répertoire | Qu’est-ce que c’est |
+| Sous-chemin | Description |
 |---------|-----------|
-| `@mcptoolshop/attestia` | Répertoire racine : chaque domaine en tant qu’espace de noms |
-| `…/types` | Types de domaines partagés (monnaie, identifiants, primitives personnalisées) |
-| `…/ledger` | Moteur d’écriture uniquement à double entrée + calcul déterministe des devises |
-| `…/registrum` | Registre constitutionnel : 11 invariants, validation par deux témoins |
-| `…/event-store` | Persistance d’événements en écriture uniquement : JSONL, chaîne de hachage |
+| `@mcptoolshop/attestia` | Fichier racine — chaque domaine en tant que namespace |
+| `…/types` | Types de domaine partagés (argent, identifiants, primitives personnalisées) |
+| `…/ledger` | Moteur de comptabilité à entrées multiples et append-only + calcul déterministe de la valeur |
+| `…/registrum` | Registre constitutionnel — 11 invariants, double validation |
+| `…/event-store` | Persistance d’événements append-only — JSONL, chaîne de hachage |
 | `…/proof` | Arbres de Merkle (RFC 6962), preuves d’inclusion et d’attestation |
-| `…/vault` | Coffre-fort personnel : portefeuilles, budgets, intentions |
-| `…/treasury` | Trésorerie organisationnelle : paie, distributions, seuils de financement |
-| `…/reconciler` | Correspondance intersystème + attestation Registrum |
+| `…/vault` | Coffre-fort personnel — portefeuilles, budgets, intentions |
+| `…/treasury` | Trésorerie d’entreprise — paie, distributions, seuils de financement |
+| `…/reconciler` | Correspondance inter-systèmes + attestation Registrum |
 | `…/chain-observer` | Observation multi-chaînes en lecture seule (EVM, XRPL, Solana, L2) |
-| `…/witness` | Attestation sur chaîne XRPL, gouvernance multi-signatures |
-| `…/verify` | Vérification de relecture, preuves de conformité, SLA |
-| `…/sdk` | Client HTTP typé pour l’API REST Attestia |
+| `…/witness` | Attestation sur la chaîne XRPL, gouvernance multi-signatures |
+| `…/verify` | Vérification de relecture, preuve de conformité, SLA |
+| `…/sdk` | Client HTTP typé pour l’API REST d’Attestia |
 
-## Schéma principal
+## Schéma de base
 
 Chaque interaction suit un flux unique, et aucune étape n’est facultative :
 
@@ -78,8 +80,8 @@ Intent → Approve → Execute → Verify
 
 ## Documentation
 
-Manuel complet, architecture, modèle de menace et guide de vérification : **<https://mcp-tool-shop-org.github.io/attestia/>** · Source : **<https://github.com/mcp-tool-shop-org/attestia>**
+Manuel complet, architecture, modèle de menace et guide de vérification : **<https://mcp-tool-shop-org.github.io/attestia/>** · Source : **<https://github.com/mcp-tool-shop-org/attestia>**
 
 ## Licence
 
-[MIT](LICENSE) – créé par [MCP Tool Shop](https://mcp-tool-shop.github.io/).
+[MIT](LICENSE) — créé par [MCP Tool Shop](https://mcp-tool-shop.github.io/).

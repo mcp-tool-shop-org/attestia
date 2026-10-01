@@ -1,6 +1,6 @@
 ---
 title: Attestia Handbook
-description: Complete guide to Attestia — financial truth infrastructure for the decentralized world.
+description: Attestia proves that an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 sidebar:
   order: 0
 ---
@@ -9,9 +9,11 @@ Welcome to the Attestia Handbook. This is the canonical reference for understand
 
 ## What is Attestia?
 
-Attestia is financial truth infrastructure for the decentralized world. Smart contracts execute. Blockchains record. But no one *attests*. Attestia is the missing layer: structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals.
+Attestia proves that an event, a transaction, or a state transition happened, and binds that proof to a chain. The domain it ships is financial truth. Smart contracts execute. Blockchains record. But no one *attests*. For money, Attestia is structural governance, deterministic accounting, and human-approved intent across chains, organizations, and individuals.
 
 Attestia does not move your money. It proves what happened, constrains what can happen, and makes the financial record unbreakable.
+
+Cognate is the AI governance domain on this event store and these Merkle proofs. RepoMesh is the separate release ledger and XRPL trust clock. Cognate calls Attestia for a proof and RepoMesh to check a release.
 
 ## Handbook contents
 

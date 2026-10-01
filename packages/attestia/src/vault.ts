@@ -1,1 +1,1 @@
-export * from "@attestia/vault";
+export * from "../../vault/src/index";

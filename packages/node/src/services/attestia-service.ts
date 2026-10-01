@@ -1152,7 +1152,9 @@ export class AttestiaService {
 
 /**
  * Map a snapshot/audit streamId to the DomainEvent metadata `source` enum.
- * (EventMetadata.source is "vault" | "treasury" | "registrum" | "observer".)
+ * Attestia's own streams only. EventMetadata.source also allows "external"
+ * for a producer outside these subsystems (Cognate uses that). This function
+ * never returns "external".
  */
 function streamSource(
   streamId: string,

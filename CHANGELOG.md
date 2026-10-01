@@ -4,6 +4,13 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [2.0.4] - 2026-10-01
+
+### Changed
+- `@mcptoolshop/attestia/proof` and `@mcptoolshop/attestia/event-store` publish bundled declarations. `MerkleTree`, `EventStore`, and `DomainEvent` import from this package. The declarations no longer point at private `@attestia/*` names.
+- `EventMetadata.source` accepts `external` for a producer outside vault, treasury, registrum, and observer. Cognate's AI-governance events use it.
+- The public description states the proof job, names the financial domain this repository ships, and names Cognate and RepoMesh as the other two products.
+
 ## [2.0.3] - 2026-09-28
 
 Docker image fix. No library API changes.

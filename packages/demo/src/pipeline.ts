@@ -32,7 +32,7 @@ import type {
 import { Reconciler } from "@attestia/reconciler";
 import { computeGlobalStateHash } from "@attestia/verify";
 import { MerkleTree, packageAttestationProof, verifyAttestationProof } from "@attestia/proof";
-import type { ChainId, DomainEvent, LedgerEntry } from "@attestia/types";
+import type { ChainId, DomainEvent, EventMetadata, LedgerEntry } from "@attestia/types";
 import type { ReconcilableIntent, ReconcilableLedgerEntry, ReconcilableChainEvent } from "@attestia/reconciler";
 
 // =============================================================================
@@ -58,7 +58,7 @@ let _eventSeq = 0;
 function domainEvent(
   type: string,
   payload: Record<string, unknown>,
-  source: "vault" | "treasury" | "registrum" | "observer" = "vault",
+  source: EventMetadata["source"] = "vault",
 ): DomainEvent {
   _eventSeq++;
   return {

@@ -9,8 +9,9 @@ import { defineConfig } from "tsup";
  * - Third-party deps (xrpl, viem, @solana/web3.js, json-canonicalize,
  *   ripple-keypairs) stay EXTERNAL and are declared in package.json
  *   `dependencies` — the consumer's package manager resolves them.
- * - `splitting: true` deduplicates shared inlined code (e.g. @attestia/types)
- *   into common chunks instead of copying it into every subpath entry.
+ * - Entries import workspace TypeScript source, not the private package names.
+ *   The declaration build then inlines MerkleTree and EventStore. Splitting stays
+ *   off so those declarations are not left pointing at chunk files that are never emitted.
  */
 export default defineConfig({
   entry: {
@@ -29,10 +30,12 @@ export default defineConfig({
     sdk: "src/sdk.ts",
   },
   format: ["esm"],
-  dts: true,
+  // Declarations are written by bundle-dts.mjs (API Extractor). tsup's own
+  // declaration build leaves imports of private @attestia/* packages.
+  dts: false,
   clean: true,
   sourcemap: true,
-  splitting: true,
+  splitting: false,
   treeshake: true,
   target: "node18",
   noExternal: [/^@attestia\//],

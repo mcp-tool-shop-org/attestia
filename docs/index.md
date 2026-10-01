@@ -1,6 +1,6 @@
 # Attestia
 
-Financial truth infrastructure for the decentralized world — structural governance, deterministic accounting, and human-approved intent across chains.
+Proves that an event, a transaction, or a state transition happened, and binds that proof to a chain. The domain it ships is financial truth: structural governance, deterministic accounting, and human-approved intent across chains.
 
 ## Key Features
 

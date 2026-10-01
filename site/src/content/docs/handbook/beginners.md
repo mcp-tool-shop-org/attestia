@@ -9,7 +9,7 @@ This page is for anyone encountering Attestia for the first time. It explains wh
 
 ## 1. What is Attestia and why does it exist?
 
-Attestia is a TypeScript monorepo that provides financial truth infrastructure for decentralized systems. It sits between the applications that move money and the blockchains that record transactions, adding a layer of structural governance, deterministic accounting, and human-approved intent.
+Attestia proves that an event, a transaction, or a state transition happened, and binds that proof to a chain. This page walks through the financial domain it ships. That domain sits between the applications that move money and the blockchains that record transactions, adding structural governance, deterministic accounting, and human-approved intent.
 
 Most blockchain tooling focuses on executing transactions. Attestia focuses on the question that comes after: *can you prove what happened, and can you prove it was authorized?*
 

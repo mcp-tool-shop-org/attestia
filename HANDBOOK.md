@@ -8,9 +8,11 @@
 
 ## Executive Summary
 
-Attestia is financial truth infrastructure for the decentralized world. It is the accounting and governance layer that sits beneath wallets, DAOs, and DeFi protocols — observing what happened on-chain, constraining what can happen next, and producing an unbreakable financial record.
+Attestia proves that an event, a transaction, or a state transition happened, and binds that proof to a chain. The domain this repository ships is financial truth: the accounting and governance layer beneath wallets, DAOs, and treasuries. It observes what happened on-chain, constrains what can happen next, and produces a financial record that can be replayed.
 
 Attestia does not move money. It proves what happened, enforces structural rules, and attests the result on-chain.
+
+Attestia, Cognate, and RepoMesh are three products. Cognate is the AI governance domain on Attestia's event store and Merkle proofs. It does not keep a second store. RepoMesh is the release network: signed events, node manifests, and an XRPL-anchored trust clock, on its own RFC 6962 ledger. Cognate calls Attestia when it needs a proof, and RepoMesh when it needs a release checked.
 
 **By the numbers:**
 

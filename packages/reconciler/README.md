@@ -2,7 +2,7 @@
 
 # @attestia/reconciler
 
-> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- financial truth infrastructure for the decentralized world.
+> Part of [Attestia](https://github.com/mcp-tool-shop-org/Attestia) -- proves an event, a transaction, or a state transition happened. The domain it ships is financial truth.
 
 **Cross-system reconciliation engine with 3D matching across intents, ledger entries, and on-chain events.**
 

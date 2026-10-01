@@ -1,1 +1,1 @@
-export * from "@attestia/proof";
+export * from "../../proof/src/index";
