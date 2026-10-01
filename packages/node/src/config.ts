@@ -5,7 +5,9 @@
  * Supports optional `.env` file loading when `dotenv` is available.
  */
 
+import { dirname } from "node:path";
 import { z } from "zod";
+import type { PersistenceConfig } from "./services/attestia-service.js";
 
 // =============================================================================
 // Schema
@@ -46,6 +48,10 @@ export const ConfigSchema = z
 
     // Idempotency
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().min(1000).default(86400000),
+
+    // Durable event log. Unset or blank keeps the in-memory service.
+    // Compose sets this to /app/data/events.jsonl on the attestia-data volume.
+    ATTESTIA_EVENTS_FILE: z.string().optional(),
   })
   // B-NODE-004: when witnessing is turned on, the URL + secret + address MUST be
   // present, so a misconfigured witness fails closed at boot instead of becoming
@@ -66,6 +72,17 @@ export const ConfigSchema = z
   });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
+
+/**
+ * Persistence for the configured owner when `ATTESTIA_EVENTS_FILE` is set.
+ * A blank value stays in memory, which is what the existing tests rely on.
+ * `dataDir` is the parent of the log so tenant snapshots sit beside it.
+ */
+export function persistenceFromConfig(config: AppConfig): PersistenceConfig | undefined {
+  const eventsFile = config.ATTESTIA_EVENTS_FILE?.trim();
+  if (!eventsFile) return undefined;
+  return { dataDir: dirname(eventsFile), eventLogPath: eventsFile };
+}
 
 // =============================================================================
 // API Key Parsing

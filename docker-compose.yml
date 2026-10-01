@@ -25,6 +25,9 @@ services:
       HOST: "0.0.0.0"
       LOG_LEVEL: "info"
       NODE_ENV: "development"
+      # This stack's volume is attestia-data. The configured owner writes
+      # this file. Cognate's compose uses the same variable on cognate-data.
+      # Do not mount one file into both processes.
       DEFAULT_CURRENCY: "USDC"
       DEFAULT_DECIMALS: "6"
       RATE_LIMIT_RPM: "100"

@@ -4,6 +4,11 @@ All notable changes to Attestia, organized by development phase.
 
 ---
 
+## [Unreleased]
+
+### Added
+- `ATTESTIA_EVENTS_FILE` opens that file as the configured owner's event log. Snapshots stay in the tenant directory. Other tenants keep their own log under the parent directory. Unset, the service stays in memory. The server image and compose set `/app/data/events.jsonl` on the `attestia-data` volume.
+
 ## [2.0.5] - 2026-10-01
 
 ### Fixed

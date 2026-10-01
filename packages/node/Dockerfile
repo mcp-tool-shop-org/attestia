@@ -90,6 +90,9 @@ COPY --from=builder /build/packages/node/dist packages/node/dist
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# This image's log. Cognate uses the same variable on its own volume.
+# One process writes the file. A second writer fails closed.
+ENV ATTESTIA_EVENTS_FILE=/app/data/events.jsonl
 
 EXPOSE 3000
 
