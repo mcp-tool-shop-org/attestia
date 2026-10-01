@@ -11,10 +11,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TenantRegistry } from "../src/services/tenant-registry.js";
+import { tenantPaths } from "../src/services/persistence-paths.js";
 
 const defaultConfig = {
   ownerId: "default",
@@ -111,6 +112,22 @@ describe("TenantRegistry — durable restore on lazy create (SEAM-1)", () => {
     expect(b).toBe(c);
     expect(a.isReady()).toBe(true);
 
+    await registry.stopAll();
+  });
+
+  it("keeps an explicit event log on the configured owner only", async () => {
+    const eventsFile = join(dataDir, "events.jsonl");
+    const registry = new TenantRegistry({
+      ...defaultConfig,
+      persistence: { dataDir, eventLogPath: eventsFile },
+    });
+    const owner = await registry.getOrCreate("default");
+    const other = await registry.getOrCreate("acme");
+    owner.declareIntent("i-owner", "transfer", "d", { toAddress: "0xa" });
+    other.declareIntent("i-other", "transfer", "d", { toAddress: "0xb" });
+    expect(existsSync(eventsFile)).toBe(true);
+    expect(existsSync(tenantPaths(dataDir, "default").eventLogPath)).toBe(false);
+    expect(existsSync(tenantPaths(dataDir, "acme").eventLogPath)).toBe(true);
     await registry.stopAll();
   });
 

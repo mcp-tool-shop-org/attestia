@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseApiKeys, loadConfig, ConfigError } from "../src/config.js";
+import { parseApiKeys, loadConfig, persistenceFromConfig, ConfigError } from "../src/config.js";
 
 // =============================================================================
 // parseApiKeys
@@ -90,6 +90,15 @@ describe("loadConfig", () => {
   it("throws on invalid PORT", () => {
     expect(() => loadConfig({ PORT: "0" })).toThrow();
     expect(() => loadConfig({ PORT: "99999" })).toThrow();
+  });
+
+  it("keeps a blank event-log path in memory and honors a set path", () => {
+    expect(persistenceFromConfig(loadConfig({}))).toBeUndefined();
+    expect(persistenceFromConfig(loadConfig({ ATTESTIA_EVENTS_FILE: "  " }))).toBeUndefined();
+    expect(persistenceFromConfig(loadConfig({ ATTESTIA_EVENTS_FILE: "/app/data/events.jsonl" }))).toEqual({
+      dataDir: "/app/data",
+      eventLogPath: "/app/data/events.jsonl",
+    });
   });
 });
 

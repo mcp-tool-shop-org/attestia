@@ -10,7 +10,7 @@ import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
 import pino from "pino";
 import type { Logger } from "pino";
-import { loadConfig, parseApiKeys } from "./config.js";
+import { loadConfig, parseApiKeys, persistenceFromConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
 import { createApp } from "./app.js";
 import type { AuthConfig } from "./middleware/auth.js";
@@ -139,11 +139,13 @@ async function main(): Promise<void> {
     );
   }
 
+  const persistence = persistenceFromConfig(config);
   const { app, tenantRegistry, dispose } = createApp({
     serviceConfig: {
       ownerId: "default",
       defaultCurrency: config.DEFAULT_CURRENCY,
       defaultDecimals: config.DEFAULT_DECIMALS,
+      ...(persistence !== undefined ? { persistence } : {}),
     },
     logFn: (entry) => {
       logger.info(entry, `${entry.method} ${entry.path} ${entry.status}`);

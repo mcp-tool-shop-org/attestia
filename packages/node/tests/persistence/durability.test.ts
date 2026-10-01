@@ -88,6 +88,23 @@ describe("default config (no persistence) — in-memory path untouched", () => {
   });
 });
 
+describe("explicit event log path", () => {
+  it("writes ATTESTIA_EVENTS_FILE and leaves the tenant log unused", async () => {
+    const eventsFile = join(dataDir, "events.jsonl");
+    const service = new AttestiaService({
+      ownerId: OWNER,
+      defaultCurrency: "USDC",
+      defaultDecimals: 6,
+      persistence: { dataDir, eventLogPath: eventsFile },
+    });
+    await service.initialize();
+    service.declareIntent("i-1", "transfer", "Send 100 USDC", { toAddress: "0xabc" });
+    expect(existsSync(eventsFile)).toBe(true);
+    expect(existsSync(tenantPaths(dataDir, OWNER).eventLogPath)).toBe(false);
+    expect(service.readAllEvents().length).toBeGreaterThan(0);
+  });
+});
+
 describe("durable round-trip — survive discard + rebuild", () => {
   it("restores intent, payroll run, envelope and ledger balances; chain verifies", async () => {
     // ── First instance: do real work. ──

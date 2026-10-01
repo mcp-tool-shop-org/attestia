@@ -6,7 +6,22 @@
  */
 
 import { AttestiaService } from "./attestia-service.js";
-import type { AttestiaServiceConfig } from "./attestia-service.js";
+import type { AttestiaServiceConfig, PersistenceConfig } from "./attestia-service.js";
+
+/**
+ * The explicit log path belongs to the configured owner. Another tenant keeps
+ * the hashed directory under dataDir, so two tenants do not share one file.
+ */
+function persistenceForTenant(
+  persistence: PersistenceConfig | undefined,
+  tenantId: string,
+  ownerId: string,
+): PersistenceConfig | undefined {
+  if (persistence === undefined) return undefined;
+  if (tenantId === ownerId || persistence.eventLogPath === undefined) return persistence;
+  const { eventLogPath: _eventLogPath, ...rest } = persistence;
+  return rest;
+}
 
 export class TenantRegistry {
   private readonly _tenants = new Map<string, AttestiaService>();
@@ -43,9 +58,14 @@ export class TenantRegistry {
     if (existing !== undefined) {
       return existing;
     }
+    const { persistence: configured, ...shared } = this._defaultConfig;
+    // The compose path is the configured owner's log. Other tenants keep
+    // `<dataDir>/<sha256(ownerId)>/events.jsonl`.
+    const persistence = persistenceForTenant(configured, tenantId, this._defaultConfig.ownerId);
     const service = new AttestiaService({
-      ...this._defaultConfig,
+      ...shared,
       ownerId: tenantId,
+      ...(persistence !== undefined ? { persistence } : {}),
     });
     this._tenants.set(tenantId, service);
     const init = service.initialize().then(() => service);

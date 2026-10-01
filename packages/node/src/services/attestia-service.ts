@@ -207,6 +207,14 @@ export interface PersistenceConfig {
   /** Defensive cap (bytes) on the event-log file read into memory on boot. */
   readonly maxLoadBytes?: number;
   /**
+   * Event log file. When set, this path is used instead of
+   * `<dataDir>/<sha256(ownerId)>/events.jsonl`. Snapshots stay in the tenant
+   * directory. `TenantRegistry` applies the override only to the configured
+   * owner; another tenant keeps its own log under `dataDir`. One process
+   * writes a file. A second process that advances the same file fails closed.
+   */
+  readonly eventLogPath?: string;
+  /**
    * Explicit recovery override (DUR-COMPOSED-002). When the latest snapshot is
    * stamped AHEAD of the durable event log (its `eventPosition` exceeds the
    * log's live position), the snapshot describes state the log cannot back —
@@ -319,7 +327,7 @@ export class AttestiaService {
       const paths = tenantPaths(config.persistence.dataDir, config.ownerId);
       const verifyOnLoad = config.persistence.verifyOnLoad ?? true;
       this.eventStore = new JsonlEventStore({
-        filePath: paths.eventLogPath,
+        filePath: config.persistence.eventLogPath ?? paths.eventLogPath,
         verifyOnLoad,
         telemetry,
         ...(config.persistence.maxLoadBytes !== undefined
