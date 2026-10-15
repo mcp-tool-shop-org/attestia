@@ -83,43 +83,57 @@
           "path": "packages/attestia/LICENSE"
         },
         {
-          "hash": "f45252b7c4809ac97b163a156df990587750716c787f946012fc3684c3333d21",
+          "hash": "63b43c8c981df64e828b1f7bcf392554905a8bf8f03415a550139750266409f2",
           "path": "packages/attestia/README.es.md"
         },
         {
-          "hash": "6645a0df4fae22bf2857234cb9b72da6cdde0eee2f85614f2b8170366cfd5810",
+          "hash": "216792b125f3182aa6f0b431f65f5982793aa5b7fa004d30db6e46477ab8732f",
           "path": "packages/attestia/README.fr.md"
         },
         {
-          "hash": "3ff5d4c203f0a2ec3fcbdc6a923ad775b3a57f26e2b6ac382147d6f36aeca487",
+          "hash": "65ac44c11b22abbae6cf662b65ce68d86e0661505aea7bd93b64d0a9a818a6cf",
           "path": "packages/attestia/README.hi.md"
         },
         {
-          "hash": "a7f918787cf9073ce5ca9a87130165472349978c9eb3fabdb0cc92e60fe7e3d1",
+          "hash": "3ac8de52af9201c1e6e1d687abe11c316428669691d1e1dda6a1324305f270b7",
           "path": "packages/attestia/README.it.md"
         },
         {
-          "hash": "d11319998810c683c9692da00f8e62739add6a59b02ca4e4cb66c64445fa0c27",
+          "hash": "981624efb2abb51843501d77792e7dac20a23276a0949d41046ffcc0c53eafa1",
           "path": "packages/attestia/README.ja.md"
         },
         {
-          "hash": "77a9cdc96e8cef5be3bd897c5effdc2c2f2e8eb99be53f5d68ad99fa5905b02c",
+          "hash": "4da2225824ba905b92786c218c0c14e451b8ef68f7299322868312371c33f0c9",
           "path": "packages/attestia/README.md"
         },
         {
-          "hash": "57843334b2c88321aa7b3163bcda1afed3f43e1d56be0de097e2534a2755fbb5",
+          "hash": "27e6a435821fa411e9e357b1803f94bdd64d3238e1966fec70031acbf3895bc7",
           "path": "packages/attestia/README.pt-BR.md"
         },
         {
-          "hash": "f213bba2670dd07d2e0b70777c8a10796b35dcf29affa716f5aff85d107055b4",
+          "hash": "b8bcb9e47632d2f9fd6d5227df7b58128c2f8a0c6c24e3b272f2a4366a9dbd3a",
           "path": "packages/attestia/README.zh.md"
         },
         {
-          "hash": "06bfb2466618a7fd72149c9410343f1790d71ef66fbc76246553b9ee51265f3c",
+          "entry": "rollup",
+          "entryRule": 1,
+          "failurePaths": [
+            {
+              "in": "rollup",
+              "kind": "throw",
+              "line": 74
+            }
+          ],
+          "hash": "9710389c32219d40436c0f027cbf48c03e9400b7406a0aae43e1af401ad92197",
+          "path": "packages/attestia/bundle-dts.mjs",
+          "sequences": []
+        },
+        {
+          "hash": "87eb8581cfa8c079f89d905eadfac88dee5dd3f19928323e86da974ee9cd216f",
           "path": "packages/attestia/package.json"
         },
         {
-          "hash": "bc80abd4aae7a48357e905da23d69ebea9409f04b65791a79f6c8d19db8cc8d8",
+          "hash": "fb8349fe91d74ccc6816b948f9d3c48cd2177f40a2e44ddda49bc1597821350f",
           "importsFiles": [
             "packages/chain-observer/src/index.ts"
           ],
@@ -130,7 +144,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "4ecab86477a6ab95ababf55948898efa4f6d4f38144bb26248ed433dceead4f6",
+          "hash": "aceaa5355abd3fbe52db0f6b062a6656747cd8b0fb8acbc9c1f3ac52a178a54f",
           "importsFiles": [
             "packages/event-store/src/index.ts"
           ],
@@ -141,7 +155,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "0c25c014e9ec7b33620b140a29995485d4a78f1a99168c3c9279bef3cb2e2390",
+          "hash": "ed68fe609fa9c1191e53214fd1cc7cecff3b240847d6d2bca7fe1711d6f83e5a",
           "importOrder": [
             "packages/types/src/index.ts",
             "packages/ledger/src/index.ts",
@@ -174,7 +188,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "aabef4a71fe1b46f31d460c48a9efd84e44d6baacb16215830acd4f7cbc70954",
+          "hash": "ff5086a13f4f80d09ab18d44a4361ad9772e87f4dba76e02bff60880f84bf18b",
           "importsFiles": [
             "packages/ledger/src/index.ts"
           ],
@@ -185,7 +199,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "eee0205602bd047eebf7c0d3ff71ee153a7f249315f65cde56d59fef4c8b0100",
+          "hash": "6be5763300376f84135d3133e3d6fb17263b9f34a5ee0b175b5bd647b19c824e",
           "importsFiles": [
             "packages/proof/src/index.ts"
           ],
@@ -196,7 +210,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "a952213e8a1c1df32509ce64379b4717223cd55efc15b6b517bb64d96342977a",
+          "hash": "b7cbc11809f635b79fc2d6b4498758a0b84a740fa7e9edf82be43dd5be245fbd",
           "importsFiles": [
             "packages/reconciler/src/index.ts"
           ],
@@ -207,7 +221,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "51c1b37aa3f63ef2be39d8dea601b959d32720f50bcdc9f5bf5eb95f5316ccb8",
+          "hash": "4255a2a8084d72f3ac11b31d7b4a614dbd475cc9ea17148ce72cc4a5793070c7",
           "importsFiles": [
             "packages/registrum/src/index.ts"
           ],
@@ -218,7 +232,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "253c1ad525a1d770d55a109db05e63116dc8c9b2f242a983d10430f16ad778ea",
+          "hash": "92c0b7b100efbefcc65139604ca68047f1d31b6f61b7a4f927c3193ae27c8d00",
           "importsFiles": [
             "packages/sdk/src/index.ts"
           ],
@@ -229,7 +243,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "6bd436a15381bf421cc9f356d0d70151d40c7c6285fd551c41c21aa348361fff",
+          "hash": "76eeeab645e6216d9e2bda82e5920794b4045c114a7db1fb0c4af618963e41ca",
           "importsFiles": [
             "packages/treasury/src/index.ts"
           ],
@@ -240,7 +254,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "760f316dc72fc0d7e77f7194e5da88ab73543caf7534e3bcbd3431b1a0a921a3",
+          "hash": "3b044ee848ec35691eadeb8ffb36ebdf05b856b4e1c51695f4540fdef5989c49",
           "importsFiles": [
             "packages/types/src/index.ts"
           ],
@@ -251,7 +265,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "a763e2e8b1c82bb13479115ad812c15657c3aecb1bc3a3d3a5d4f89df903048b",
+          "hash": "ae4d500405e3edf00735f47fd143a3d4c6dbb2a8a89da8ed261d423c1da6b490",
           "importsFiles": [
             "packages/vault/src/index.ts"
           ],
@@ -262,7 +276,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "6aa255472b413d98e7ad1291c023a37a6a41998114ad0c42fb76a4b09c170538",
+          "hash": "8c8ce36cd2f0746b5b4dd36e3781f12ad096f444158107366d2d50186cf7b48c",
           "importsFiles": [
             "packages/verify/src/index.ts"
           ],
@@ -273,7 +287,7 @@
           "reexportsOnly": true
         },
         {
-          "hash": "a28aed2179b8f302eb2bf888dc091664c7d5451c7b3d699bc55990c344f202ef",
+          "hash": "fdbaabc2dc086af6ca05ec012970f66bd69d6790dfd205da5e367f7b36f50557",
           "importsFiles": [
             "packages/witness/src/index.ts"
           ],
@@ -323,7 +337,7 @@
           "path": "packages/attestia/tsconfig.json"
         },
         {
-          "hash": "89c92eaf2e37f509a131cf4d2feea920660fe20730455003c2f4e6b3f3451d33",
+          "hash": "cb865f0785ae465ade91a81ce0c88ddff2abcc388220e9244446f8e271bb9369",
           "path": "packages/attestia/tsup.config.ts"
         },
         {
@@ -355,7 +369,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "d7b713812ca5e38cd076be6a3b2ba9f78419401959eae9b21e389d77b6e0f3d4",
+          "hash": "abfd14ba39e397ee406f8d45a8293d115b82a8ae200915ffa07a87a198cf651c",
           "path": "packages/chain-observer/README.md"
         },
         {
@@ -1161,7 +1175,7 @@
               "line": 190
             }
           ],
-          "hash": "1ab10d01c57685b7b8dc251626462cdb905a975240feb6b80811bcc913f8a391",
+          "hash": "9e5fde58c0a54d286d0b3ead57501de46d8eea0a0d2e195993c7ece3e08eee9a",
           "importOrder": [
             "packages/vault/src/index.ts",
             "packages/ledger/src/index.ts",
@@ -1216,7 +1230,7 @@
           "path": "docs/crucible-integration-roadmap.md"
         },
         {
-          "hash": "c698a072cc1336914a73a3181efcc0ed8ff4ceb18ccf1f0e4b0428a5d20b2ed2",
+          "hash": "244c7effc57500db304b99864e2ad3369b2a48d087fc6f2b3ff33b180b61c46e",
           "path": "docs/index.md"
         }
       ],
@@ -1241,7 +1255,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "bf33bbf3e6f9182a96385c4c3e9c30767626926fee2ead234d20a09377abe170",
+          "hash": "3f9de5af7f72bce7126f39d55955e397ad2726efd43eed6a7bdb131713274970",
           "path": "packages/event-store/README.md"
         },
         {
@@ -1359,9 +1373,10 @@
           "path": "packages/event-store/src/in-memory-store.ts"
         },
         {
-          "hash": "af4d8ccd3a2aa9a5ca6640c62931aa239bb253f581f7ecd5039130289980e085",
+          "hash": "d4fd130a5e9e8fb88085fcd72b62e9ca057a90cd24b849a2da8db920ca1d9a91",
           "importOrder": [
             "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts",
             "packages/event-store/src/hash-chain.ts",
             "packages/event-store/src/in-memory-store.ts",
             "packages/event-store/src/jsonl-store.ts",
@@ -1376,7 +1391,8 @@
             "packages/event-store/src/in-memory-store.ts",
             "packages/event-store/src/jsonl-store.ts",
             "packages/event-store/src/snapshot-store.ts",
-            "packages/event-store/src/types.ts"
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
           ],
           "path": "packages/event-store/src/index.ts",
           "reexportsOnly": true
@@ -1786,7 +1802,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "20215f3416f2e8c24a0beb905058bc16962973ced9b80794c19951e319419a33",
+          "hash": "a96858b3d7df9d35d26f0d425bcf4d555cbd98af6cef30c67ec87f3b74344505",
           "path": "packages/ledger/README.md"
         },
         {
@@ -2148,11 +2164,11 @@
           "path": "packages/node/.env.example"
         },
         {
-          "hash": "1fff8bda74a7928144f800ac9342a695aa3c8e88e4dd0b52d44662222332bc4d",
+          "hash": "9bea67730a64a6d197a9684ca2efac84da2ce82bd1404ba22792fad7ab9e9b04",
           "path": "packages/node/Dockerfile"
         },
         {
-          "hash": "9bb3093ebdfa73275dd0859dec32f060db71fba97b6e319a1783d64b4cd06dfc",
+          "hash": "668e480864dff44df088a330acad674d36dc6204eab79b41f55fb2a65b22533b",
           "path": "packages/node/README.md"
         },
         {
@@ -2395,36 +2411,40 @@
         {
           "exports": [
             "loadConfig",
-            "parseApiKeys"
+            "parseApiKeys",
+            "persistenceFromConfig"
           ],
           "failurePaths": [
             {
               "in": "parseApiKeys",
               "kind": "throw",
-              "line": 97
+              "line": 118
             },
             {
               "in": "parseApiKeys",
               "kind": "throw",
-              "line": 105
+              "line": 126
             },
             {
               "in": "parseApiKeys",
               "kind": "throw",
-              "line": 108
+              "line": 129
             },
             {
               "in": "parseApiKeys",
               "kind": "throw",
-              "line": 113
+              "line": 134
             },
             {
               "in": "loadConfig",
               "kind": "throw",
-              "line": 166
+              "line": 187
             }
           ],
-          "hash": "15cd3e99ebfa29dcf1e0ec2200d6d8dc345e46edc334ae22dfd83dbee840ceab",
+          "hash": "5abf1334b12fa7ab5a868bb2e275ada6439475128b6c6cf68c51776507670885",
+          "importsFiles": [
+            "packages/node/src/services/attestia-service.ts"
+          ],
           "path": "packages/node/src/config.ts"
         },
         {
@@ -2447,15 +2467,15 @@
             {
               "in": "shutdown",
               "kind": "catch",
-              "line": 217
+              "line": 219
             },
             {
               "in": "isMainModule",
               "kind": "catch",
-              "line": 237
+              "line": 239
             }
           ],
-          "hash": "10c952c7f02d24486885d538867b33506f922cb26428e00b609349b3fe1a132c",
+          "hash": "d5e9135ea06d39a8689db80ff7d421d2759befdb15c67e080eb12058a8b513a2",
           "importsFiles": [
             "packages/node/src/app.ts",
             "packages/node/src/config.ts",
@@ -2501,6 +2521,13 @@
                     "file": "packages/node/src/config.ts"
                   },
                   "via": "buildAuthConfig"
+                },
+                {
+                  "line": 142,
+                  "name": "persistenceFromConfig",
+                  "target": {
+                    "file": "packages/node/src/config.ts"
+                  }
                 },
                 {
                   "inner": [
@@ -2591,7 +2618,7 @@
                     }
                   ],
                   "innerTruncated": true,
-                  "line": 142,
+                  "line": 143,
                   "name": "createApp",
                   "target": {
                     "file": "packages/node/src/app.ts"
@@ -3184,65 +3211,65 @@
             {
               "in": "addSigner",
               "kind": "catch",
-              "line": 697
+              "line": 705
             },
             {
               "in": "addSigner",
               "kind": "throw",
-              "line": 698
+              "line": 706
             },
             {
               "in": "removeSigner",
               "kind": "catch",
-              "line": 717
+              "line": 725
             },
             {
               "in": "removeSigner",
               "kind": "throw",
-              "line": 718
+              "line": 726
             },
             {
               "in": "changeQuorum",
               "kind": "catch",
-              "line": 738
+              "line": 746
             },
             {
               "in": "changeQuorum",
               "kind": "throw",
-              "line": 739
+              "line": 747
             },
             {
               "in": "restoreAll",
               "kind": "catch",
-              "line": 952
+              "line": 960
             },
             {
               "in": "restoreAll",
               "kind": "catch",
-              "line": 974
+              "line": 982
             },
             {
               "in": "restoreAll",
               "kind": "catch",
-              "line": 988
+              "line": 996
             },
             {
               "in": "restoreAll",
               "kind": "catch",
-              "line": 1002
+              "line": 1010
             },
             {
               "in": "restoreAll",
               "kind": "catch",
-              "line": 1012
+              "line": 1020
             },
             {
               "in": "restoreAll",
               "kind": "throw",
-              "line": 1074
+              "line": 1082
             }
           ],
-          "hash": "6c72a2a51a211fce5020c7e90871617009e2c97d78eeeddf4d3dde6f7f6cbdd8",
+          "hash": "4c879217f81f2e03a564f3304f1278cccda753101370224deeff6e6067ac3fe8",
           "importOrder": [
             "packages/vault/src/index.ts",
             "packages/ledger/src/index.ts",
@@ -3293,7 +3320,7 @@
           "path": "packages/node/src/services/persistence-paths.ts"
         },
         {
-          "hash": "ad7bfd91dc89ab7c9d9c6db8215b79aa410a64ac8c13942d43c04e98d0ac4658",
+          "hash": "a65ba49facda7dce9729d0ffba8a289ddd5f085d2be3983c207086c087e40de1",
           "importsFiles": [
             "packages/node/src/services/attestia-service.ts"
           ],
@@ -3441,7 +3468,7 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "5e8e9d6fd2b9c0ceb8fbe0f3efbcf1cd0d5098eae997bedb23f85898ee11afcd",
+          "hash": "d67fd8b163a232e69cb734fc7e4782f346f77acb848b1863116ee639d9b3e408",
           "importsFiles": [
             "packages/node/src/config.ts"
           ],
@@ -3699,7 +3726,7 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "fc915c4987356bc3cdd656bf2cadfa47d4d6048be2695a4678cd97380ebca9e9",
+          "hash": "204971c4660b780e2c4d68815d28e9a8030d6b3908cf9c3ff9eef8798e4c6245",
           "importOrder": [
             "packages/node/src/services/attestia-service.ts",
             "packages/types/src/index.ts",
@@ -3813,8 +3840,13 @@
           "path": "packages/node/tests/setup.ts"
         },
         {
-          "hash": "67943a75c68318fed7893886396dd1cf416e079f2cc9e2eadb60c11c470d4339",
+          "hash": "ff46f1ad544095f3e6d26c87add06ba4e85547727e772f7126bb5a13cdc58d62",
+          "importOrder": [
+            "packages/node/src/services/tenant-registry.ts",
+            "packages/node/src/services/persistence-paths.ts"
+          ],
           "importsFiles": [
+            "packages/node/src/services/persistence-paths.ts",
             "packages/node/src/services/tenant-registry.ts"
           ],
           "path": "packages/node/tests/tenant-registry.test.ts",
@@ -3880,7 +3912,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "e39cee4124c6fe1c907e0f5f1ec4b20e1746d294ebe68bfd110c05e66f80f63d",
+          "hash": "e214f82ed45e3500acc869f75dd5cfad9ba0e2233399282ef020dc8d669cb0ab",
           "path": "packages/proof/README.md"
         },
         {
@@ -4087,7 +4119,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "ba7fa6d9115fff91f8691a250d80b5ae54bd17fff7e4fd7ac647b5edd8508e05",
+          "hash": "7efdcb80b2dc34e71a8b8371976252924df7c7f60f7dded9f4521a3e442bad33",
           "path": "packages/reconciler/README.md"
         },
         {
@@ -4414,7 +4446,7 @@
           "path": "packages/registrum/LICENSE"
         },
         {
-          "hash": "e894e6e28fca815c6983e672c287587559e63788581e68132e0bf7c4c4149ab8",
+          "hash": "24407a7fc2fc8b31dea64a1c16d01bfad2b12bcd76ced1c81f1c121ae040c637",
           "path": "packages/registrum/README.md"
         },
         {
@@ -6052,7 +6084,7 @@
           "path": "ARCHITECTURE.md"
         },
         {
-          "hash": "f474d334fb92aa6cbf6a4c9e6dab6cafc7e1c43548bf46845bb9819378b96046",
+          "hash": "5b2eede272ca20744ff7f368851fa76a682cba05b9ea2c6be8377707031ea902",
           "path": "CHANGELOG.md"
         },
         {
@@ -6064,7 +6096,7 @@
           "path": "DESIGN.md"
         },
         {
-          "hash": "5eb2f138a799ffcaf479ae7a227c43f6439725353f784c48c6683ec406eac973",
+          "hash": "02c6f7d76e8e3488f00f702440171d0a61398ddd43c05df9ed98955f8766e5c9",
           "path": "HANDBOOK.md"
         },
         {
@@ -6092,35 +6124,35 @@
           "path": "PILOT_SCOPE.md"
         },
         {
-          "hash": "65c015cfea2579ea0705914e4bba514a7d58219850542f3a2e2b81f9d0a80b49",
+          "hash": "9e86fe8e07d5607b63647adce9a01b8d85eff331c4a3460d437b715bd013e023",
           "path": "README.es.md"
         },
         {
-          "hash": "b3546200117deb8f0ca4068e7c87c33fa119925ce2e9d35743908f7608d7e4f2",
+          "hash": "80c27658d32265138ee05eb815abffeafac065e72cab9ae98ebb9a985ae23a02",
           "path": "README.fr.md"
         },
         {
-          "hash": "cdcdf793b83910c8ec7eb5605e3d718b835bbf8bbd8cbad39394e07daab09a2a",
+          "hash": "df478e4fe1cdaeefe9edd87f9d77e2b511cbadddc432dc4908555385f3604b2e",
           "path": "README.hi.md"
         },
         {
-          "hash": "7262d2fdcd5b9f9272a3e572ed138ab4bf4e146cdb7d6e62517d98159c6c9418",
+          "hash": "f1733b15b1039c546e37e6f33c0bcbcc18107ea7a67d9a7ae47e306ff5754e60",
           "path": "README.it.md"
         },
         {
-          "hash": "104b86f2aed7c8f9e986701be00f45168bdb2e3a8b667aea71ed35ecdb9ccf35",
+          "hash": "1fd18ccd893c47ca1745aa4b9fce57b8fdf37296d1830971716552aae31260de",
           "path": "README.ja.md"
         },
         {
-          "hash": "85cc5b60f8434a9a352eb6a5e4b819609d22d965097797b9d989a77d5e5c37c1",
+          "hash": "1b5c1e397047503d29a17815f67f298bf06ea7ac30c83dbd276f2fe292ee5e97",
           "path": "README.md"
         },
         {
-          "hash": "8b37b8f661818c5180f211b0c6bfc4d0e9b91a7a0697fec9c60c41f1e5b4fad1",
+          "hash": "96ae126b9fbdf5de17b8d3b4877ef0153a0e0ba4390dd766ebbf8e4dd6777243",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "b9ef20169fafa2bf546ec5f858b1f077bf34e1b1525fe835254573d4b91fb11b",
+          "hash": "de2bbc1f3d40ab95760bc4e6769d0cb553a8561c9f365e053b9a341011977a47",
           "path": "README.zh.md"
         },
         {
@@ -6164,15 +6196,15 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "274d756407e9bb21354854fd0948597ef8999c006bb1291e3525dc20f8385653",
+          "hash": "03c7715abbc9ef22b5f519e5cc4d9d1a6c01b4493a2f1e4dbcf41527e24a01a8",
           "path": "docker-compose.yml"
         },
         {
-          "hash": "bba2f50504fb0f84e313e3cda08999427c3b558e38de4d78ca91ebde1a554cc4",
+          "hash": "d489879ed62fb05c4b4f3af27f180ffe4ccc785aa18eb85ff15ff662f8ac41ac",
           "path": "package.json"
         },
         {
-          "hash": "e489411b976c732349d34668649d953b756c8fef0d2b8250cb49f560242b8cb9",
+          "hash": "5bbc1cf478c9fb4a8d33c683b592ab1ed469aafc0a74ce00048e87bd7034b831",
           "path": "pnpm-lock.yaml"
         },
         {
@@ -6260,7 +6292,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "1d34062575dd7f0565106391f3c5ce0c2ab3241665aab01c4ef45b0af059b706",
+          "hash": "dafb7bd6d3ac5762cf66d7caa0c8011a972adadef455ef7a6ed283635a2d1434",
           "path": "packages/sdk/README.md"
         },
         {
@@ -6456,7 +6488,7 @@
           "path": "site/astro.config.mjs"
         },
         {
-          "hash": "af5d4f54dca60686724d306eb58759fb25b6f5ba4d66559ab84a968112a184e5",
+          "hash": "0607a19c4f60b635244a906c7ad2424359b50e20c4a83bc140f202abce4a941e",
           "path": "site/package-lock.json"
         },
         {
@@ -6481,7 +6513,7 @@
           "path": "site/src/content/docs/handbook/architecture.md"
         },
         {
-          "hash": "8fc0e4f3d9cc3c4319706b3e082f0657cc8356cb56259c7e95f0e91b4f5ee920",
+          "hash": "b85fef383094c320316719dea5110c39424c33b76e00d86c9a38ad3bd5b32e5e",
           "path": "site/src/content/docs/handbook/beginners.md"
         },
         {
@@ -6489,7 +6521,7 @@
           "path": "site/src/content/docs/handbook/getting-started.md"
         },
         {
-          "hash": "dcc82162b3cd236479aa8fa11620ee3916f98f2f38033762ef5fa0bd437859d7",
+          "hash": "df372cf1c2bebe4b28e10e382dfac34205f0d75c38120f956511f0398130aafd",
           "path": "site/src/content/docs/handbook/index.md"
         },
         {
@@ -6553,7 +6585,7 @@
           "path": "specs/DEFINITIONS.md"
         },
         {
-          "hash": "57f723c81245cafe0f80c3fb751f6bc4ae171052fdd1e736d6f7413fb214e6e5",
+          "hash": "39f1bb578b23ff4dabf27220926a4d27751968a4f70384b0fc2e72970ac952d4",
           "path": "specs/RFC-001-DETERMINISTIC-EVENT-MODEL.md"
         },
         {
@@ -6610,7 +6642,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "2bff1b0ea1cc3724bcadc8db6c8a8e35b4d26ffc9b4293f961b1cee29bf7f0dd",
+          "hash": "fdf588dc4efedece5bdb393d4478151a1f2870291f6bcc93a01a17a945b9407f",
           "path": "packages/treasury/README.md"
         },
         {
@@ -7097,7 +7129,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "8e969e29dc35a0aca5a84bf8b5bf4d61d34629f6d7c4f20728837679ad3e0c60",
+          "hash": "5fe3534bb43b9e3f874f34562c01980defac52530eac445f8382b4a050a9fa93",
           "path": "packages/types/README.md"
         },
         {
@@ -7109,7 +7141,7 @@
           "path": "packages/types/src/chain.ts"
         },
         {
-          "hash": "0faaf3642a231566f1fc5c29320edc7331c2a0e80012480a18ede1469dd505aa",
+          "hash": "85872fb7c68fc9ee63175a80bab0ca839cbcc163a0e58a90536b672afa827f5d",
           "path": "packages/types/src/event.ts"
         },
         {
@@ -7132,7 +7164,7 @@
             "isSolanaOnChainEvent",
             "isTokenRef"
           ],
-          "hash": "40fac2633ec76e4544dec3cb6b55baa43a3a0995591234fde4651b20bacb8eb5",
+          "hash": "0af6a02d233c4f901285a5fee58dd28b0c28733be681f0c815303d89f4f9df96",
           "importOrder": [
             "packages/types/src/financial.ts",
             "packages/types/src/intent.ts",
@@ -7188,7 +7220,7 @@
           "path": "packages/types/src/solana.ts"
         },
         {
-          "hash": "16fcce266d1b07269e92d3d163df10b04a2ccaf822dbb244d30b54319572e4d3",
+          "hash": "2f857162c1f30fb7257aba0e6d9a3e5b0a1459cc29fd3655fcf9dd593688509c",
           "importsFiles": [
             "packages/types/src/guards.ts"
           ],
@@ -7236,7 +7268,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "43d1716fcc1797801036f8464634341404f4d23c6e14606b86fa5acbd30d94e2",
+          "hash": "16021c27b460ac2fd1cbcefe6958c87f3d2e251cd33c263ecbd78c62bb61c6a5",
           "path": "packages/vault/README.md"
         },
         {
@@ -7617,7 +7649,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "a0522e33e7eb16374e232573275d59c7658a04ae58c959dda1c7a0125bb3558e",
+          "hash": "815ef526f3726d1a422928f8c549a17c7250d4287c96efa0c293515eaf7c8c7b",
           "path": "packages/verify/README.md"
         },
         {
@@ -8295,7 +8327,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "46a1b6a2c223f79525f2ddfd2a4c0a86d73db1ccc4a2a13f0161ac9a5e866b0b",
+          "hash": "89da7d81ff4096e01c78d6d4fd476735202ae5985b0ec723159517c8d55b18e0",
           "path": "packages/witness/README.md"
         },
         {
@@ -9454,7 +9486,7 @@
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 13
+          "files": 14
         },
         {
           "boundary": "chain-observer",
@@ -9529,6 +9561,11 @@
       ],
       "readers": [],
       "runs": [
+        {
+          "job": "build-and-test",
+          "path": "packages/attestia/bundle-dts.mjs",
+          "runKind": "executes"
+        },
         {
           "built": true,
           "job": "build-and-test",
@@ -10427,7 +10464,7 @@
           "via": "vitest packages/witness/vitest.config.ts"
         }
       ],
-      "runsCount": 123,
+      "runsCount": 124,
       "secrets": [],
       "sends": {
         "deploysPages": false,
@@ -10643,6 +10680,9 @@
           "event": "workflow_dispatch"
         }
       ],
+      "untrackedLandings": [
+        "packages/attestia/dist/"
+      ],
       "uses": [
         "actions/checkout",
         "actions/download-artifact",
@@ -10688,7 +10728,7 @@
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 17
+          "files": 18
         },
         {
           "boundary": "chain-observer",
@@ -10781,6 +10821,12 @@
           "packed": true,
           "path": "packages/",
           "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "job": "build-and-push",
+          "path": "packages/attestia/bundle-dts.mjs",
+          "runKind": "executes",
           "via": "docker build packages/node/Dockerfile"
         },
         {
@@ -11133,7 +11179,7 @@
           "via": "docker build packages/node/Dockerfile"
         }
       ],
-      "runsCount": 48,
+      "runsCount": 49,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -11160,6 +11206,9 @@
         {
           "event": "workflow_dispatch"
         }
+      ],
+      "untrackedLandings": [
+        "packages/attestia/dist/"
       ],
       "uses": [
         "actions/checkout",
@@ -11456,7 +11505,7 @@
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 14
+          "files": 15
         },
         {
           "boundary": "chain-observer",
@@ -11531,6 +11580,11 @@
       ],
       "readers": [],
       "runs": [
+        {
+          "job": "release",
+          "path": "packages/attestia/bundle-dts.mjs",
+          "runKind": "executes"
+        },
         {
           "built": true,
           "job": "release",
@@ -12437,7 +12491,7 @@
           "via": "vitest packages/witness/vitest.config.ts"
         }
       ],
-      "runsCount": 124,
+      "runsCount": 125,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -12638,6 +12692,9 @@
             "v*"
           ]
         }
+      ],
+      "untrackedLandings": [
+        "packages/attestia/dist/"
       ],
       "uses": [
         "actions/checkout",
@@ -12944,8 +13001,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "92c144c11a80d3a09ddfcf8dde80f83bbdfc6896",
-    "tracked": 592
+    "commit": "4ce59c244b3f7453e4740c2fd1e49361aeec6c7d",
+    "tracked": 593
   },
   "landings": [
     {
@@ -13032,6 +13089,17 @@
       ],
       "target": "packages",
       "writers": []
+    },
+    {
+      "readers": [],
+      "target": "packages/attestia/dist",
+      "tracked": false,
+      "writers": [
+        {
+          "by": "packages/attestia/bundle-dts.mjs",
+          "confidence": "ast"
+        }
+      ]
     },
     {
       "readers": [

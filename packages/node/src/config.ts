@@ -108,11 +108,15 @@ export function parseApiKeys(raw: string): readonly ParsedApiKey[] {
 
   const keys: ParsedApiKey[] = [];
 
-  for (const entry of raw.split(",")) {
+  // Errors name an entry by position only: an entry begins with the secret key, and a
+  // misordered one can put it in the role slot, so no entry text may reach a message
+  // (main.ts prints startup errors to the log).
+  for (const [index, entry] of raw.split(",").entries()) {
+    const position = index + 1;
     const parts = entry.trim().split(":");
     if (parts.length !== 3) {
       throw new Error(
-        `Invalid API_KEYS entry: "${entry.trim()}". Expected format: key:role:tenantId`,
+        `Invalid API_KEYS entry ${position}: expected 3 ":"-separated fields (key:role:tenantId), found ${parts.length}`,
       );
     }
 
@@ -123,7 +127,7 @@ export function parseApiKeys(raw: string): readonly ParsedApiKey[] {
     }
     if (!VALID_ROLES.has(role)) {
       throw new Error(
-        `Invalid role "${role}" in API_KEYS. Must be: admin, operator, or viewer`,
+        `Invalid role in API_KEYS entry ${position}. Must be: admin, operator, or viewer`,
       );
     }
     if (tenantId === "") {

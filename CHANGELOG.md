@@ -6,8 +6,14 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-14
+
 ### Added
 - `ATTESTIA_EVENTS_FILE` opens that file as the configured owner's event log. Snapshots stay in the tenant directory. Other tenants keep their own log under the parent directory. Unset, the service stays in memory. The server image and compose set `/app/data/events.jsonl` on the `attestia-data` volume.
+
+### Security
+
+- **A malformed `API_KEYS` entry no longer puts the key in the startup error.** `parseApiKeys` echoed the raw entry, which holds the key, into its error, and `main.ts` prints that error to the startup log. The error now names the entry by position (`entry 2`) and the problem, and the invalid-role message no longer repeats the role, which holds the secret in an entry written in the wrong order. (CodeQL `js/clear-text-logging`.)
 
 ## [2.0.5] - 2026-10-01
 

@@ -164,7 +164,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "node",
-      "qualifyingSourceCommits": 4,
+      "qualifyingSourceCommits": 5,
       "rebaseline": null
     },
     {
@@ -447,8 +447,8 @@
         "path": ".dockerignore"
       },
       {
-        "commits": 15,
-        "lines": 312,
+        "commits": 17,
+        "lines": 348,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -472,13 +472,13 @@
         "path": ".gitignore"
       },
       {
-        "commits": 10,
-        "lines": 320,
+        "commits": 14,
+        "lines": 342,
         "path": "CHANGELOG.md"
       },
       {
-        "commits": 8,
-        "lines": 135,
+        "commits": 9,
+        "lines": 139,
         "path": "HANDBOOK.md"
       },
       {
@@ -492,43 +492,43 @@
         "path": "INSTITUTIONAL_READINESS.md"
       },
       {
-        "commits": 4,
-        "lines": 446,
+        "commits": 5,
+        "lines": 570,
         "path": "README.es.md"
       },
       {
-        "commits": 4,
-        "lines": 510,
+        "commits": 5,
+        "lines": 656,
         "path": "README.fr.md"
       },
       {
-        "commits": 4,
-        "lines": 458,
+        "commits": 5,
+        "lines": 568,
         "path": "README.hi.md"
       },
       {
-        "commits": 4,
-        "lines": 510,
+        "commits": 5,
+        "lines": 640,
         "path": "README.it.md"
       },
       {
-        "commits": 4,
-        "lines": 494,
+        "commits": 5,
+        "lines": 618,
         "path": "README.ja.md"
       },
       {
-        "commits": 8,
-        "lines": 177,
+        "commits": 9,
+        "lines": 195,
         "path": "README.md"
       },
       {
-        "commits": 4,
-        "lines": 522,
+        "commits": 5,
+        "lines": 612,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 4,
-        "lines": 502,
+        "commits": 5,
+        "lines": 608,
         "path": "README.zh.md"
       },
       {
@@ -552,8 +552,8 @@
         "path": "VERIFICATION_GUIDE.md"
       },
       {
-        "commits": 6,
-        "lines": 535,
+        "commits": 8,
+        "lines": 561,
         "path": "atlas/README.md"
       },
       {
@@ -562,18 +562,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 6,
-        "lines": 4057,
+        "commits": 8,
+        "lines": 4161,
         "path": "atlas/page.json"
       },
       {
-        "commits": 6,
-        "lines": 6441,
+        "commits": 8,
+        "lines": 6501,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 6,
-        "lines": 40750,
+        "commits": 8,
+        "lines": 40792,
         "path": "atlas/structure.json"
       },
       {
@@ -582,8 +582,8 @@
         "path": "codecov.yml"
       },
       {
-        "commits": 4,
-        "lines": 39,
+        "commits": 6,
+        "lines": 45,
         "path": "docker-compose.yml"
       },
       {
@@ -592,13 +592,13 @@
         "path": "docs/crucible-integration-roadmap.md"
       },
       {
-        "commits": 5,
-        "lines": 10,
+        "commits": 6,
+        "lines": 12,
         "path": "docs/index.md"
       },
       {
-        "commits": 13,
-        "lines": 33,
+        "commits": 15,
+        "lines": 39,
         "path": "package.json"
       },
       {
@@ -607,113 +607,118 @@
         "path": "packages/attestia/LICENSE"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 202,
         "path": "packages/attestia/README.es.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 214,
         "path": "packages/attestia/README.fr.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 222,
         "path": "packages/attestia/README.hi.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 228,
         "path": "packages/attestia/README.it.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 222,
         "path": "packages/attestia/README.ja.md"
       },
       {
-        "commits": 4,
-        "lines": 178,
+        "commits": 5,
+        "lines": 186,
         "path": "packages/attestia/README.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 202,
         "path": "packages/attestia/README.pt-BR.md"
       },
       {
-        "commits": 2,
-        "lines": 170,
+        "commits": 3,
+        "lines": 204,
         "path": "packages/attestia/README.zh.md"
       },
       {
-        "commits": 9,
-        "lines": 160,
+        "commits": 1,
+        "lines": 100,
+        "path": "packages/attestia/bundle-dts.mjs"
+      },
+      {
+        "commits": 11,
+        "lines": 242,
         "path": "packages/attestia/package.json"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/chain-observer.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/event-store.ts"
       },
       {
-        "commits": 2,
-        "lines": 50,
+        "commits": 3,
+        "lines": 74,
         "path": "packages/attestia/src/index.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/ledger.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/proof.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/reconciler.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/registrum.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/sdk.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/treasury.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/types.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/vault.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/verify.ts"
       },
       {
-        "commits": 2,
-        "lines": 2,
+        "commits": 3,
+        "lines": 4,
         "path": "packages/attestia/src/witness.ts"
       },
       {
@@ -727,14 +732,19 @@
         "path": "packages/attestia/tsconfig.json"
       },
       {
-        "commits": 2,
-        "lines": 78,
+        "commits": 3,
+        "lines": 89,
         "path": "packages/attestia/tsup.config.ts"
       },
       {
         "commits": 2,
         "lines": 14,
         "path": "packages/attestia/vitest.config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/chain-observer/README.md"
       },
       {
         "commits": 3,
@@ -832,9 +842,14 @@
         "path": "packages/demo/src/index.ts"
       },
       {
-        "commits": 4,
-        "lines": 1328,
+        "commits": 5,
+        "lines": 1332,
         "path": "packages/demo/src/pipeline.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/event-store/README.md"
       },
       {
         "commits": 1,
@@ -857,8 +872,8 @@
         "path": "packages/event-store/src/in-memory-store.ts"
       },
       {
-        "commits": 4,
-        "lines": 28,
+        "commits": 5,
+        "lines": 29,
         "path": "packages/event-store/src/index.ts"
       },
       {
@@ -912,6 +927,11 @@
         "path": "packages/event-store/tests/telemetry.test.ts"
       },
       {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/ledger/README.md"
+      },
+      {
         "commits": 3,
         "lines": 6,
         "path": "packages/ledger/package.json"
@@ -952,9 +972,14 @@
         "path": "packages/ledger/tests/telemetry.test.ts"
       },
       {
-        "commits": 1,
-        "lines": 16,
+        "commits": 3,
+        "lines": 22,
         "path": "packages/node/Dockerfile"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/node/README.md"
       },
       {
         "commits": 5,
@@ -967,13 +992,13 @@
         "path": "packages/node/src/app.ts"
       },
       {
-        "commits": 2,
-        "lines": 248,
+        "commits": 4,
+        "lines": 282,
         "path": "packages/node/src/config.ts"
       },
       {
-        "commits": 6,
-        "lines": 402,
+        "commits": 8,
+        "lines": 410,
         "path": "packages/node/src/main.ts"
       },
       {
@@ -1072,8 +1097,8 @@
         "path": "packages/node/src/routes/vault-budgets.ts"
       },
       {
-        "commits": 5,
-        "lines": 1978,
+        "commits": 8,
+        "lines": 2002,
         "path": "packages/node/src/services/attestia-service.ts"
       },
       {
@@ -1082,8 +1107,8 @@
         "path": "packages/node/src/services/persistence-paths.ts"
       },
       {
-        "commits": 2,
-        "lines": 82,
+        "commits": 4,
+        "lines": 130,
         "path": "packages/node/src/services/tenant-registry.ts"
       },
       {
@@ -1127,8 +1152,8 @@
         "path": "packages/node/tests/body-limit.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 140,
+        "commits": 4,
+        "lines": 162,
         "path": "packages/node/tests/config.test.ts"
       },
       {
@@ -1187,8 +1212,8 @@
         "path": "packages/node/tests/middleware/rate-limit.test.ts"
       },
       {
-        "commits": 3,
-        "lines": 866,
+        "commits": 5,
+        "lines": 900,
         "path": "packages/node/tests/persistence/durability.test.ts"
       },
       {
@@ -1227,9 +1252,14 @@
         "path": "packages/node/tests/routes/vault-budgets.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 200,
+        "commits": 4,
+        "lines": 238,
         "path": "packages/node/tests/tenant-registry.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/proof/README.md"
       },
       {
         "commits": 5,
@@ -1290,6 +1320,11 @@
         "commits": 2,
         "lines": 298,
         "path": "packages/proof/tests/observability-and-packaging.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/reconciler/README.md"
       },
       {
         "commits": 1,
@@ -1375,6 +1410,11 @@
         "commits": 2,
         "lines": 662,
         "path": "packages/reconciler/tests/structured-discrepancies.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/registrum/README.md"
       },
       {
         "commits": 5,
@@ -1512,6 +1552,11 @@
         "path": "packages/registrum/tests/stage-c-hardening.test.ts"
       },
       {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/sdk/README.md"
+      },
+      {
         "commits": 3,
         "lines": 6,
         "path": "packages/sdk/package.json"
@@ -1545,6 +1590,11 @@
         "commits": 5,
         "lines": 578,
         "path": "packages/sdk/tests/http-client.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/treasury/README.md"
       },
       {
         "commits": 1,
@@ -1607,9 +1657,19 @@
         "path": "packages/treasury/tests/stage-c-hardening.test.ts"
       },
       {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/types/README.md"
+      },
+      {
         "commits": 3,
         "lines": 6,
         "path": "packages/types/package.json"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "packages/types/src/event.ts"
       },
       {
         "commits": 2,
@@ -1617,8 +1677,8 @@
         "path": "packages/types/src/financial.ts"
       },
       {
-        "commits": 3,
-        "lines": 120,
+        "commits": 4,
+        "lines": 122,
         "path": "packages/types/src/guards.ts"
       },
       {
@@ -1632,14 +1692,19 @@
         "path": "packages/types/src/observability.ts"
       },
       {
-        "commits": 3,
-        "lines": 160,
+        "commits": 4,
+        "lines": 162,
         "path": "packages/types/tests/guards.test.ts"
       },
       {
         "commits": 2,
         "lines": 106,
         "path": "packages/types/tests/observability.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/vault/README.md"
       },
       {
         "commits": 1,
@@ -1690,6 +1755,11 @@
         "commits": 2,
         "lines": 844,
         "path": "packages/vault/tests/stage-c-hardening.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/verify/README.md"
       },
       {
         "commits": 1,
@@ -1790,6 +1860,11 @@
         "commits": 2,
         "lines": 348,
         "path": "packages/verify/tests/verifier-telemetry.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 2,
+        "path": "packages/witness/README.md"
       },
       {
         "commits": 3,
@@ -1907,8 +1982,8 @@
         "path": "packages/witness/tests/timeout.test.ts"
       },
       {
-        "commits": 9,
-        "lines": 1868,
+        "commits": 11,
+        "lines": 2221,
         "path": "pnpm-lock.yaml"
       },
       {
@@ -1927,8 +2002,8 @@
         "path": "site/astro.config.mjs"
       },
       {
-        "commits": 2,
-        "lines": 12102,
+        "commits": 4,
+        "lines": 12114,
         "path": "site/package-lock.json"
       },
       {
@@ -1952,8 +2027,8 @@
         "path": "site/src/content/docs/handbook/architecture.md"
       },
       {
-        "commits": 5,
-        "lines": 155,
+        "commits": 6,
+        "lines": 157,
         "path": "site/src/content/docs/handbook/beginners.md"
       },
       {
@@ -1962,8 +2037,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 5,
-        "lines": 17,
+        "commits": 6,
+        "lines": 23,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1985,31 +2060,36 @@
         "commits": 5,
         "lines": 152,
         "path": "site/src/site-config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 4,
+        "path": "specs/RFC-001-DETERMINISTIC-EVENT-MODEL.md"
       }
     ]
   },
   "confidence": {
     "level": "low",
-    "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
+    "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-01T02:14:21.600Z",
+  "generatedAt": "2026-10-15T01:17:25.260Z",
   "generatedFrom": {
-    "commit": "92c144c11a80d3a09ddfcf8dde80f83bbdfc6896"
+    "commit": "4ce59c244b3f7453e4740c2fd1e49361aeec6c7d"
   },
   "pairs": [
     {
       "a": "CHANGELOG.md",
       "b": "package.json",
-      "either": 6,
-      "shared": 5,
-      "strength": 0.833333
+      "either": 8,
+      "shared": 6,
+      "strength": 0.75
     },
     {
       "a": "package.json",
       "b": "packages/attestia/package.json",
-      "either": 7,
-      "shared": 4,
-      "strength": 0.571429
+      "either": 8,
+      "shared": 5,
+      "strength": 0.625
     }
   ],
   "parameters": {
@@ -2021,17 +2101,17 @@
     "fallenShared": 3,
     "floor": "fallen",
     "floorHeld": false,
-    "floorTrigger": "both",
-    "headDate": "2026-09-30T13:33:00-07:00",
-    "inScopeFiles": 597,
+    "floorTrigger": "revision-depth",
+    "headDate": "2026-10-01T13:37:38-07:00",
+    "inScopeFiles": 598,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 28,
+    "qualifyingCommits": 32,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-03T20:33:00.000Z",
+    "since": "2026-04-04T20:37:38.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
