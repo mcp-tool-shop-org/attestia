@@ -51,6 +51,38 @@ describe("parseApiKeys", () => {
     expect(() => parseApiKeys("k1:superuser:t1")).toThrow("Invalid role");
   });
 
+  it("identifies a malformed entry by position, never by its text", () => {
+    const secret = "sk_live_s3cr3t_do_not_log";
+    // Wrong field count, second entry: the key leads the entry and must not be echoed.
+    let message = "";
+    try {
+      parseApiKeys(`ok:admin:t1,${secret}:admin`);
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toContain("entry 2");
+    expect(message).not.toContain(secret);
+    expect(message).not.toContain("admin:t1");
+
+    // Too many fields (a key containing ':').
+    expect(() => parseApiKeys(`${secret}:x:admin:t1`)).toThrow("entry 1");
+    expect(() => parseApiKeys(`${secret}:x:admin:t1`)).not.toThrow(secret);
+  });
+
+  it("does not echo the role slot when an entry is misordered", () => {
+    // role:key:tenant puts the secret where the role belongs.
+    const secret = "sk_live_s3cr3t_do_not_log";
+    let message = "";
+    try {
+      parseApiKeys(`admin:${secret}:t1`);
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toContain("Invalid role");
+    expect(message).toContain("entry 1");
+    expect(message).not.toContain(secret);
+  });
+
   it("throws on empty tenant ID", () => {
     expect(() => parseApiKeys("k1:admin:")).toThrow(
       "Tenant ID cannot be empty",

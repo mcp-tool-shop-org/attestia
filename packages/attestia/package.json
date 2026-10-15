@@ -1,6 +1,6 @@
 {
   "name": "@mcptoolshop/attestia",
-  "version": "2.0.5",
+  "version": "2.1.0",
   "description": "Proves an event, transaction, or state transition happened and binds that proof to a chain. Ships the financial domain: vault, treasury, and registrum.",
   "type": "module",
   "license": "MIT",

@@ -1,28 +1,32 @@
 # attestia: how it works
 
-Mapped at 2026-10-01 from commit 92c144c by Atlas 1.24.0.
+Mapped at 2026-10-15 from commit 4ce59c2 by Atlas 1.24.0.
 
 ## What this is
 
-23 parts, mostly TypeScript (407 files), CSS (2), JavaScript (2) and Astro (1). Work enters through 5 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes @mcptoolshop/attestia to npm and a container image. It deploys a site to GitHub Pages. People import @mcptoolshop/attestia.
+23 parts, mostly TypeScript (407 files), JavaScript (3), CSS (2) and Astro (1). Work enters through 5 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes @mcptoolshop/attestia to npm and a container image. It deploys a site to GitHub Pages. People import @mcptoolshop/attestia.
 
-## What changed since 2026-09-30 (56da319)
+## What changed since 2026-10-01 (92c144c)
 
-- CI's pull request trigger no longer names `**/*.js`, `**/*.jsx`, `**/*.ts`, `**/*.tsx`, `.github/workflows/**`, `atlas/**`, `codecov.yml`, `package.json`, `pnpm-lock.yaml`, `site/astro.config.mjs`, `site/package-lock.json`, `site/package.json` and `tsconfig*.json`.
-- 1 file changed content, across 1 part.
+- CI now also runs packages/attestia/bundle-dts.mjs.
+- Publish to GHCR now also runs packages/attestia/bundle-dts.mjs.
+- Release now also runs packages/attestia/bundle-dts.mjs.
+- packages/attestia/dist is now written by packages/attestia/bundle-dts.mjs.
+- In packages/node/src/main.ts, `main` gained a step, `persistenceFromConfig`, before `createApp`.
+- 1 file added and 67 changed content, across 19 parts.
 
 ## What comes in
 
-1. **Publish to GHCR.** When a release is published; or by hand. Runs packages/node/src/main.ts; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more; packs package.json, packages/, packages/attestia/package.json and 17 more into an image.
-2. **CI.** On a pull request to main; on a push to main touching 13 paths; or by hand. Runs packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts, packages/chain-observer/tests/evm/ and 175 more; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more.
-3. **Release.** When a tag matching `v*` is pushed. Runs packages/attestia/tests/, packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts and 181 more; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more.
+1. **Publish to GHCR.** When a release is published; or by hand. Runs packages/attestia/bundle-dts.mjs and packages/node/src/main.ts; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more; packs package.json, packages/, packages/attestia/package.json and 17 more into an image.
+2. **CI.** On a pull request to main; on a push to main touching 13 paths; or by hand. Runs packages/attestia/bundle-dts.mjs, packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts and 181 more; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more.
+3. **Release.** When a tag matching `v*` is pushed. Runs packages/attestia/bundle-dts.mjs, packages/attestia/tests/, packages/chain-observer/tests/chains.test.ts and 182 more; builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more.
 4. **Deploy site to GitHub Pages.** On a push to main touching 2 paths; or by hand. Runs site/astro.config.mjs and site/src/.
 5. **@mcptoolshop/attestia** (the package people import). Loads packages/attestia/dist/index.d.ts, built from a source this map cannot place.
 
 ## What happens through Publish to GHCR
 
-1. The workflow runs packages/node/src/main.ts in node; it builds 13 files in attestia, packages/chain-observer/src/ in chain-observer, packages/demo/src/ in demo, packages/event-store/src/ in event-store, packages/ledger/src/ in ledger, and 146 files in 10 more parts; it packs packages/attestia/package.json in attestia, packages/chain-observer/package.json in chain-observer, packages/demo/package.json in demo, packages/event-store/package.json in event-store, packages/ledger/package.json in ledger, and 419 files in 12 more places into an image.
-   1. Inside packages/node/src/main.ts, `main` does, in order: `loadConfig`, `parseApiKeys` and `createApp`.
+1. The workflow runs packages/attestia/bundle-dts.mjs in attestia and packages/node/src/main.ts in node; it builds 13 files in attestia, packages/chain-observer/src/ in chain-observer, packages/demo/src/ in demo, packages/event-store/src/ in event-store, packages/ledger/src/ in ledger, and 146 files in 10 more parts; it packs packages/attestia/package.json in attestia, packages/chain-observer/package.json in chain-observer, packages/demo/package.json in demo, packages/event-store/package.json in event-store, packages/ledger/package.json in ledger, and 420 files in 12 more places into an image.
+   1. Inside packages/node/src/main.ts, `main` does, in order: `config.ts` (3 steps) and `createApp`.
    2. **`createApp`** runs, in order:
       1. `requestIdMiddleware`
       2. `loggerMiddleware`
@@ -35,17 +39,18 @@ Mapped at 2026-10-01 from commit 92c144c by Atlas 1.24.0.
       9. `createPublicProofRoutes`
       10. `createPublicComplianceRoutes`
       11. `createPublicOpenApiRoutes`
-2. It publishes a container image.
+2. It writes to packages/attestia/dist/, which is not tracked.
+3. It publishes a container image.
 
 ## Who reads the results
 
-Publish to GHCR writes nothing this map can see.
+Publish to GHCR writes only to packages/attestia/dist/, which is not tracked.
 
 ## The other doors
 
-**CI** runs packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts, packages/chain-observer/tests/evm/ and 175 more, builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more, and uploads coverage to Codecov.
+**CI** runs packages/attestia/bundle-dts.mjs, packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts and 181 more, builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more, writes to packages/attestia/dist/, which is not tracked, and uploads coverage to Codecov.
 
-**Release** runs packages/attestia/tests/, packages/chain-observer/tests/chains.test.ts, packages/chain-observer/tests/error-ux.test.ts and 181 more, builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more, publishes @mcptoolshop/attestia to npm, and creates a GitHub release.
+**Release** runs packages/attestia/bundle-dts.mjs, packages/attestia/tests/, packages/chain-observer/tests/chains.test.ts and 182 more, builds packages/attestia/src/chain-observer.ts, packages/attestia/src/event-store.ts, packages/attestia/src/index.ts and 193 more, writes to packages/attestia/dist/, which is not tracked, publishes @mcptoolshop/attestia to npm, and creates a GitHub release.
 
 **Deploy site to GitHub Pages** runs site/astro.config.mjs and site/src/, and deploys the site.
 
@@ -66,7 +71,7 @@ Publish to GHCR writes nothing this map can see.
 
 No two source files changed together often enough to name.
 
-Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits.
+Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 
@@ -100,8 +105,9 @@ Read those in order to follow one pull request end to end.
 ## What this map cannot see
 
 - 5 writes and 7 reads use paths built at run time and are not named here.
+- 1 write goes to places this repository does not track, so it is not listed as generated.
 - 6 writes and 66 reads go to a path their caller passes, not to this repository.
 - There is a docker-compose.yml that no workflow runs; what deploys from it does so from outside this repository, and is not on this page.
-- Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
+- Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.
