@@ -8,6 +8,10 @@ All notable changes to Attestia, organized by development phase.
 
 ## [2.1.1] - 2026-10-24
 
+### Changed
+
+- **Built-in Zod 4 validation issue wording in `details.issues[].message` and `ConfigError` text.** Built-in constraint messages use Zod 4's phrasing (`"Required"` → `"Invalid input: expected <type>, received undefined"`, `"String must contain …"` → `"Too small: …"`, and `"Invalid enum value …"` → `"Invalid option: …"`). The HTTP error envelope, error codes, issue paths, and every custom refinement message (`WITNESS_*` boot checks and `boundedRecord` entry/byte limits) are unchanged.
+
 ### Security
 
 - **Upgrade `zod` to `^4.6.6` (resolved `4.6.7`) for `GHSA-mrhx-c7xc-m3w5`.** Moves `@attestia/node` and workspace peer resolutions (`viem` / `ox` / `abitype`) off `zod` 3.x to `zod` 4.6.7, adapting `ConfigSchema` (`WITNESS_ENABLED` boolean output default and custom issue code) and `boundedRecord` (`z.record(z.string(), z.unknown())` two-argument signature).
