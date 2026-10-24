@@ -6,6 +6,10 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+### Docs
+
+- Crash recovery is described in HANDBOOK.md and the handbook's architecture page, and the event-store README now says what holds after a resume from a torn tail. HANDBOOK.md no longer lists a corrupt middle line as recovered: by default (`verifyOnLoad: true`), the store refuses to open when a committed event in the middle of the log is damaged (`INTEGRITY_VIOLATION`).
+
 ## [2.1.2] - 2026-10-24
 
 ### Fixed

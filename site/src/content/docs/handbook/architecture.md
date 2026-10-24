@@ -93,6 +93,15 @@ Chains are witnesses, not authorities. XRPL attests. But authority flows from st
 
 The event store (`@attestia/event-store`) is the persistence backbone. Every operation across all three systems is recorded as an append-only, hash-chained JSONL entry. There are 32 domain event types covering vault intents, ledger transactions, treasury operations, governance changes, observer events, reconciliation outcomes, and witness submissions. Each event references the hash of its predecessor, making the chain tamper-evident and independently verifiable.
 
+The JSONL store survives a crash mid-write. Each append is written and `fsync`ed before it returns. If a writer is
+killed partway through, it can leave a torn last line with no trailing newline. On reopen, the store skips that line,
+reports it in `loadDiagnostics`, and verifies the chain up to the last complete event. Since 2.1.2, the first append
+after such a load writes a lone newline first, so the new event starts on its own line and links to the last complete
+event. The file is never truncated or rewritten, so the torn fragment stays on disk and is skipped again on every
+load. Any damage that breaks the hash chain is refused by default (`verifyOnLoad: true`): a damaged or missing
+committed event in the middle of the log, an edited event, or a missing head before hashed events makes the store
+refuse to open with `INTEGRITY_VIOLATION` (unless `verifyOnLoad: false` is passed for recovery).
+
 ### Proof packaging
 
 The proof module (`@attestia/proof`) builds Merkle trees over attestation records and packages inclusion proofs. When an external party needs to verify that a specific event was attested, the proof package provides the Merkle root, the leaf data, and the sibling hashes needed for independent verification without replaying the entire event log.
