@@ -33,9 +33,9 @@ export interface EventMetadata {
   /**
    * Who emitted this event.
    * `vault`, `treasury`, `registrum`, and `observer` are Attestia's own domains.
-   * `external` is a producer outside those domains. Cognate's AI-governance events use it.
+   * `cognate` is Cognate's AI-governance domain; `external` is a producer outside those domains.
    */
-  readonly source: "vault" | "treasury" | "registrum" | "observer" | "external";
+  readonly source: "vault" | "treasury" | "registrum" | "observer" | "cognate" | "external";
 }
 
 /**

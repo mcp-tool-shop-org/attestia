@@ -6,6 +6,11 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+### Added
+- `EventMetadata.source` and `isEventMetadata` accept `"cognate"` as a first-class producer domain alongside `"vault"`, `"treasury"`, `"registrum"`, `"observer"`, and `"external"`, allowing `@attestia/event-store`'s `EventCatalog` to index and query Cognate AI-governance events directly (`catalog.listBySource("cognate")`) without weakening the runtime source guard.
+- `@attestia/proof` (and `@mcptoolshop/attestia/proof`) exports `hashStoredEventLeaf` and `StoredEventLeafInput` to bind the append-only event store envelope (`globalPosition`, `streamId`, `version`, `appendedAt`, `hash`, `previousHash`) together with `event.type`, `event.metadata`, and `event.payload` into a deterministic RFC 8785 + SHA-256 Merkle leaf. Existing `hashAttestation` exports and hashes stay byte-identical.
+- Coverage: 96.85% statements/lines across the repository (`36,567 / 37,757`); `@attestia/types` 100% statements/lines/functions and 96.62% branches (floor raised `80 -> 90`); `@attestia/proof` 100% statements/lines/functions and 98.29% branches (floor `95`).
+
 ## [2.1.0] - 2026-10-14
 
 ### Added

@@ -138,7 +138,7 @@ export function isIntent(value: unknown): value is Intent {
 // Event guards
 // =============================================================================
 
-const EVENT_SOURCES = new Set<string>(["vault", "treasury", "registrum", "observer", "external"]);
+const EVENT_SOURCES = new Set<string>(["vault", "treasury", "registrum", "observer", "cognate", "external"]);
 
 export function isEventMetadata(value: unknown): value is EventMetadata {
   if (value === null || typeof value !== "object") return false;

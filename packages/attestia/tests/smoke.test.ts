@@ -72,6 +72,7 @@ describe("@mcptoolshop/attestia bundle", () => {
     expect(ledger.compareMoney).toBeTypeOf("function");
     expect(proof.MerkleTree).toBeTypeOf("function");
     expect(proof.hashAttestation).toBeTypeOf("function");
+    expect(proof.hashStoredEventLeaf).toBeTypeOf("function");
     expect(registrum.StructuralRegistrar).toBeTypeOf("function");
     expect(eventStore.JsonlEventStore).toBeTypeOf("function");
     expect(eventStore.InMemoryEventStore).toBeTypeOf("function");
