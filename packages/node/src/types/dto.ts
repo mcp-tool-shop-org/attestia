@@ -35,9 +35,9 @@ export function boundedRecord(
   maxBytes: number = MAX_RECORD_SERIALIZED_BYTES,
 ): z.ZodType<Record<string, unknown>> {
   return z
-    .record(z.unknown())
+    .record(z.string(), z.unknown())
     .refine((rec) => Object.keys(rec).length <= maxEntries, {
-      message: `Record has too many entries (max ${maxEntries})`,
+      error: `Record has too many entries (max ${maxEntries})`,
     })
     .refine(
       (rec) => {
@@ -48,7 +48,7 @@ export function boundedRecord(
           return false;
         }
       },
-      { message: `Record exceeds maximum serialized size (${maxBytes} bytes)` },
+      { error: `Record exceeds maximum serialized size (${maxBytes} bytes)` },
     ) as z.ZodType<Record<string, unknown>>;
 }
 

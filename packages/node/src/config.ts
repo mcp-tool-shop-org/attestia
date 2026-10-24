@@ -41,7 +41,7 @@ export const ConfigSchema = z
     WITNESS_ENABLED: z
       .string()
       .transform((v) => v === "true")
-      .default("false"),
+      .default(false),
     WITNESS_URL: z.string().optional(),
     WITNESS_SECRET: z.string().optional(),
     WITNESS_ADDRESS: z.string().optional(),
@@ -63,7 +63,7 @@ export const ConfigSchema = z
       const value = cfg[key];
       if (value === undefined || value.trim() === "") {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: [key],
           message: `${key} is required when WITNESS_ENABLED=true (set it, or set WITNESS_ENABLED=false)`,
         });
