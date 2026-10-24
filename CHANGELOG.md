@@ -6,6 +6,12 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-24
+
+### Security
+
+- **Upgrade `zod` to `^4.6.6` (resolved `4.6.7`) for `GHSA-mrhx-c7xc-m3w5`.** Moves `@attestia/node` and workspace peer resolutions (`viem` / `ox` / `abitype`) off `zod` 3.x to `zod` 4.6.7, adapting `ConfigSchema` (`WITNESS_ENABLED` boolean output default and custom issue code) and `boundedRecord` (`z.record(z.string(), z.unknown())` two-argument signature).
+
 ## [2.1.0] - 2026-10-14
 
 ### Added
