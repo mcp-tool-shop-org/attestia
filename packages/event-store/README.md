@@ -129,6 +129,18 @@ await snapshots.save({
 const latest = await snapshots.load("intent-001");
 ```
 
+### Crash Recovery (`JsonlEventStore`)
+
+`JsonlEventStore` is strictly append-only (`packages/event-store/src/jsonl-store.ts:19`: the backing file is never truncated or rewritten).
+
+- **What happens after a crash:** If a writer is terminated mid-write (`kill -9`, power loss) and leaves a torn final line without a trailing `\n`, `new JsonlEventStore({ filePath })` skips the unparseable fragment during load, records it in `store.loadDiagnostics` (`reason: "parse_error"` with its 1-based `lineIndex`), emits a `load` warning (`code: "LOAD_LINES_SKIPPED"`), and verifies the hash chain up to the last complete event. If the crashed process also left a `.lock` file behind, the next append probes the recorded PID with `process.kill(pid, 0)` and automatically breaks the lock when the holder is provably dead (`ESRCH`, `lock.break_stale` / `code: "LOCK_STALE_BROKEN"`).
+- **What the store repairs:** When a loaded non-empty log does not end in `\n` (such as a torn tail left by a killed writer, or a bare `\r`), the store writes and `fsync`s a lone `\n` before its first `append()` (under the append lock, after verifying no external writer advanced the file) and emits a structured `append.repair_newline` telemetry warning (`code: "TORN_TAIL_NEWLINE_REPAIRED"`). The torn fragment remains isolated on its own skipped line while the new event starts on a fresh line and links cleanly to the last committed event's `globalPosition` and `hash`.
+- **What the store still refuses (fail-closed):**
+  - **Torn or corrupted lines in the middle of the log (tampering):** A damaged line between two committed events leaves a `globalPosition` gap and a `previousHash` mismatch on the following event; with `verifyOnLoad: true` (the default), construction throws `EventStoreError("INTEGRITY_VIOLATION")` and refuses to open.
+  - **In-place modification or head truncation:** Any mutated event payload or missing genesis anchor fails hash-chain verification on load with `EventStoreError("INTEGRITY_VIOLATION")` unless `verifyOnLoad: false` is explicitly passed for forensic inspection.
+  - **External concurrent advance from a stale cursor:** If another process grew the file after this instance loaded it, `append()` throws `EventStoreError("CONCURRENCY_CONFLICT")` before writing either a repair newline or new events.
+  - **Logs exceeding `maxLoadBytes`:** Construction fails closed with `EventStoreError("LOG_TOO_LARGE")`.
+
 ## API
 
 ### Core
