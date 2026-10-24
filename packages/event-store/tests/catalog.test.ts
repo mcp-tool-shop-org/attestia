@@ -134,6 +134,11 @@ describe("listing", () => {
     expect(vaultEvents).toHaveLength(2);
     expect(vaultEvents.map((s) => s.type)).toContain("vault.a");
     expect(vaultEvents.map((s) => s.type)).toContain("vault.b");
+
+    catalog.register(makeSchema("cognate.run.preregistered", 1, "cognate"));
+    const cognateEvents = catalog.listBySource("cognate");
+    expect(cognateEvents).toHaveLength(1);
+    expect(cognateEvents[0]!.type).toBe("cognate.run.preregistered");
   });
 });
 
