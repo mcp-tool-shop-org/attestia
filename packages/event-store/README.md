@@ -141,7 +141,8 @@ const latest = await snapshots.load("intent-001");
   - **External concurrent advance from a stale cursor:** If another process grew the file after this instance loaded it, `append()` throws `EventStoreError("CONCURRENCY_CONFLICT")` before writing either a repair newline or new events.
   - **Logs exceeding `maxLoadBytes`:** Construction fails closed with `EventStoreError("LOG_TOO_LARGE")`.
 - **What holds after a resume:**
-  - Every event whose `append()` returned is on disk, since each append is written and `fsync`ed before it returns. The append that was in flight when the writer died never returned, and its torn line isn't recovered.
+  - Every event whose `append()` returned is on disk, since each append is written and `fsync`ed before it returns.
+  - An append that was in flight when the writer died never returned. A multi-event append goes out as one write, so a crash can leave a prefix of its events on disk: those load as committed, in order and hash-chained, and the torn remainder is skipped. A caller that needs all-or-nothing must check after a restart which of its events landed (by `metadata.eventId`) rather than assume none did.
   - The torn fragment stays in the file (it is never truncated) and is skipped again, as one `parse_error` line, on every later load, with the same `LOAD_LINES_SKIPPED` warning.
   - Events appended after the repair load and verify with `verifyOnLoad: true`, contiguous in `globalPosition` with the events before the tear.
   - The repair runs at most once per load. A file that already ends in `
