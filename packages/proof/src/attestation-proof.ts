@@ -14,7 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
-import { NOOP_TELEMETRY, type Telemetry } from "@attestia/types";
+import { NOOP_TELEMETRY, type EventMetadata, type Telemetry } from "@attestia/types";
 import { MerkleTree } from "./merkle-tree.js";
 import type { AttestationProofPackage, MerkleProof } from "./types.js";
 
@@ -47,6 +47,94 @@ function sha256(data: string): string {
  */
 export function hashAttestation(attestation: unknown): string {
   return sha256(canonicalize(attestation));
+}
+
+/**
+ * Shape of a hash-chained stored event whose store envelope is bound into a
+ * Merkle leaf by {@link hashStoredEventLeaf}.
+ *
+ * Structurally matches `HashedStoredEvent` from `@attestia/event-store`.
+ */
+export interface StoredEventLeafInput<TPayload = Record<string, unknown>> {
+  readonly event: Readonly<{
+    readonly type: string;
+    readonly metadata: EventMetadata;
+    readonly payload: Readonly<TPayload>;
+  }>;
+  readonly streamId: string;
+  readonly version: number;
+  readonly globalPosition: number;
+  readonly appendedAt: string;
+  readonly hash: string;
+  readonly previousHash: string;
+}
+
+/**
+ * Compute the canonical Merkle leaf hash for a hash-chained stored event,
+ * binding the store envelope (`globalPosition`, `streamId`, `version`,
+ * `appendedAt`, `hash`, `previousHash`) together with the domain event
+ * (`type`, `metadata`, `payload`).
+ *
+ * Unlike hashing `{ type, metadata, payload }` alone with {@link hashAttestation},
+ * this function binds the event's position in the log and its hash-chain link
+ * into the leaf digest so that reordering, cross-stream replay, or envelope
+ * tampering changes the Merkle leaf and invalidates any inclusion proof.
+ *
+ * @param stored - A hash-chained stored event (`HashedStoredEvent`)
+ * @returns 64-char lowercase SHA-256 hex digest of the canonical stored event
+ * @throws Error if any required store-envelope field is missing or invalid
+ */
+export function hashStoredEventLeaf(stored: StoredEventLeafInput): string {
+  if (
+    stored === null ||
+    typeof stored !== "object" ||
+    stored.event === null ||
+    typeof stored.event !== "object"
+  ) {
+    throw new Error("hashStoredEventLeaf: stored event must be an object with an event field");
+  }
+  if (typeof stored.streamId !== "string" || stored.streamId.length === 0) {
+    throw new Error("hashStoredEventLeaf: streamId must be a non-empty string");
+  }
+  if (
+    typeof stored.version !== "number" ||
+    !Number.isInteger(stored.version) ||
+    stored.version < 1
+  ) {
+    throw new Error("hashStoredEventLeaf: version must be a positive integer");
+  }
+  if (
+    typeof stored.globalPosition !== "number" ||
+    !Number.isInteger(stored.globalPosition) ||
+    stored.globalPosition < 1
+  ) {
+    throw new Error("hashStoredEventLeaf: globalPosition must be a positive integer");
+  }
+  if (typeof stored.appendedAt !== "string" || stored.appendedAt.length === 0) {
+    throw new Error("hashStoredEventLeaf: appendedAt must be a non-empty ISO timestamp string");
+  }
+  if (typeof stored.hash !== "string" || stored.hash.length === 0) {
+    throw new Error("hashStoredEventLeaf: hash must be a non-empty string");
+  }
+  if (typeof stored.previousHash !== "string" || stored.previousHash.length === 0) {
+    throw new Error("hashStoredEventLeaf: previousHash must be a non-empty string");
+  }
+
+  return sha256(
+    canonicalize({
+      event: {
+        type: stored.event.type,
+        metadata: stored.event.metadata,
+        payload: stored.event.payload,
+      },
+      streamId: stored.streamId,
+      version: stored.version,
+      globalPosition: stored.globalPosition,
+      appendedAt: stored.appendedAt,
+      hash: stored.hash,
+      previousHash: stored.previousHash,
+    }),
+  );
 }
 
 /**
