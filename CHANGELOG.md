@@ -6,6 +6,12 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-24
+
+### Fixed
+
+- **`JsonlEventStore` no longer fuses the first post-crash append onto a torn last line (`@attestia/event-store` `0.2.3`).** When a writer crashed mid-write and left a partial final line without a trailing `\n`, reopening the store skipped the torn fragment on load (`parse_error`), but its first `append()` wrote directly onto that unterminated line. The newly appended event was fused onto the torn fragment, so the next load skipped the fused line as `parse_error` (losing the event) and failed closed with `INTEGRITY_VIOLATION` (`globalPosition` gap and `previousHash` mismatch on the following event). `JsonlEventStore` now detects during load when a non-empty file does not end with `\n` and, under the append lock after the external-advance check, writes and `fsync`s a lone `\n` before the first append and emits an `append.repair_newline` (`code: "TORN_TAIL_NEWLINE_REPAIRED"`) telemetry warning. The torn fragment stays on its own skipped line without truncating or rewriting the file.
+
 ## [2.1.1] - 2026-10-24
 
 ### Changed
