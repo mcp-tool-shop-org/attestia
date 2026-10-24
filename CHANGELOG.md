@@ -11,6 +11,7 @@ All notable changes to Attestia, organized by development phase.
 ### Changed
 
 - **Built-in Zod 4 validation issue wording in `details.issues[].message` and `ConfigError` text.** Built-in constraint messages use Zod 4's phrasing (`"Required"` → `"Invalid input: expected <type>, received undefined"`, `"String must contain …"` → `"Too small: …"`, and `"Invalid enum value …"` → `"Invalid option: …"`). The HTTP error envelope, error codes, issue paths, and every custom refinement message (`WITNESS_*` boot checks and `boundedRecord` entry/byte limits) are unchanged.
+- **Zod 4 reports fewer follow-on issues and rejects non-finite numbers.** After a failed `.int()` check, Zod 4 stops checking that field, so a non-integer `PORT` reports one issue instead of also listing later fields, and a float under `.int().min(1)` gives one issue instead of two. Both still fail with the same code. `z.number()` now rejects `Infinity`; JSON can't carry it, so only direct programmatic calls are affected.
 
 ### Security
 
