@@ -204,6 +204,17 @@ export class JsonlEventStore implements EventStore {
    */
   private _knownFileSize: number | undefined;
 
+  /**
+   * True when the file loaded at construction was non-empty and did not end
+   * with `\n` (e.g., a crashed writer left a torn last line without a trailing
+   * newline). Before the first append on this instance (under the append lock,
+   * after {@link _detectExternalAdvanceUnderLock}), a lone `\n` is written and
+   * fsynced so the new event starts on its own line rather than fusing onto the
+   * torn fragment, preserving the append-only contract ("file is never
+   * truncated or rewritten").
+   */
+  private _needsTrailingNewline = false;
+
   /** Path to the lockfile for concurrent append protection */
   private readonly _lockPath: string;
 
@@ -412,6 +423,28 @@ export class JsonlEventStore implements EventStore {
 
         storedEvents.push(hashed);
         lines += JSON.stringify(hashed) + "\n";
+      }
+
+      // Torn-tail recovery (approach a): if the loaded file was non-empty and
+      // did not end with `\n`, write and fsync a lone `\n` before the first
+      // append so the new event starts on its own line instead of fusing onto
+      // the torn fragment. Executed under the lock AFTER
+      // _detectExternalAdvanceUnderLock so a stale writer fails closed before
+      // touching the file.
+      if (this._needsTrailingNewline) {
+        const repairBytes = this._writeAndSync("\n");
+        this._knownFileSize = this._knownFileSize! + repairBytes;
+        this._needsTrailingNewline = false;
+        this._emit({
+          op: "append.repair_newline",
+          level: "warn",
+          outcome: "degraded",
+          attributes: {
+            code: "TORN_TAIL_NEWLINE_REPAIRED",
+            skippedLines: this._loadDiagnostics.skippedLines,
+          },
+          message: `repaired missing trailing newline on ${basename(this._filePath)} before append (crash recovery; skippedLines=${this._loadDiagnostics.skippedLines})`,
+        });
       }
 
       // Write to file atomically (all lines in one write + fsync).
@@ -650,6 +683,7 @@ export class JsonlEventStore implements EventStore {
 
     if (!existsSync(this._filePath)) {
       this._knownFileSize = undefined;
+      this._needsTrailingNewline = false;
       return { eventsLoaded, skippedLines, skips };
     }
 
@@ -689,6 +723,10 @@ export class JsonlEventStore implements EventStore {
     // the file advanced underneath us (A-ES-001). Using Buffer.byteLength keeps
     // this correct for multi-byte UTF-8 content rather than .length (code units).
     this._knownFileSize = Buffer.byteLength(content, "utf-8");
+    // A non-empty file that does not end with `\n` has an unterminated final
+    // line (typically a torn write after a hard crash, or a bare `\r`). Mark it
+    // so the first append writes a lone `\n` before appending new events.
+    this._needsTrailingNewline = content.length > 0 && !content.endsWith("\n");
     const lines = content.split("\n");
 
     // 1-based line index, incremented for EVERY line (including blanks) so the
