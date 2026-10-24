@@ -43,7 +43,7 @@ const MerkleProofSchema = z.object({
 
 const ProofPackageSchema = z.object({
   version: z.literal(1),
-  attestation: z.unknown(),
+  attestation: z.unknown().optional(),
   attestationHash: z.string().length(64),
   merkleRoot: z.string().length(64),
   inclusionProof: MerkleProofSchema,

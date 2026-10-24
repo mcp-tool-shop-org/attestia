@@ -478,9 +478,7 @@ describe("Public API route families — invalid request error shapes", () => {
         "Check the listed field issues and resubmit with a valid body.",
       );
       const paths = body.error.details.issues.map((i) => i.path);
-      for (const expectedPath of tc.expectedPaths) {
-        expect(paths, `${tc.family} missing path ${expectedPath}`).toContain(expectedPath);
-      }
+      expect(paths, `${tc.family} issue paths`).toEqual(tc.expectedPaths);
       for (const issue of body.error.details.issues) {
         expect(typeof issue.message).toBe("string");
         expect(issue.message.length).toBeGreaterThan(0);

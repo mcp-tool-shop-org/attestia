@@ -285,6 +285,32 @@ describe("POST /api/v1/proofs/verify", () => {
     const body = (await verRes.json()) as { error: { code: string } };
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
+
+  it("accepts a proof package POSTed without 'attestation' (schema validation passes, matching Zod 3)", async () => {
+    const attId = await createAttestation(instance);
+
+    const genRes = await instance.app.request(
+      makeRequest(`/api/v1/proofs/attestation/${attId}`),
+    );
+    const genBody = (await genRes.json()) as { data: Record<string, unknown> };
+
+    const { attestation: _omitted, ...withoutAttestation } = genBody.data;
+    expect("attestation" in withoutAttestation).toBe(false);
+
+    const apiRes = await instance.app.request(
+      makeRequest("/api/v1/proofs/verify", "POST", withoutAttestation),
+    );
+    expect(apiRes.status).toBe(200);
+    const apiBody = (await apiRes.json()) as { data: { valid: boolean } };
+    expect(apiBody.data.valid).toBe(false);
+
+    const pubRes = await instance.app.request(
+      makeRequest("/public/v1/proofs/verify", "POST", withoutAttestation),
+    );
+    expect(pubRes.status).toBe(200);
+    const pubBody = (await pubRes.json()) as { data: { valid: boolean } };
+    expect(pubBody.data.valid).toBe(false);
+  });
 });
 
 // =============================================================================
