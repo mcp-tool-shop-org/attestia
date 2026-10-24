@@ -282,7 +282,7 @@ The durable backbone. All domain events flow through the event store. Features i
 - **Snapshot support** — periodic state snapshots for fast recovery with hash verification
 - **Event catalog** — 34 formalized event types with schema versioning and migration support
 - **Crash recovery** — a torn last line left by a killed writer is skipped on load, and the first append writes a newline so new events start on a fresh line (since 2.1.2)
-- **Fail-closed on damage** — a damaged line in the middle of the log, an edited event or a missing head makes the store refuse to open (`INTEGRITY_VIOLATION`)
+- **Fail-closed on damage** — by default (`verifyOnLoad: true`), a damaged committed event in the middle of the log, an edited event, or a missing head makes the store refuse to open (`INTEGRITY_VIOLATION`)
 
 ---
 

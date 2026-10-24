@@ -98,8 +98,9 @@ killed partway through, it can leave a torn last line with no trailing newline. 
 reports it in `loadDiagnostics`, and verifies the chain up to the last complete event. Since 2.1.2, the first append
 after such a load writes a lone newline first, so the new event starts on its own line and links to the last complete
 event. The file is never truncated or rewritten, so the torn fragment stays on disk and is skipped again on every
-load. Damage anywhere else is refused: a broken line in the middle of the log, an edited event or a missing head makes
-the store refuse to open with `INTEGRITY_VIOLATION`.
+load. Any damage that breaks the hash chain is refused by default (`verifyOnLoad: true`): a damaged or missing
+committed event in the middle of the log, an edited event, or a missing head before hashed events makes the store
+refuse to open with `INTEGRITY_VIOLATION` (unless `verifyOnLoad: false` is passed for recovery).
 
 ### Proof packaging
 
