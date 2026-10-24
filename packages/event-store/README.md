@@ -140,6 +140,13 @@ const latest = await snapshots.load("intent-001");
   - **In-place modification or head truncation:** Any mutated event payload or missing genesis anchor fails hash-chain verification on load with `EventStoreError("INTEGRITY_VIOLATION")` unless `verifyOnLoad: false` is explicitly passed for forensic inspection.
   - **External concurrent advance from a stale cursor:** If another process grew the file after this instance loaded it, `append()` throws `EventStoreError("CONCURRENCY_CONFLICT")` before writing either a repair newline or new events.
   - **Logs exceeding `maxLoadBytes`:** Construction fails closed with `EventStoreError("LOG_TOO_LARGE")`.
+- **What holds after a resume:**
+  - Every event whose `append()` returned is on disk, since each append is written and `fsync`ed before it returns. The append that was in flight when the writer died never returned, and its torn line isn't recovered.
+  - The torn fragment stays in the file (it is never truncated) and is skipped again, as one `parse_error` line, on every later load, with the same `LOAD_LINES_SKIPPED` warning.
+  - Events appended after the repair load and verify with `verifyOnLoad: true`, contiguous in `globalPosition` with the events before the tear.
+  - The repair runs at most once per load. A file that already ends in `
+` (or `
+`), and an empty file, get no extra newline. If the event write fails after the newline was written, a retry doesn't write a second one.
 
 ## API
 

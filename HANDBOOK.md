@@ -281,7 +281,8 @@ The durable backbone. All domain events flow through the event store. Features i
 - **Hash chaining** — each event includes a hash of the previous, forming a tamper-evident chain (SHA-256, RFC 8785)
 - **Snapshot support** — periodic state snapshots for fast recovery with hash verification
 - **Event catalog** — 34 formalized event types with schema versioning and migration support
-- **Corruption recovery** — truncated lines, corrupt middle, empty file handling
+- **Crash recovery** — a torn last line left by a killed writer is skipped on load, and the first append writes a newline so new events start on a fresh line (since 2.1.2)
+- **Fail-closed on damage** — a damaged line in the middle of the log, an edited event or a missing head makes the store refuse to open (`INTEGRITY_VIOLATION`)
 
 ---
 
