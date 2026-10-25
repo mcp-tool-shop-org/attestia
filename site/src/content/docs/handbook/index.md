@@ -17,21 +17,23 @@ Cognate is the AI governance domain on this event store and these Merkle proofs.
 
 ## Handbook contents
 
-This handbook is organized into five sections:
+This handbook is organized into six sections:
 
-- **[Beginners](/Attestia/handbook/beginners/)** — New to Attestia? Start here for a plain-language walkthrough of what the project does, who it is for, core concepts, a hands-on tutorial, and answers to common questions.
-- **[Getting Started](/Attestia/handbook/getting-started/)** — Install dependencies, run the test suite, and try XRPL integration testing with a local standalone rippled node.
-- **[Architecture](/Attestia/handbook/architecture/)** — Understand the three-tier system (Personal Vault, Org Treasury, Registrum) and the core Intent-Approve-Execute-Verify flow.
-- **[Principles](/Attestia/handbook/principles/)** — The six non-negotiable principles enforced in every line of Attestia code, and why they matter.
-- **[Reference](/Attestia/handbook/reference/)** — Package status table for all 14 packages, documentation index, and security and data scope.
+- **[Beginners](/attestia/handbook/beginners/)** — New to Attestia? Start here for a plain-language walkthrough of what the project does, who it is for, core concepts, a hands-on tutorial, and answers to common questions.
+- **[Getting Started](/attestia/handbook/getting-started/)** — Install dependencies, run the test suite, and try XRPL integration testing with a local standalone rippled node.
+- **[Architecture](/attestia/handbook/architecture/)** — Understand the three-tier system (Personal Vault, Org Treasury, Registrum) and the core Intent-Approve-Execute-Verify flow.
+- **[Principles](/attestia/handbook/principles/)** — The six non-negotiable principles enforced in every line of Attestia code, and why they matter.
+- **[What's new](/attestia/handbook/whats-new/)** — What changed in 2.1: crash recovery for the event log, Zod 4 validation messages, and a durable event log for the service.
+- **[Reference](/attestia/handbook/reference/)** — Package status table for all 15 packages, documentation index, and security and data scope.
 
 ## At a glance
 
 | Metric | Value |
 |--------|-------|
-| Packages | 14 |
-| Tests | 2,564 |
-| Coverage | 95%+ |
+| Version | 2.1.2 |
+| Packages | 15 |
+| Tests | 2,594 |
+| Coverage | 94.9–100% statements per package |
 | License | MIT |
 | Chain support | XRPL, Ethereum, Solana, L2s |
 

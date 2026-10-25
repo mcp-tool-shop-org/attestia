@@ -6,17 +6,20 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-25
+
 ### Docs
 
+- **Release docs.** The README, HANDBOOK.md, the handbook and the landing page carry the 2.1.2 version, test counts from CI (2,594 tests, plus the bundle's 3 smoke tests, which CI's coverage run doesn't include), the event-type count (34, which three handbook pages gave as 32) and the 57 REST endpoints, with HANDBOOK.md's endpoint table rebuilt from the routes. The README and a new handbook page say what is new in 2.1. Handbook links that pointed at `/Attestia/` (a 404 on the case-sensitive Pages host) now point at `/attestia/`.
 - Crash recovery is described in HANDBOOK.md and the handbook's architecture page, and the event-store README now says what holds after a resume from a torn tail. HANDBOOK.md no longer lists a corrupt middle line as recovered: by default (`verifyOnLoad: true`), the store refuses to open when a committed event in the middle of the log is damaged (`INTEGRITY_VIOLATION`).
-
-## [2.1.2] - 2026-10-24
 
 ### Fixed
 
 - **`JsonlEventStore` no longer fuses the first post-crash append onto a torn last line (`@attestia/event-store` `0.2.3`).** When a writer crashed mid-write and left a partial final line without a trailing `\n`, reopening the store skipped the torn fragment on load (`parse_error`), but its first `append()` wrote directly onto that unterminated line. The newly appended event was fused onto the torn fragment, so the next load skipped the fused line as `parse_error` (losing the event) and failed closed with `INTEGRITY_VIOLATION` (`globalPosition` gap and `previousHash` mismatch on the following event). `JsonlEventStore` now detects during load when a non-empty file does not end with `\n` and, under the append lock after the external-advance check, writes and `fsync`s a lone `\n` before the first append and emits an `append.repair_newline` (`code: "TORN_TAIL_NEWLINE_REPAIRED"`) telemetry warning. The torn fragment stays on its own skipped line without truncating or rewriting the file.
 
 ## [2.1.1] - 2026-10-24
+
+Not published separately; these changes ship in 2.1.2.
 
 ### Changed
 
