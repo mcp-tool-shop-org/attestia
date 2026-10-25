@@ -6,11 +6,12 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-25
+
 ### Docs
 
+- **Release docs.** The README, HANDBOOK.md, the handbook and the landing page carry the 2.1.2 version, test counts from CI (2,594 tests, plus the bundle's 3 smoke tests, which CI's coverage run doesn't include), the event-type count (34, which three handbook pages gave as 32) and the 41 REST endpoints, with HANDBOOK.md's endpoint table rebuilt from the routes. The README and a new handbook page say what is new in 2.1. Handbook links that pointed at `/Attestia/` (a 404 on the case-sensitive Pages host) now point at `/attestia/`.
 - Crash recovery is described in HANDBOOK.md and the handbook's architecture page, and the event-store README now says what holds after a resume from a torn tail. HANDBOOK.md no longer lists a corrupt middle line as recovered: by default (`verifyOnLoad: true`), the store refuses to open when a committed event in the middle of the log is damaged (`INTEGRITY_VIOLATION`).
-
-## [2.1.2] - 2026-10-24
 
 ### Fixed
 

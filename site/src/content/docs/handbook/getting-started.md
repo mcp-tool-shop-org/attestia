@@ -25,13 +25,13 @@ pnpm install
 
 ## Development commands
 
-The monorepo provides top-level scripts that operate across all 14 packages:
+The monorepo provides top-level scripts that operate across all 15 packages:
 
 | Command | What it does |
 |---------|-------------|
 | `pnpm install` | Install all dependencies across the workspace |
 | `pnpm build` | Build all packages in dependency order |
-| `pnpm test` | Run the full test suite (2,564 tests) |
+| `pnpm test` | Run the full test suite (2,597 tests) |
 | `pnpm test:coverage` | Run tests with coverage reporting (target: 95%) |
 | `pnpm typecheck` | Type-check all packages with TypeScript |
 | `pnpm bench` | Run performance benchmarks |
@@ -43,7 +43,7 @@ A typical development cycle looks like:
 ```bash
 pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (2,564)
+pnpm test             # Run all tests (2,597)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages
 pnpm verify           # All three in sequence (build + typecheck + test)
@@ -75,11 +75,11 @@ The integration tests exercise the full attestation round-trip: creating attesta
 
 ## Project structure
 
-Attestia is a monorepo with 14 packages under `packages/`. Each package is independently buildable and testable, but they share common types through `@attestia/types`. The dependency graph flows upward from types through the domain layer (ledger, registrum, vault, treasury) into the integration layer (reconciler, witness, verify) and finally the API surface (node, sdk).
+Attestia is a monorepo with 15 packages under `packages/`. Each package is independently buildable and testable, but they share common types through `@attestia/types`. The dependency graph flows upward from types through the domain layer (ledger, registrum, vault, treasury) into the integration layer (reconciler, witness, verify) and finally the API surface (node, sdk).
 
 ## Next steps
 
-- **[Beginners](/Attestia/handbook/beginners/)** — Plain-language walkthrough if you are new to the project
-- **[Architecture](/Attestia/handbook/architecture/)** — Understand the three-tier system and supporting infrastructure
-- **[Principles](/Attestia/handbook/principles/)** — The six invariants enforced in code
-- **[Reference](/Attestia/handbook/reference/)** — Full package table and documentation index
+- **[Beginners](/attestia/handbook/beginners/)** — Plain-language walkthrough if you are new to the project
+- **[Architecture](/attestia/handbook/architecture/)** — Understand the three-tier system and supporting infrastructure
+- **[Principles](/attestia/handbook/principles/)** — The six invariants enforced in code
+- **[Reference](/attestia/handbook/reference/)** — Full package table and documentation index

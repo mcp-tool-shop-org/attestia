@@ -2,22 +2,22 @@ import type { SiteConfig } from '@mcptoolshop/site-theme';
 
 export const config: SiteConfig = {
   title: 'Attestia',
-  description: 'Financial truth infrastructure for the decentralized world.',
+  description: 'Proves an event, transaction, or state transition happened and binds that proof to a chain. Ships the financial domain: vault, treasury, and registrum.',
   logoBadge: 'A',
   brandName: 'Attestia',
-  repoUrl: 'https://github.com/mcp-tool-shop-org/Attestia',
+  repoUrl: 'https://github.com/mcp-tool-shop-org/attestia',
   footerText: 'MIT Licensed — built by <a href="https://github.com/mcp-tool-shop-org" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop-org</a>',
 
   hero: {
-    badge: '14 packages · 2,472 tests · 95%+ coverage',
+    badge: 'v2.1.2 · 15 packages · 2,594 tests',
     headline: 'Attestia',
-    headlineAccent: 'financial truth infrastructure.',
+    headlineAccent: 'proof that it happened.',
     description: 'Structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals. We don\'t move your money. We prove what happened.',
     primaryCta: { href: '#architecture', label: 'See architecture' },
     secondaryCta: { href: 'handbook/', label: 'Read the Handbook' },
     previews: [
       { label: 'Flow', code: 'Intent → Approve → Execute → Verify' },
-      { label: 'Test', code: 'pnpm test  # 2,472 tests, all green' },
+      { label: 'Test', code: 'pnpm test  # 2,597 tests, all green' },
       { label: 'Attest', code: 'XRPL witnesses. Ethereum settles.' },
     ],
   },
@@ -53,7 +53,7 @@ export const config: SiteConfig = {
       kind: 'data-table',
       id: 'packages',
       title: 'Packages',
-      subtitle: '14 packages, all tested, all typed.',
+      subtitle: '15 workspace packages: 13 tested libraries, the npm bundle and the demo. Counts are from CI.',
       columns: ['Package', 'Tests', 'Purpose'],
       rows: [
         ['@attestia/types', '75', 'Shared domain types (zero deps)'],
@@ -65,10 +65,10 @@ export const config: SiteConfig = {
         ['@attestia/reconciler', '98', '3D cross-system matching + Registrum attestation'],
         ['@attestia/witness', '295', 'XRPL on-chain attestation, multi-sig governance, retry'],
         ['@attestia/verify', '273', 'Replay verification, compliance evidence, SLA enforcement'],
-        ['@attestia/event-store', '253', 'Append-only event persistence, JSONL, hash chain, 34 event types'],
+        ['@attestia/event-store', '263', 'Append-only event persistence, JSONL, hash chain, 34 event types, crash recovery'],
         ['@attestia/proof', '94', 'Merkle trees, inclusion proofs, attestation proof packaging'],
-        ['@attestia/sdk', '85', 'Typed HTTP client SDK for external consumers'],
-        ['@attestia/node', '280', 'Hono REST API — 34 endpoints, auth, multi-tenancy'],
+        ['@attestia/sdk', '115', 'Typed HTTP client SDK for external consumers'],
+        ['@attestia/node', '362', 'Hono REST API — 41 endpoints, auth, multi-tenancy'],
       ],
     },
     {
@@ -78,7 +78,7 @@ export const config: SiteConfig = {
       cards: [
         { title: 'Build & test', code: `pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (2,472)
+pnpm test             # Run all tests (2,597)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages` },
         { title: 'XRPL integration', code: `docker compose up -d              # Start standalone rippled

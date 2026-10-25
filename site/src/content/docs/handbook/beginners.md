@@ -52,7 +52,7 @@ Attestia has three subsystems that share a single source of truth:
 
 ### Append-only records
 
-Nothing is ever updated or deleted. If a correction is needed, a new compensating entry is appended. The event store tracks 32 domain event types, and every one is immutable once recorded. This makes the full history replayable at any time.
+Nothing is ever updated or deleted. If a correction is needed, a new compensating entry is appended. The event store tracks 34 domain event types, and every one is immutable once recorded. This makes the full history replayable at any time.
 
 ### Fail-closed
 
@@ -106,7 +106,7 @@ The demo runs the full Attestia pipeline locally: declare an intent, approve it,
 After running the demo, try the test suite to see the full scope of the project:
 
 ```bash
-# Run all 2,564 tests
+# Run all 2,597 tests
 pnpm test
 
 # Run with coverage reporting
@@ -123,7 +123,7 @@ pnpm test:coverage
 | **Attestation** | An immutable proof that a financial event occurred and was structurally valid. Written to the XRPL. |
 | **Reconciliation** | 3D matching across the Vault, Treasury, and Registrum to confirm all three systems agree. |
 | **Witness** | The module that writes attestation records to the XRPL. Supports multi-sig governance and retry logic. |
-| **Event store** | Append-only persistence layer. Stores 32 domain event types as hash-chained JSONL entries. |
+| **Event store** | Append-only persistence layer. Stores 34 domain event types as hash-chained JSONL entries. |
 | **Vault** | The Personal Vault. Reads multi-chain balances and manages individual budgets and intents. |
 | **Treasury** | The Org Treasury. Handles payroll, distributions, and dual-gate funding with double-entry accounting. |
 | **Dual-gate** | A funding pattern requiring both a structural gate (does it conform to rules?) and a human gate (did someone approve?). |
@@ -136,8 +136,8 @@ pnpm test:coverage
 
 Once you have run the demo and understand the core flow, here is where to go next:
 
-- **[Getting Started](/Attestia/handbook/getting-started/)** — Deeper setup instructions including XRPL integration testing with a local Docker-based rippled node.
-- **[Architecture](/Attestia/handbook/architecture/)** — Detailed breakdown of the three-tier system, cross-system reconciliation, and the XRPL witness layer.
-- **[Principles](/Attestia/handbook/principles/)** — The six non-negotiable principles enforced in code, with explanations of why each one matters.
-- **[Reference](/Attestia/handbook/reference/)** — Full package table with test counts, documentation index, and security scope.
+- **[Getting Started](/attestia/handbook/getting-started/)** — Deeper setup instructions including XRPL integration testing with a local Docker-based rippled node.
+- **[Architecture](/attestia/handbook/architecture/)** — Detailed breakdown of the three-tier system, cross-system reconciliation, and the XRPL witness layer.
+- **[Principles](/attestia/handbook/principles/)** — The six non-negotiable principles enforced in code, with explanations of why each one matters.
+- **[Reference](/attestia/handbook/reference/)** — Full package table with test counts, documentation index, and security scope.
 - **Source code** — The `packages/` directory contains 14 independently buildable packages. Start with `@attestia/types` for the shared domain types, then explore `@attestia/registrum` for the invariant system.

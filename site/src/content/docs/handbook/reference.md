@@ -5,27 +5,28 @@ sidebar:
   order: 4
 ---
 
-This page is the quick-reference for Attestia's 14 packages, the full documentation index, and the security and data scope declaration.
+This page is the quick-reference for Attestia's 15 packages, the full documentation index, and the security and data scope declaration.
 
 ## Package status
 
-14 packages, 2,564 tests, 95%+ coverage. All green.
+Version 2.1.2. 15 workspace packages, 2,594 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package. All green. Counts are from CI on Node 22.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|
-| `@attestia/types` | 72 | Shared domain types (zero deps) |
-| `@attestia/registrum` | 341 | Constitutional governance — 11 invariants, dual-witness validation |
-| `@attestia/ledger` | 154 | Append-only double-entry engine |
-| `@attestia/chain-observer` | 278 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
-| `@attestia/vault` | 75 | Personal vault — portfolios, budgets, intents |
-| `@attestia/treasury` | 92 | Org treasury — payroll, distributions, funding gates |
-| `@attestia/reconciler` | 81 | 3D cross-system matching + Registrum attestation |
-| `@attestia/witness` | 278 | XRPL on-chain attestation, multi-sig governance, retry |
-| `@attestia/verify` | 242 | Replay verification, compliance evidence, SLA enforcement |
-| `@attestia/event-store` | 226 | Append-only event persistence, JSONL, hash chain, 34 event types |
-| `@attestia/proof` | 75 | Merkle trees, inclusion proofs, attestation proof packaging |
-| `@attestia/sdk` | 79 | Typed HTTP client SDK for external consumers |
-| `@attestia/node` | 227 | Hono REST API — 34 endpoints, auth, multi-tenancy, public API, compliance |
+| `@attestia/types` | 75 | Shared domain types (zero deps) |
+| `@attestia/registrum` | 368 | Constitutional governance — 11 invariants, dual-witness validation |
+| `@attestia/ledger` | 156 | Append-only double-entry engine |
+| `@attestia/chain-observer` | 295 | Multi-chain read-only observation (EVM + XRPL + Solana + L2s) |
+| `@attestia/vault` | 91 | Personal vault — portfolios, budgets, intents |
+| `@attestia/treasury` | 109 | Org treasury — payroll, distributions, funding gates |
+| `@attestia/reconciler` | 98 | 3D cross-system matching + Registrum attestation |
+| `@attestia/witness` | 295 | XRPL on-chain attestation, multi-sig governance, retry |
+| `@attestia/verify` | 273 | Replay verification, compliance evidence, SLA enforcement |
+| `@attestia/event-store` | 263 | Append-only event persistence, JSONL, hash chain, 34 event types |
+| `@attestia/proof` | 94 | Merkle trees, inclusion proofs, attestation proof packaging |
+| `@attestia/sdk` | 115 | Typed HTTP client SDK for external consumers |
+| `@attestia/node` | 362 | Hono REST API — 41 endpoints, auth, multi-tenancy, public API, compliance |
+| `@mcptoolshop/attestia` | 3 | The published npm package: every library above in one bundle, with subpath exports (smoke tests, run by `pnpm test`; CI's coverage run doesn't include them) |
 | `@attestia/demo` | — | Interactive CLI demo — walk through the full Attestia pipeline (private, no tests) |
 
 ### Package dependency flow
