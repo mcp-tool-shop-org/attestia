@@ -19,8 +19,8 @@ import type { ObserverConfig } from "../../src/observer.js";
 // Mocks
 // =============================================================================
 
-const mockGetSlot = vi.fn().mockResolvedValue(250_000_000);
-const mockGetBalance = vi.fn().mockResolvedValue(0);
+const mockGetSlot = vi.fn().mockResolvedValue(250_000_000n);
+const mockGetBalance = vi.fn().mockResolvedValue(0n);
 const mockGetParsedTokenAccountsByOwner = vi.fn().mockResolvedValue({ value: [] });
 const mockGetSignaturesForAddress = vi.fn();
 const mockGetParsedTransactions = vi.fn();
@@ -58,15 +58,15 @@ const FIXTURE_ADDRESS = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
  * at different slots, simulating real-world transaction data.
  */
 const FIXTURE_SIGNATURES = [
-  { signature: "sig-sol-1", slot: 250_000_100 },
-  { signature: "sig-spl-1", slot: 250_000_050 },
-  { signature: "sig-sol-2", slot: 250_000_200 },
+  { signature: "sig-sol-1", slot: 250_000_100n },
+  { signature: "sig-spl-1", slot: 250_000_050n },
+  { signature: "sig-sol-2", slot: 250_000_200n },
 ];
 
 const FIXTURE_TRANSACTIONS = [
   {
-    slot: 250_000_100,
-    blockTime: 1700001000,
+    slot: 250_000_100n,
+    blockTime: 1700001000n,
     transaction: {
       message: {
         instructions: [{
@@ -85,8 +85,8 @@ const FIXTURE_TRANSACTIONS = [
     meta: {},
   },
   {
-    slot: 250_000_050,
-    blockTime: 1700000500,
+    slot: 250_000_050n,
+    blockTime: 1700000500n,
     transaction: {
       message: {
         instructions: [{
@@ -106,8 +106,8 @@ const FIXTURE_TRANSACTIONS = [
     meta: {},
   },
   {
-    slot: 250_000_200,
-    blockTime: 1700002000,
+    slot: 250_000_200n,
+    blockTime: 1700002000n,
     transaction: {
       message: {
         instructions: [{

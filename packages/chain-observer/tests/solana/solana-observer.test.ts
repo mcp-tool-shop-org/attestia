@@ -15,8 +15,8 @@ import type { ObserverConfig } from "../../src/observer.js";
 // Mocks
 // =============================================================================
 
-const mockGetSlot = vi.fn().mockResolvedValue(250_000_000);
-const mockGetBalance = vi.fn().mockResolvedValue(5_000_000_000); // 5 SOL
+const mockGetSlot = vi.fn().mockResolvedValue(250_000_000n);
+const mockGetBalance = vi.fn().mockResolvedValue(5_000_000_000n); // 5 SOL
 const mockGetParsedTokenAccountsByOwner = vi.fn().mockResolvedValue({ value: [] });
 const mockGetSignaturesForAddress = vi.fn().mockResolvedValue([]);
 const mockGetParsedTransactions = vi.fn().mockResolvedValue([]);
@@ -54,8 +54,8 @@ function createConfig(
 describe("SolanaObserver", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetSlot.mockResolvedValue(250_000_000);
-    mockGetBalance.mockResolvedValue(5_000_000_000);
+    mockGetSlot.mockResolvedValue(250_000_000n);
+    mockGetBalance.mockResolvedValue(5_000_000_000n);
     mockGetParsedTokenAccountsByOwner.mockResolvedValue({ value: [] });
     mockGetSignaturesForAddress.mockResolvedValue([]);
     mockGetParsedTransactions.mockResolvedValue([]);
@@ -148,8 +148,8 @@ describe("SolanaObserver", () => {
 
     it("includes finalized slot when profile has finality config", async () => {
       mockGetSlot
-        .mockResolvedValueOnce(250_000_000)  // confirmed (main query)
-        .mockResolvedValueOnce(249_999_900); // finalized
+        .mockResolvedValueOnce(250_000_000n)  // confirmed (main query)
+        .mockResolvedValueOnce(249_999_900n); // finalized
 
       const observer = new SolanaObserver(
         createConfig(CHAINS.SOLANA_MAINNET, SOLANA_MAINNET_PROFILE),
@@ -287,12 +287,12 @@ describe("SolanaObserver", () => {
     it("extracts native SOL transfers", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig1", slot: 250_000_000 },
+        { signature: "sig1", slot: 250_000_000n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 250_000_000,
-          blockTime: 1700000000,
+          slot: 250_000_000n,
+          blockTime: 1700000000n,
           transaction: {
             message: {
               instructions: [
@@ -333,12 +333,12 @@ describe("SolanaObserver", () => {
     it("extracts SPL token transfers", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig2", slot: 250_000_001 },
+        { signature: "sig2", slot: 250_000_001n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 250_000_001,
-          blockTime: 1700000001,
+          slot: 250_000_001n,
+          blockTime: 1700000001n,
           transaction: {
             message: {
               instructions: [
@@ -381,12 +381,12 @@ describe("SolanaObserver", () => {
     it("filters by direction", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig3", slot: 250_000_002 },
+        { signature: "sig3", slot: 250_000_002n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 250_000_002,
-          blockTime: 1700000002,
+          slot: 250_000_002n,
+          blockTime: 1700000002n,
           transaction: {
             message: {
               instructions: [
@@ -420,12 +420,12 @@ describe("SolanaObserver", () => {
 
       // Reset mocks for outgoing query
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig3", slot: 250_000_002 },
+        { signature: "sig3", slot: 250_000_002n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 250_000_002,
-          blockTime: 1700000002,
+          slot: 250_000_002n,
+          blockTime: 1700000002n,
           transaction: {
             message: {
               instructions: [
@@ -458,14 +458,14 @@ describe("SolanaObserver", () => {
     it("applies limit", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig-a", slot: 100 },
-        { signature: "sig-b", slot: 101 },
-        { signature: "sig-c", slot: 102 },
+        { signature: "sig-a", slot: 100n },
+        { signature: "sig-b", slot: 101n },
+        { signature: "sig-c", slot: 102n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 100,
-          blockTime: 1700000000,
+          slot: 100n,
+          blockTime: 1700000000n,
           transaction: {
             message: {
               instructions: [{
@@ -477,8 +477,8 @@ describe("SolanaObserver", () => {
           meta: {},
         },
         {
-          slot: 101,
-          blockTime: 1700000001,
+          slot: 101n,
+          blockTime: 1700000001n,
           transaction: {
             message: {
               instructions: [{
@@ -490,8 +490,8 @@ describe("SolanaObserver", () => {
           meta: {},
         },
         {
-          slot: 102,
-          blockTime: 1700000002,
+          slot: 102n,
+          blockTime: 1700000002n,
           transaction: {
             message: {
               instructions: [{
@@ -518,13 +518,13 @@ describe("SolanaObserver", () => {
     it("sorts by slot ascending", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValueOnce([
-        { signature: "sig-later", slot: 200 },
-        { signature: "sig-earlier", slot: 100 },
+        { signature: "sig-later", slot: 200n },
+        { signature: "sig-earlier", slot: 100n },
       ]);
       mockGetParsedTransactions.mockResolvedValueOnce([
         {
-          slot: 200,
-          blockTime: 1700000200,
+          slot: 200n,
+          blockTime: 1700000200n,
           transaction: {
             message: {
               instructions: [{
@@ -536,8 +536,8 @@ describe("SolanaObserver", () => {
           meta: {},
         },
         {
-          slot: 100,
-          blockTime: 1700000100,
+          slot: 100n,
+          blockTime: 1700000100n,
           transaction: {
             message: {
               instructions: [{
