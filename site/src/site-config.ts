@@ -6,7 +6,7 @@ export const config: SiteConfig = {
   logoBadge: 'A',
   brandName: 'Attestia',
   repoUrl: 'https://github.com/mcp-tool-shop-org/attestia',
-  footerText: 'MIT Licensed — built by <a href="https://github.com/mcp-tool-shop-org" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop-org</a>',
+  footerText: 'MIT Licensed — built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop</a>',
 
   hero: {
     badge: 'v2.1.2 · 15 packages · 2,594 tests',

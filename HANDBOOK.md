@@ -549,4 +549,4 @@ Branch protection requires:
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2026 mcp-tool-shop-org
+[MIT](LICENSE) — Copyright (c) 2026 mcp-tool-shop
