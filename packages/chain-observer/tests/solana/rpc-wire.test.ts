@@ -52,7 +52,7 @@ const parsedTx = {
   },
 };
 
-const handlers: Record<string, () => unknown> = {
+const handlers = new Map<string, () => unknown>(Object.entries({
   getSlot: () => 250_000_000,
   getBalance: () => ({ context: { slot: 250_000_000 }, value: 5_000_000_000 }),
   getTokenAccountsByOwner: () => ({
@@ -93,7 +93,7 @@ const handlers: Record<string, () => unknown> = {
     { signature: "sig1", slot: 250_000_000, err: null, memo: null, blockTime: 1_700_000_000, confirmationStatus: "finalized" },
   ],
   getTransaction: () => parsedTx,
-};
+}));
 
 function containsBigint(value: unknown): boolean {
   if (typeof value === "bigint") return true;
@@ -113,7 +113,7 @@ describe("SolanaObserver against a real JSON-RPC wire (web3.js not mocked)", () 
       req.on("data", (c: Buffer) => (body += c.toString("utf8")));
       req.on("end", () => {
         const answer = (r: { id: unknown; method: string }) => {
-          const h = handlers[r.method];
+          const h = handlers.get(r.method);
           return h
             ? { jsonrpc: "2.0", id: r.id, result: h() }
             : { jsonrpc: "2.0", id: r.id, error: { code: -32601, message: `no ${r.method}` } };
