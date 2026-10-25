@@ -1,6 +1,6 @@
 # Attestia — Project Handbook
 
-**Version:** 2.1.2
+**Version:** 2.1.3
 **Date:** October 25, 2026
 **Status:** Active development — Phases 1–12 complete
 
@@ -20,7 +20,7 @@ Attestia, Cognate, and RepoMesh are three products. Cognate is the AI governance
 |--------|-------|
 | Packages | 15 (13 tested libraries, the npm bundle, the demo) |
 | Source lines (TypeScript) | ~19,000 |
-| Tests | 2,594 in CI, plus 3 bundle smoke tests |
+| Tests | 2,605 in CI, plus 3 bundle smoke tests |
 | Test coverage | 94.9–100% statements per package |
 | Runtime dependencies (core) | 0 |
 | REST API endpoints | 57 (plus health, readiness and metrics) |

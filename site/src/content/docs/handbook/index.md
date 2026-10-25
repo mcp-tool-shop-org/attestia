@@ -30,9 +30,9 @@ This handbook is organized into six sections:
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.1.2 |
+| Version | 2.1.3 |
 | Packages | 15 |
-| Tests | 2,594 |
+| Tests | 2,605 |
 | Coverage | 94.9–100% statements per package |
 | License | MIT |
 | Chain support | XRPL, Ethereum, Solana, L2s |

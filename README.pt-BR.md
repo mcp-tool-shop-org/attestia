@@ -133,7 +133,7 @@ Nenhuma etapa é opcional. Nenhuma etapa é automatizada.
 
 ## Status
 
-Versão 2.1.2. 15 pacotes de espaço de trabalho, 2.594 testes em CI, mais 3 testes de fumaça de pacote, 94,9–100% de cobertura de declarações por pacote, tudo verde. Construindo em público.
+Versão 2.1.3. 15 pacotes de espaço de trabalho, 2.605 testes em CI, mais 3 testes de fumaça de pacote, 94,9–100% de cobertura de declarações por pacote, tudo verde. Construindo em público.
 
 | Pacote | Testes | Propósito |
 |---------|-------|---------|
