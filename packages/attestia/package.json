@@ -83,6 +83,7 @@
   "scripts": {
     "build": "tsup && node bundle-dts.mjs",
     "test": "vitest run",
+    "test:coverage": "vitest run",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
