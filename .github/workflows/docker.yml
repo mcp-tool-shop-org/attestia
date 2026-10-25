@@ -5,6 +5,10 @@ name: Publish to GHCR
 # `release: published` event, so that trigger alone never built an image for
 # v2.0.4, v2.0.5 or v2.1.0. On a v* tag, metadata-action makes X.Y.Z, X.Y,
 # sha-* and (flavor latest=auto, for a semver tag) latest.
+#
+# Only a v* tag ref pushes. Any other ref (a dispatch on main or a branch)
+# builds the image and pushes nothing, so no path puts an unreleased build on
+# GHCR or moves latest.
 on:
   workflow_call:
   release:
@@ -32,6 +36,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
@@ -47,13 +52,12 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: packages/node/Dockerfile
-          push: true
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
