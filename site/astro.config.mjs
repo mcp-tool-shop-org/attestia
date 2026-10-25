@@ -7,7 +7,7 @@ const SITE = 'https://mcp-tool-shop-org.github.io';
 const BASE = '/attestia';
 const OG_IMAGE = `${SITE}${BASE}/og-image.png`;
 const OG_DESCRIPTION =
-  'Financial truth infrastructure for the decentralized world — structural governance, deterministic accounting, and human-approved intent.';
+  'Proves an event, transaction, or state transition happened and binds that proof to a chain. Ships the financial domain: vault, treasury, and registrum.';
 
 export default defineConfig({
   site: SITE,
@@ -31,7 +31,7 @@ export default defineConfig({
         { tag: 'meta', attrs: { name: 'twitter:image', content: OG_IMAGE } },
       ],
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/mcp-tool-shop-org/Attestia' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/mcp-tool-shop-org/attestia' },
       ],
       sidebar: [
         { label: 'Handbook', items: [{ autogenerate: { directory: 'handbook' } }] },

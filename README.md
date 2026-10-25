@@ -133,7 +133,7 @@ No step is optional. No step is automated away.
 
 ## Status
 
-14 packages, 2,564 tests, 95%+ coverage, all green. Building in public.
+Version 2.1.2. 15 workspace packages, 2,594 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package, all green. Building in public.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|
@@ -146,18 +146,27 @@ No step is optional. No step is automated away.
 | `@attestia/reconciler` | 98 | 3D cross-system matching + Registrum attestation |
 | `@attestia/witness` | 295 | XRPL on-chain attestation, multi-sig governance, retry |
 | `@attestia/verify` | 273 | Replay verification, compliance evidence, SLA enforcement |
-| `@attestia/event-store` | 253 | Append-only event persistence, JSONL, hash chain, 34 event types |
+| `@attestia/event-store` | 263 | Append-only event persistence, JSONL, hash chain, 34 event types |
 | `@attestia/proof` | 94 | Merkle trees (RFC 6962), inclusion proofs, attestation proof packaging |
 | `@attestia/sdk` | 115 | Typed HTTP client SDK for external consumers |
-| `@attestia/node` | 342 | Hono REST API — durable persistence, auth, multi-tenancy, treasury/vault/governance, OpenAPI |
+| `@attestia/node` | 362 | Hono REST API — durable persistence, auth, multi-tenancy, treasury/vault/governance, OpenAPI |
+| `@mcptoolshop/attestia` | 3 | The published npm package: every library above in one bundle, with subpath exports (smoke tests, run by `pnpm test`; CI's coverage run doesn't include them) |
 | `@attestia/demo` | — | Interactive CLI demo — walk through the full Attestia pipeline (private, no tests) |
+
+### What's new in 2.1
+
+- **2.1.2: crash recovery for the event log.** If a writer is killed partway through a line, `JsonlEventStore` skips the torn last line on reopen, and its first append writes a newline so new events start on a fresh line. The torn fragment stays in the file and is skipped on every load. Events whose `append()` returned are on disk. A damaged event in the middle of the log still makes the store refuse to open (`INTEGRITY_VIOLATION`, with the default `verifyOnLoad: true`). The event-store README says [what holds after a resume](packages/event-store/README.md).
+- **2.1.1: Zod 4.** Validation now runs on Zod 4.6.7. The wording of built-in validation messages in `details.issues[].message` and in `ConfigError` text changed (for example, `"Required"` is now `"Invalid input: expected <type>, received undefined"`). Error codes, issue paths, the HTTP error envelope and Attestia's own refinement messages are unchanged, so match on codes and paths, not message text.
+- **2.1.0: a durable event log for the service.** `ATTESTIA_EVENTS_FILE` opens that file as the configured owner's event log. Unset, the service stays in memory. A malformed `API_KEYS` entry no longer puts the key in the startup error.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ### Development
 
 ```bash
 pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (2,564)
+pnpm test             # Run all tests (2,597)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages
 pnpm bench            # Run benchmarks
@@ -194,8 +203,9 @@ docker compose down               # Stop rippled
 
 ## Security & Data Scope
 
-- **Data accessed:** Reads and writes financial ledger entries, attestation records, and cryptographic proofs. Connects to blockchain nodes (XRPL) when witness module is active.
+- **Data accessed:** Reads and writes financial ledger entries, attestation records, and cryptographic proofs. The service writes its event log to the file named by `ATTESTIA_EVENTS_FILE` when it is set. Connects to blockchain nodes (XRPL) when witness module is active.
 - **Data NOT accessed:** No telemetry. No user credential storage. No third-party analytics.
+- **Integrity on disk:** the event log is append-only and hash-chained. A torn last line from a crash is skipped and the log resumes; any damage that breaks the chain makes the store refuse to open by default.
 - **Permissions required:** Read/write access to local data directories. Network access for blockchain attestation only. See [THREAT_MODEL.md](THREAT_MODEL.md) for full STRIDE analysis.
 
 ## Scorecard

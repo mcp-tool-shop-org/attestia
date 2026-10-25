@@ -44,7 +44,7 @@
     "invariants",
     "deterministic"
   ],
-  "author": "mcp-tool-shop-org",
+  "author": "mcp-tool-shop",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.0.0",
