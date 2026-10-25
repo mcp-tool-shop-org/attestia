@@ -25,7 +25,7 @@ Version 2.1.2. 15 workspace packages, 2,594 tests in CI plus 3 bundle smoke test
 | `@attestia/event-store` | 263 | Append-only event persistence, JSONL, hash chain, 34 event types |
 | `@attestia/proof` | 94 | Merkle trees, inclusion proofs, attestation proof packaging |
 | `@attestia/sdk` | 115 | Typed HTTP client SDK for external consumers |
-| `@attestia/node` | 362 | Hono REST API — 41 endpoints, auth, multi-tenancy, public API, compliance |
+| `@attestia/node` | 362 | Hono REST API — 57 endpoints, auth, multi-tenancy, public API, compliance |
 | `@mcptoolshop/attestia` | 3 | The published npm package: every library above in one bundle, with subpath exports (smoke tests, run by `pnpm test`; CI's coverage run doesn't include them) |
 | `@attestia/demo` | — | Interactive CLI demo — walk through the full Attestia pipeline (private, no tests) |
 

@@ -140,4 +140,4 @@ Once you have run the demo and understand the core flow, here is where to go nex
 - **[Architecture](/attestia/handbook/architecture/)** — Detailed breakdown of the three-tier system, cross-system reconciliation, and the XRPL witness layer.
 - **[Principles](/attestia/handbook/principles/)** — The six non-negotiable principles enforced in code, with explanations of why each one matters.
 - **[Reference](/attestia/handbook/reference/)** — Full package table with test counts, documentation index, and security scope.
-- **Source code** — The `packages/` directory contains 14 independently buildable packages. Start with `@attestia/types` for the shared domain types, then explore `@attestia/registrum` for the invariant system.
+- **Source code** — The `packages/` directory contains 15 independently buildable packages. Start with `@attestia/types` for the shared domain types, then explore `@attestia/registrum` for the invariant system.

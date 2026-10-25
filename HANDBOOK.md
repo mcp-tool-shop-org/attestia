@@ -23,7 +23,7 @@ Attestia, Cognate, and RepoMesh are three products. Cognate is the AI governance
 | Tests | 2,594 in CI, plus 3 bundle smoke tests |
 | Test coverage | 94.9–100% statements per package |
 | Runtime dependencies (core) | 0 |
-| REST API endpoints | 41 (plus health, readiness and metrics) |
+| REST API endpoints | 57 (plus health, readiness and metrics) |
 | Supported chains | EVM (Ethereum, Arbitrum, Base, Optimism) + XRPL + Solana |
 
 ---
@@ -94,7 +94,7 @@ Attestia is a TypeScript monorepo (pnpm workspaces) organized as 15 packages wit
 │                                                                │
 │          ┌────────────────────────────────────┐               │
 │          │  Node (REST API)                    │               │
-│          │  34 endpoints · Auth · Multi-tenant │               │
+│          │  57 endpoints · Auth · Multi-tenant │               │
 │          └────────────────────────────────────┘               │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -320,7 +320,7 @@ The integration layer for third-party systems. Features include:
 
 The operational interface to the entire Attestia stack. Built on Hono with a full middleware stack:
 
-**41 API endpoints: 33 under `/api/v1/` and 8 under `/public/v1/`:**
+**57 API endpoints: 49 under `/api/v1/` and 8 under `/public/v1/`:**
 
 | Category | Endpoints |
 |----------|-----------|
@@ -332,9 +332,9 @@ The operational interface to the entire Attestia stack. Built on Hono with a ful
 | Proofs | `GET /proofs/merkle-root`, `GET /proofs/attestation/:id`, `POST /proofs/verify` |
 | Compliance | `GET /compliance/frameworks`, `GET /compliance/report/:frameworkId` |
 | Audit log | `GET /audit-logs` |
-| Treasury | `GET /treasury/payroll-runs`, `GET /treasury/payroll-runs/:id`, `GET /treasury/distributions`, `GET /treasury/distributions/:id`, `GET /treasury/funding-gates`, `GET /treasury/funding-gates/:id` |
-| Vault | `GET /vault/budget`, `GET /vault/envelopes`, `GET /vault/portfolio` |
-| Governance | `GET /governance/policy` |
+| Treasury | `POST /treasury/payroll-runs`, `POST /treasury/payroll-runs/:id/approve`, `POST /treasury/payroll-runs/:id/execute`, `GET /treasury/payroll-runs`, `GET /treasury/payroll-runs/:id`, `POST /treasury/distributions`, `POST /treasury/distributions/:id/approve`, `POST /treasury/distributions/:id/compute`, `POST /treasury/distributions/:id/execute`, `GET /treasury/distributions`, `GET /treasury/distributions/:id`, `POST /treasury/funding-gates`, `POST /treasury/funding-gates/:id/approve`, `POST /treasury/funding-gates/:id/reject`, `POST /treasury/funding-gates/:id/execute`, `GET /treasury/funding-gates`, `GET /treasury/funding-gates/:id` |
+| Vault | `POST /vault/envelopes`, `POST /vault/envelopes/:id/allocate`, `GET /vault/budget`, `GET /vault/envelopes`, `GET /vault/portfolio` |
+| Governance | `POST /governance/signers`, `POST /governance/signers/remove`, `POST /governance/quorum`, `GET /governance/policy` |
 | OpenAPI | `GET /openapi.json` |
 | Public verification | `GET /public/v1/verify/health`, `GET /public/v1/verify/state-bundle`, `POST /public/v1/verify/submit-report`, `GET /public/v1/verify/reports`, `GET /public/v1/verify/consensus`, `POST /public/v1/proofs/verify`, `GET /public/v1/compliance/summary`, `GET /public/v1/openapi.json` |
 

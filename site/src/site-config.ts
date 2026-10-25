@@ -68,7 +68,7 @@ export const config: SiteConfig = {
         ['@attestia/event-store', '263', 'Append-only event persistence, JSONL, hash chain, 34 event types, crash recovery'],
         ['@attestia/proof', '94', 'Merkle trees, inclusion proofs, attestation proof packaging'],
         ['@attestia/sdk', '115', 'Typed HTTP client SDK for external consumers'],
-        ['@attestia/node', '362', 'Hono REST API — 41 endpoints, auth, multi-tenancy'],
+        ['@attestia/node', '362', 'Hono REST API — 57 endpoints, auth, multi-tenancy'],
       ],
     },
     {

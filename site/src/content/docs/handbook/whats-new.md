@@ -15,8 +15,8 @@ Now `JsonlEventStore` (`@attestia/event-store` 0.2.3) notices on load that the f
 
 What holds after a resume:
 
-- Every event whose `append()` returned is on disk. The append that was in flight when the writer died isn't recovered.
-- A multi-event `append()` goes out in one write, so a torn batch can leave some of its events committed. To see which landed, check `event.metadata.eventId` on the records from `read()` or `readAll()`, or check `streamVersion(streamId)`.
+- Every event whose `append()` returned is on disk. An append that was in flight when the writer died never returned, and any torn fragment at the end of the file isn't recovered.
+- A multi-event `append()` goes out in one write, so a crash can leave a prefix of its events committed. To see which landed, check `event.metadata.eventId` on the `StoredEvent` records from `read()` or `readAll()`, or check `streamVersion(streamId)`. The store doesn't index `eventId` or check it for uniqueness.
 - The torn fragment stays in the file. The store never truncates or rewrites the log, and it skips the fragment as a `parse_error` line on every load.
 - Events appended after the repair load and verify, in order with the events before the tear.
 - The repair runs at most once per load. A file that already ends in `\n` or `\r\n`, or an empty file, gets no extra newline.
