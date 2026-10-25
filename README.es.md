@@ -133,7 +133,7 @@ Ningún paso es opcional. Ningún paso se automatiza.
 
 ## Estado
 
-Versión 2.1.2. 15 paquetes de espacio de trabajo, 2594 pruebas en CI más 3 pruebas de humo de paquetes, 94,9-100% de cobertura de declaraciones por paquete, todo en verde. Construyendo en público.
+Versión 2.1.3. 15 paquetes de espacio de trabajo, 2605 pruebas en CI más 3 pruebas de humo de paquetes, 94,9-100% de cobertura de declaraciones por paquete, todo en verde. Construyendo en público.
 
 | Paquete | Pruebas | Propósito |
 |---------|-------|---------|

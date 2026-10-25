@@ -133,7 +133,7 @@ No step is optional. No step is automated away.
 
 ## Status
 
-Version 2.1.2. 15 workspace packages, 2,594 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package, all green. Building in public.
+Version 2.1.3. 15 workspace packages, 2,605 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package, all green. Building in public.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|

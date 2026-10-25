@@ -133,7 +133,7 @@ Aucune étape n’est facultative. Aucune étape n’est automatisée.
 
 ## État
 
-Version 2.1.2. 15 packages d’espace de travail, 2 594 tests en CI plus 3 tests de validation de bundle, 94,9 à 100 % de couverture des instructions par package, tout est vert. Construction en public.
+Version 2.1.3. 15 packages d’espace de travail, 2 605 tests en CI plus 3 tests de validation de bundle, 94,9 à 100 % de couverture des instructions par package, tout est vert. Construction en public.
 
 | Package | Tests | Objectif |
 |---------|-------|---------|

@@ -6,6 +6,21 @@ All notable changes to Attestia, organized by development phase.
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-10-25
+
+### Security
+
+- **Hono and `@hono/node-server` are upgraded in the node server (`@attestia/node` `0.2.4`).** `hono` `^4.13.13` and `@hono/node-server` `^1.19.17` clear 12 moderate and 1 low advisory in the HTTP service and its Docker image. No code change.
+- **`@solana/web3.js` is upgraded to 3.x (`@attestia/chain-observer` `0.2.3`, `@mcptoolshop/attestia`).** Version 3 is built on `@solana/kit` and drops `jayson` and the `uuid` and `stream-json` versions it pinned, so the published bundle no longer carries their advisories. `pnpm audit --prod` reports no vulnerabilities at moderate or high.
+
+### Fixed
+
+- **`SolanaObserver` fails closed on integers above 2^53 − 1.** `@solana/web3.js` 3.x returns slots and parsed-instruction numbers as bigint. A value above `Number.MAX_SAFE_INTEGER` used to lose precision silently when narrowed to a number. It now raises an `ObserverError` with code `RPC_ERROR`, the chain id and a hint (`getStatus` reports it as `errorCode: "RPC_ERROR"`). Results are plain numbers and strings, as before.
+
+### Changed
+
+- The node image is built by the release workflow after the npm publish (#32), so the image tagged `latest` follows each release.
+
 ## [2.1.2] - 2026-10-25
 
 ### Docs

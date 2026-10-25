@@ -9,7 +9,7 @@ This page is the quick-reference for Attestia's 15 packages, the full documentat
 
 ## Package status
 
-Version 2.1.2. 15 workspace packages, 2,594 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package. All green. Counts are from CI on Node 22.
+Version 2.1.3. 15 workspace packages, 2,605 tests in CI plus 3 bundle smoke tests, 94.9–100% statement coverage per package. All green. Counts are from CI on Node 22.
 
 | Package | Tests | Purpose |
 |---------|-------|---------|

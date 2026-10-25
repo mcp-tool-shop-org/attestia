@@ -9,7 +9,7 @@ export const config: SiteConfig = {
   footerText: 'MIT Licensed — built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop</a>',
 
   hero: {
-    badge: 'v2.1.2 · 15 packages · 2,594 tests',
+    badge: 'v2.1.3 · 15 packages · 2,605 tests',
     headline: 'Attestia',
     headlineAccent: 'proof that it happened.',
     description: 'Structural governance, deterministic accounting, and human-approved intent — unified across chains, organizations, and individuals. We don\'t move your money. We prove what happened.',

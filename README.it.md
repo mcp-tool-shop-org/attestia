@@ -133,7 +133,7 @@ Nessun passaggio è facoltativo. Nessun passaggio viene automatizzato.
 
 ## Stato
 
-Versione 2.1.2. 15 pacchetti di spazio di lavoro, 2.594 test in CI più 3 test di verifica del bundle, copertura dello statement dal 94,9 al 100% per pacchetto, tutto a posto. In fase di sviluppo pubblico.
+Versione 2.1.3. 15 pacchetti di spazio di lavoro, 2.605 test in CI più 3 test di verifica del bundle, copertura dello statement dal 94,9 al 100% per pacchetto, tutto a posto. In fase di sviluppo pubblico.
 
 | Pacchetto | Test | Scopo |
 |---------|-------|---------|
