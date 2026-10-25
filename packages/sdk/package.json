@@ -30,7 +30,7 @@
     "api",
     "verification"
   ],
-  "author": "mcp-tool-shop-org",
+  "author": "mcp-tool-shop",
   "license": "MIT",
   "dependencies": {
     "@attestia/types": "workspace:*"
