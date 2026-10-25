@@ -91,7 +91,7 @@ Chains are witnesses, not authorities. XRPL attests. But authority flows from st
 
 ### Event store
 
-The event store (`@attestia/event-store`) is the persistence backbone. Every operation across all three systems is recorded as an append-only, hash-chained JSONL entry. There are 32 domain event types covering vault intents, ledger transactions, treasury operations, governance changes, observer events, reconciliation outcomes, and witness submissions. Each event references the hash of its predecessor, making the chain tamper-evident and independently verifiable.
+The event store (`@attestia/event-store`) is the persistence backbone. Every operation across all three systems is recorded as an append-only, hash-chained JSONL entry. There are 34 domain event types covering vault intents, ledger transactions, treasury operations, governance changes, observer events, reconciliation outcomes, and witness submissions. Each event references the hash of its predecessor, making the chain tamper-evident and independently verifiable.
 
 The JSONL store survives a crash mid-write. Each append is written and `fsync`ed before it returns. If a writer is
 killed partway through, it can leave a torn last line with no trailing newline. On reopen, the store skips that line,

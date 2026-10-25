@@ -1,7 +1,7 @@
 # Attestia — Project Handbook
 
-**Version:** 2.0.0
-**Date:** May 29, 2026
+**Version:** 2.1.2
+**Date:** October 25, 2026
 **Status:** Active development — Phases 1–12 complete
 
 ---
@@ -18,12 +18,12 @@ Attestia, Cognate, and RepoMesh are three products. Cognate is the AI governance
 
 | Metric | Value |
 |--------|-------|
-| Packages | 14 |
+| Packages | 15 (13 tested libraries, the npm bundle, the demo) |
 | Source lines (TypeScript) | ~19,000 |
-| Tests | 2,564 |
-| Test coverage | 95%+ |
+| Tests | 2,594 in CI, plus 3 bundle smoke tests |
+| Test coverage | 94.9–100% statements per package |
 | Runtime dependencies (core) | 0 |
-| REST API endpoints | 34 |
+| REST API endpoints | 57 (plus health, readiness and metrics) |
 | Supported chains | EVM (Ethereum, Arbitrum, Base, Optimism) + XRPL + Solana |
 
 ---
@@ -59,7 +59,7 @@ No step is optional. No step is automated away.
 
 ## Architecture
 
-Attestia is a TypeScript monorepo (pnpm workspaces) organized as 14 packages with strict dependency direction. The core domain packages have zero runtime dependencies.
+Attestia is a TypeScript monorepo (pnpm workspaces) organized as 15 packages with strict dependency direction. The core domain packages have zero runtime dependencies.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -94,7 +94,7 @@ Attestia is a TypeScript monorepo (pnpm workspaces) organized as 14 packages wit
 │                                                                │
 │          ┌────────────────────────────────────┐               │
 │          │  Node (REST API)                    │               │
-│          │  34 endpoints · Auth · Multi-tenant │               │
+│          │  57 endpoints · Auth · Multi-tenant │               │
 │          └────────────────────────────────────┘               │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -128,7 +128,7 @@ Attestia is a TypeScript monorepo (pnpm workspaces) organized as 14 packages wit
 ### @attestia/types
 **Purpose:** Shared domain types across the entire stack.
 **Runtime deps:** None.
-**Tests:** 72.
+**Tests:** 75.
 
 Defines the canonical shapes for `Identity`, `Money`, `Intent`, `ChainRef`, `Event`, and all domain event types. Includes type guards, factory functions, and the event metadata builders used by every other package. Zero dependencies by design — this package is the vocabulary of the system.
 
@@ -137,7 +137,7 @@ Defines the canonical shapes for `Identity`, `Money`, `Intent`, `ChainRef`, `Eve
 ### @attestia/registrum
 **Purpose:** Constitutional governance — the structural registrar.
 **Runtime deps:** json-canonicalize.
-**Tests:** 341.
+**Tests:** 368.
 **Source:** ~5,600 lines (largest package).
 
 The heart of Attestia. Registrum enforces 11 structural invariants that hold unconditionally. It manages identities, organizations, roles, and governance transitions through a deterministic state machine. Features include:
@@ -154,7 +154,7 @@ This is the constitutional layer. If Registrum rejects something, the system hal
 ### @attestia/ledger
 **Purpose:** Append-only double-entry accounting engine.
 **Runtime deps:** None.
-**Tests:** 154.
+**Tests:** 156.
 
 A pure-function ledger that enforces the fundamental accounting equation: every debit has an equal credit. Features include:
 
@@ -170,7 +170,7 @@ Ported from the Python-based Payroll Engine. Zero runtime dependencies — pure 
 ### @attestia/chain-observer
 **Purpose:** Multi-chain read-only observation layer.
 **Runtime deps:** viem, xrpl.js, @solana/web3.js.
-**Tests:** 278.
+**Tests:** 295.
 
 Observes blockchain state without modifying it. Supports:
 
@@ -188,7 +188,7 @@ This is the only package where external chain SDKs are permitted.
 ### @attestia/vault
 **Purpose:** Personal financial management — observe, budget, allocate.
 **Runtime deps:** Internal packages only.
-**Tests:** 75.
+**Tests:** 91.
 
 The individual's view of their finances across chains. Features include:
 
@@ -204,7 +204,7 @@ Evolved from the NextLedger project (C#).
 ### @attestia/treasury
 **Purpose:** Organizational financial management — payroll, distributions, funding gates.
 **Runtime deps:** Internal packages only.
-**Tests:** 92.
+**Tests:** 109.
 
 The organization's financial control plane. Features include:
 
@@ -220,7 +220,7 @@ Evolved from the Python-based Payroll Engine.
 ### @attestia/reconciler
 **Purpose:** Cross-system reconciliation — match intents to reality.
 **Runtime deps:** Internal packages + json-canonicalize.
-**Tests:** 81.
+**Tests:** 98.
 
 The truth engine. Reconciler performs 3D matching across three dimensions:
 
@@ -235,7 +235,7 @@ When all three agree, the record is clean. When they disagree, the system halts 
 ### @attestia/witness
 **Purpose:** XRPL on-chain attestation — write proofs to the ledger.
 **Runtime deps:** xrpl.js, json-canonicalize.
-**Tests:** 278.
+**Tests:** 295.
 
 Takes reconciliation reports and attestation payloads and writes them to the XRP Ledger as payment memos. Features include:
 
@@ -253,7 +253,7 @@ The witness is the bridge between Attestia's internal truth and public, verifiab
 ### @attestia/verify
 **Purpose:** Deterministic replay verification, compliance evidence, SLA enforcement.
 **Runtime deps:** Internal packages + json-canonicalize.
-**Tests:** 242.
+**Tests:** 273.
 
 Answers one question: given the same sequence of events, do we arrive at the same state? Features include:
 
@@ -272,7 +272,7 @@ If replay produces a different result, something is wrong. Fail-closed.
 ### @attestia/event-store
 **Purpose:** Append-only event persistence with hash chaining.
 **Runtime deps:** json-canonicalize.
-**Tests:** 226.
+**Tests:** 263.
 
 The durable backbone. All domain events flow through the event store. Features include:
 
@@ -289,7 +289,7 @@ The durable backbone. All domain events flow through the event store. Features i
 ### @attestia/proof
 **Purpose:** Merkle trees, inclusion proofs, attestation proof packaging.
 **Runtime deps:** json-canonicalize.
-**Tests:** 75.
+**Tests:** 94.
 
 Cryptographic proof infrastructure. Features include:
 
@@ -302,7 +302,7 @@ Cryptographic proof infrastructure. Features include:
 ### @attestia/sdk
 **Purpose:** Typed HTTP client SDK for external consumers.
 **Runtime deps:** @attestia/types (type-only).
-**Tests:** 79.
+**Tests:** 115.
 
 The integration layer for third-party systems. Features include:
 
@@ -316,11 +316,11 @@ The integration layer for third-party systems. Features include:
 ### @attestia/node
 **Purpose:** HTTP service — the deployable API surface.
 **Runtime deps:** Hono, pino, Zod.
-**Tests:** 227.
+**Tests:** 362.
 
 The operational interface to the entire Attestia stack. Built on Hono with a full middleware stack:
 
-**34 API endpoints under `/api/v1/` and `/public/v1/`:**
+**57 API endpoints: 49 under `/api/v1/` and 8 under `/public/v1/`:**
 
 | Category | Endpoints |
 |----------|-----------|
@@ -329,9 +329,14 @@ The operational interface to the entire Attestia stack. Built on Hono with a ful
 | Verification | `POST /verify/replay`, `POST /verify/hash` |
 | Reconciliation | `POST /reconcile`, `POST /attest`, `GET /attestations` |
 | Export | `GET /export/events` (NDJSON stream), `GET /export/state` (snapshot + GlobalStateHash) |
-| Proofs | `POST /proofs/generate`, `POST /proofs/verify`, `GET /proofs/:id`, `POST /proofs/inclusion` |
-| Compliance | `GET /compliance/frameworks`, `POST /compliance/report`, `GET /compliance/summary` |
-| Public verification | `GET /public/v1/verify/state-bundle`, `POST /public/v1/verify/submit-report`, `GET /public/v1/verify/consensus`, `POST /public/v1/verify/proof`, `GET /public/v1/openapi.json` |
+| Proofs | `GET /proofs/merkle-root`, `GET /proofs/attestation/:id`, `POST /proofs/verify` |
+| Compliance | `GET /compliance/frameworks`, `GET /compliance/report/:frameworkId` |
+| Audit log | `GET /audit-logs` |
+| Treasury | `POST /treasury/payroll-runs`, `POST /treasury/payroll-runs/:id/approve`, `POST /treasury/payroll-runs/:id/execute`, `GET /treasury/payroll-runs`, `GET /treasury/payroll-runs/:id`, `POST /treasury/distributions`, `POST /treasury/distributions/:id/approve`, `POST /treasury/distributions/:id/compute`, `POST /treasury/distributions/:id/execute`, `GET /treasury/distributions`, `GET /treasury/distributions/:id`, `POST /treasury/funding-gates`, `POST /treasury/funding-gates/:id/approve`, `POST /treasury/funding-gates/:id/reject`, `POST /treasury/funding-gates/:id/execute`, `GET /treasury/funding-gates`, `GET /treasury/funding-gates/:id` |
+| Vault | `POST /vault/envelopes`, `POST /vault/envelopes/:id/allocate`, `GET /vault/budget`, `GET /vault/envelopes`, `GET /vault/portfolio` |
+| Governance | `POST /governance/signers`, `POST /governance/signers/remove`, `POST /governance/quorum`, `GET /governance/policy` |
+| OpenAPI | `GET /openapi.json` |
+| Public verification | `GET /public/v1/verify/health`, `GET /public/v1/verify/state-bundle`, `POST /public/v1/verify/submit-report`, `GET /public/v1/verify/reports`, `GET /public/v1/verify/consensus`, `POST /public/v1/proofs/verify`, `GET /public/v1/compliance/summary`, `GET /public/v1/openapi.json` |
 
 **Infrastructure endpoints:**
 
@@ -402,7 +407,7 @@ These hold at every phase and are not negotiable:
 
 ### Current State
 
-Phases 1 through 12 are complete. All 14 packages are built, tested, and operational. The system is audit-ready, externally verifiable, compliance-mappable, and SDK-consumable. An auditor can independently replay events to the same GlobalStateHash.
+Phases 1 through 12 are complete. All 15 packages are built, tested, and operational. The system is audit-ready, externally verifiable, compliance-mappable, and SDK-consumable. An auditor can independently replay events to the same GlobalStateHash.
 
 ### Milestones
 
@@ -444,7 +449,7 @@ Phases 1 through 12 are complete. All 14 packages are built, tested, and operati
 ```bash
 pnpm install                # Install all dependencies
 pnpm build                  # Build all packages
-pnpm test                   # Run all tests (2,564)
+pnpm test                   # Run all tests (2,597)
 pnpm test:coverage          # Run with coverage reporting
 pnpm typecheck              # Type-check all packages
 pnpm bench                  # Run benchmarks
@@ -544,4 +549,4 @@ Branch protection requires:
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2026 mcp-tool-shop-org
+[MIT](LICENSE) — Copyright (c) 2026 mcp-tool-shop
