@@ -1,12 +1,20 @@
 name: Publish to GHCR
 
+# release.yml calls this workflow after the npm publish succeeds, on the
+# v* tag push. A release created there with GITHUB_TOKEN raises no
+# `release: published` event, so that trigger alone never built an image for
+# v2.0.4, v2.0.5 or v2.1.0. On a v* tag, metadata-action makes X.Y.Z, X.Y,
+# sha-* and (flavor latest=auto, for a semver tag) latest.
 on:
+  workflow_call:
   release:
     types: [published]
   workflow_dispatch:
 
+# Not github.workflow: in a called workflow that is the caller's name, so the
+# group would equal release.yml's and cancel-in-progress would cancel it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: docker-${{ github.ref }}
   cancel-in-progress: true
 
 env:

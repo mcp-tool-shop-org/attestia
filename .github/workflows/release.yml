@@ -106,3 +106,13 @@ jobs:
             --title "@mcptoolshop/attestia ${GITHUB_REF_NAME}" \
             --generate-notes \
             --verify-tag
+
+  image:
+    name: Publish the node image to GHCR
+    # Runs only after the release job's tests, npm publish and GitHub Release
+    # have succeeded.
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker.yml
