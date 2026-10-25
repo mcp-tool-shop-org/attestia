@@ -13,7 +13,7 @@ These are not aspirational. They are enforced in code. Every package in Attestia
 
 **Implementation:** No UPDATE, no DELETE — only new entries.
 
-Every financial event in Attestia is immutable once recorded. The event store (`@attestia/event-store`) enforces append-only semantics at the storage layer. If a correction is needed, a new compensating entry is appended — the original record is never modified. This means the full history is always replayable and auditable. There are 32 defined event types, and every one follows this rule.
+Every financial event in Attestia is immutable once recorded. The event store (`@attestia/event-store`) enforces append-only semantics at the storage layer. If a correction is needed, a new compensating entry is appended — the original record is never modified. This means the full history is always replayable and auditable. There are 34 defined event types, and every one follows this rule.
 
 ### 2. Fail-closed
 
