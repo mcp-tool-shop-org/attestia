@@ -102,8 +102,8 @@ beforeEach(() => {
   evmGetLogs.mockResolvedValue([]);
   evmGetBlock.mockReset();
   evmReadContract.mockReset();
-  solGetSlot.mockResolvedValue(250_000_000);
-  solGetBalance.mockResolvedValue(5_000_000_000);
+  solGetSlot.mockResolvedValue(250_000_000n);
+  solGetBalance.mockResolvedValue(5_000_000_000n);
   xrplRequest.mockReset();
   xrplIsConnected.mockReturnValue(true);
 });
@@ -237,7 +237,7 @@ describe("finality-tag failure degrades to 'connected, finality unknown' (D3-B-0
   it("Solana: stays connected when the finalized-slot fetch fails", async () => {
     // First getSlot (liveness) OK, second getSlot('finalized') fails.
     solGetSlot
-      .mockResolvedValueOnce(250_000_000) // liveness
+      .mockResolvedValueOnce(250_000_000n) // liveness
       .mockRejectedValueOnce(new Error("finalized commitment unavailable")); // finalized
 
     const observer = new SolanaObserver({
@@ -483,7 +483,7 @@ describe("RPC retry parity + telemetry (PB-WCO-001, PB-WCO-004)", () => {
 
   it("Solana: retries are no longer silent — emits rpc.retry (PB-WCO-004)", async () => {
     const { telemetry, events } = makeCapturingSink();
-    solGetSlot.mockResolvedValue(250_000_000);
+    solGetSlot.mockResolvedValue(250_000_000n);
     solGetBalance
       .mockRejectedValueOnce(new Error("503 Service Unavailable fetch failed"))
       .mockResolvedValue(5_000_000_000);

@@ -55,6 +55,21 @@ import { withRetry } from "../retry.js";
 // Solana Observer
 // =============================================================================
 
+/**
+ * @solana/web3.js v3 returns slots, balances, block times and the numbers inside
+ * jsonParsed instructions (such as tokenAmount.decimals) as bigint, and bigint
+ * does not survive JSON.stringify. The observer's public shapes carry these as
+ * numbers or strings, so narrow at the boundary and refuse a value that would
+ * lose precision.
+ */
+function toSafeNumber(value: bigint | number): number {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) {
+    throw new RangeError(`Solana value ${String(value)} is outside the safe integer range`);
+  }
+  return n;
+}
+
 export class SolanaObserver implements ChainObserver {
   readonly chainId: string;
   private connection: Connection | null = null;
@@ -119,8 +134,8 @@ export class SolanaObserver implements ChainObserver {
 
     let slot: number;
     try {
-      slot = await this.connection.getSlot(
-        this.rpcConfig.commitment as Commitment,
+      slot = toSafeNumber(
+        await this.connection.getSlot(this.rpcConfig.commitment as Commitment),
       );
     } catch (err) {
       // Core liveness probe failed → genuinely disconnected. Surface the reason
@@ -149,7 +164,7 @@ export class SolanaObserver implements ChainObserver {
         const finalizedSlot = await this.connection.getSlot("finalized");
         return {
           ...status,
-          finalizedBlock: finalizedSlot,
+          finalizedBlock: toSafeNumber(finalizedSlot),
         };
       } catch (err) {
         // Finalized slot unavailable — stay connected, report finality unknown.
@@ -185,7 +200,7 @@ export class SolanaObserver implements ChainObserver {
       balance: balance.toString(),
       decimals: 9, // SOL uses lamports (9 decimals)
       symbol: "SOL",
-      atBlock: slot,
+      atBlock: toSafeNumber(slot),
       observedAt: new Date().toISOString(),
     };
   }
@@ -216,7 +231,7 @@ export class SolanaObserver implements ChainObserver {
     const tokenAccount = response.value[0]!;
     const parsed = tokenAccount.account.data.parsed as {
       info: {
-        tokenAmount: { amount: string; decimals: number; uiAmountString: string };
+        tokenAmount: { amount: string; decimals: bigint | number; uiAmountString: string };
       };
     };
 
@@ -228,7 +243,7 @@ export class SolanaObserver implements ChainObserver {
       token: query.token,
       symbol: `SPL:${query.token}`, // Full mint address — avoids misleading truncated hash
       balance: tokenAmount.amount,
-      decimals: tokenAmount.decimals,
+      decimals: toSafeNumber(tokenAmount.decimals),
       observedAt: new Date().toISOString(),
     };
   }
@@ -377,9 +392,9 @@ export class SolanaObserver implements ChainObserver {
     observedAt: string,
   ): TransferEvent[] {
     const events: TransferEvent[] = [];
-    const slot = tx.slot;
+    const slot = toSafeNumber(tx.slot);
     const timestamp = tx.blockTime
-      ? new Date(tx.blockTime * 1000).toISOString()
+      ? new Date(Number(tx.blockTime) * 1000).toISOString()
       : observedAt;
 
     // Extract instructions
@@ -427,7 +442,7 @@ export class SolanaObserver implements ChainObserver {
           ? String((info.tokenAmount as { amount: string })?.amount ?? "0")
           : String(info.amount ?? "0");
         const decimals = type === "transferChecked"
-          ? ((info.tokenAmount as { decimals: number })?.decimals ?? 0)
+          ? toSafeNumber((info.tokenAmount as { decimals: bigint | number })?.decimals ?? 0)
           : 0;
         const mint = info.mint as string | undefined;
 

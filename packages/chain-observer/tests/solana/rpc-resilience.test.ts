@@ -87,8 +87,8 @@ describe("SolanaObserver RPC resilience", () => {
     });
 
     it("all queries fail after disconnect", async () => {
-      mockGetSlot.mockResolvedValue(100);
-      mockGetBalance.mockResolvedValue(0);
+      mockGetSlot.mockResolvedValue(100n);
+      mockGetBalance.mockResolvedValue(0n);
 
       const observer = new SolanaObserver(createConfig());
       await observer.connect();
@@ -105,7 +105,7 @@ describe("SolanaObserver RPC resilience", () => {
   describe("RPC error handling", () => {
     it("getBalance propagates RPC errors", async () => {
       mockGetBalance.mockRejectedValue(new Error("RPC timeout"));
-      mockGetSlot.mockResolvedValue(100);
+      mockGetSlot.mockResolvedValue(100n);
 
       const observer = new SolanaObserver(createConfig());
       await observer.connect();
@@ -153,8 +153,8 @@ describe("SolanaObserver RPC resilience", () => {
 
     it("getTransfers does not emit partial events on transaction fetch failure", async () => {
       mockGetSignaturesForAddress.mockResolvedValue([
-        { signature: "sig1", slot: 100 },
-        { signature: "sig2", slot: 101 },
+        { signature: "sig1", slot: 100n },
+        { signature: "sig2", slot: 101n },
       ]);
       mockGetParsedTransactions.mockRejectedValue(
         new Error("Transaction fetch failed"),
@@ -186,15 +186,15 @@ describe("SolanaObserver RPC resilience", () => {
     it("handles null transactions in batch gracefully", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValue([
-        { signature: "sig1", slot: 100 },
-        { signature: "sig2", slot: 101 },
+        { signature: "sig1", slot: 100n },
+        { signature: "sig2", slot: 101n },
       ]);
       // First tx is null (skipped/dropped), second has data
       mockGetParsedTransactions.mockResolvedValue([
         null,
         {
-          slot: 101,
-          blockTime: 1700000001,
+          slot: 101n,
+          blockTime: 1700000001n,
           transaction: {
             message: {
               instructions: [{
@@ -227,12 +227,12 @@ describe("SolanaObserver RPC resilience", () => {
     it("handles transactions with no matching instructions", async () => {
       const addr = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
       mockGetSignaturesForAddress.mockResolvedValue([
-        { signature: "sig1", slot: 100 },
+        { signature: "sig1", slot: 100n },
       ]);
       mockGetParsedTransactions.mockResolvedValue([
         {
-          slot: 100,
-          blockTime: 1700000000,
+          slot: 100n,
+          blockTime: 1700000000n,
           transaction: {
             message: {
               instructions: [{
