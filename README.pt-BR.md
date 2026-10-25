@@ -32,17 +32,17 @@ Não movimentamos seu dinheiro. Provamos o que aconteceu, restringimos o que pod
 - **Governança estrutural, não governança política.** Não votamos sobre o que é válido. Definimos invariantes que se mantêm incondicionalmente — a identidade é explícita, a linhagem é ininterrupta, a ordem é determinística.
 - **A intenção não é a execução.** Declarar o que você quer e fazê-lo são atos separados, com portões separados. A lacuna entre eles é onde a confiança reside.
 - **As cadeias são testemunhas, não autoridades.** A XRPL atesta. A Ethereum liquida. Mas a autoridade emana de regras estruturais, não do consenso de qualquer cadeia.
-- **Infraestrutura simples vence.** O mundo não precisa de outro protocolo DeFi. Ele precisa da camada de contabilidade subjacente — a infraestrutura financeira que torna tudo o mais confiável.
+- **Infraestrutura simples vence.** O mundo não precisa de mais um protocolo DeFi. Ele precisa da camada de contabilidade subjacente — a infraestrutura financeira que torna tudo o mais confiável.
 
 ## Lugar no sistema
 
 Attestia, Cognate e RepoMesh são três produtos.
 
-A **Attestia** prova que um evento, uma transação ou uma transição de estado ocorreu e vincula essa prova a uma cadeia. O domínio que oferece é a verdade financeira: cofre pessoal, tesouraria organizacional e registo. Seus primitivos de prova são um armazenamento de eventos apenas de adição e provas de Merkle.
+A **Attestia** prova que um evento, uma transação ou uma transição de estado ocorreu e vincula essa prova a uma cadeia. O domínio que ela oferece é a verdade financeira: cofre pessoal, tesouraria organizacional e registrum. Seus primitivos de prova são um armazenamento de eventos apenas de adição e provas de Merkle.
 
-A **Cognate** é o domínio de governança de IA nesses primitivos: linhagem do modelo, decisões de política, capacidades do agente e integridade de prompts e resultados. Não mantém um segundo armazenamento de eventos.
+A **Cognate** é o domínio de governança de IA nesses primitivos: linhagem do modelo, decisões de política, capacidades do agente e integridade do prompt e da saída. Ela não mantém um segundo armazenamento de eventos.
 
-A **RepoMesh** é a rede de lançamento: eventos assinados, manifestos de nós e um relógio de confiança ancorado na XRPL. Mantém seu próprio livro-razão RFC 6962. Não usa a árvore de Merkle da Attestia.
+A **RepoMesh** é a rede de lançamento: eventos assinados, manifestos de nós e um relógio de confiança ancorado na XRPL. Ela mantém seu próprio livro-razão RFC 6962. Não usa a árvore de Merkle da Attestia.
 
 A Cognate chama a Attestia quando precisa de uma prova e a RepoMesh quando precisa que um lançamento seja verificado.
 
@@ -81,7 +81,7 @@ A Attestia é três sistemas, uma verdade:
 
 | Sistema | Função | Origem |
 |--------|------|--------|
-| **Personal Vault** | Observação de portfólio multi-cadeia, orçamento de envelope, declaração de intenção | Evoluiu do NextLedger |
+| **Personal Vault** | Observação de portfólio multi-cadeia, orçamento de envelope, declaração de intenção | Evoluiu da NextLedger |
 | **Org Treasury** | Folha de pagamento determinística, distribuições DAO, financiamento de duplo portão, livro-razão de dupla entrada | Evoluiu do Payroll Engine |
 | **Registrum** | Registrador estrutural — 11 invariantes, validação de dupla testemunha, atestação XRPL | Inalterado — camada constitucional |
 
@@ -89,7 +89,7 @@ A Attestia é três sistemas, uma verdade:
 
 ## Experimente em 2 minutos
 
-A maneira mais rápida de entender a Attestia é observar um pagamento fluir completamente. A demonstração interativa executa o pipeline completo de **Intenção → Aprovação → Execução → Verificação → Atestação → Prova** de ponta a ponta — cada etapa é calculada em tempo real em relação aos pacotes de domínio reais (correspondência, hash, atestação no estilo XRPL, prova de Merkle), não uma simulação.
+A maneira mais rápida de entender a Attestia é observar um pagamento percorrer todo o processo. A demonstração interativa executa o pipeline completo de **Intenção → Aprovação → Execução → Verificação → Atestação → Prova** de ponta a ponta — cada etapa é calculada em tempo real em relação aos pacotes de domínio reais (correspondência, hash, atestação no estilo XRPL, prova de Merkle), não uma simulação.
 
 ```bash
 pnpm install   # Install all dependencies
@@ -125,7 +125,7 @@ Nenhuma etapa é opcional. Nenhuma etapa é automatizada.
 | Registros apenas de adição | Sem ATUALIZAR, sem EXCLUIR — apenas novas entradas |
 | Falha segura | A divergência interrompe o sistema, nunca se cura silenciosamente |
 | Reprodução determinística | Os mesmos eventos produzem o mesmo estado, sempre |
-| IA apenas consultiva | A IA pode analisar, alertar, sugerir — nunca aprovar, assinar ou executar |
+| Apenas IA consultiva | A IA pode analisar, alertar, sugerir — nunca aprovar, assinar ou executar |
 | Observação multi-cadeia | Ethereum, XRPL, Solana, L2s — camada de leitura agnóstica à cadeia |
 | Identidade estrutural | Explícita, imutável, única — não biométrica, mas constitucional |
 
@@ -133,7 +133,7 @@ Nenhuma etapa é opcional. Nenhuma etapa é automatizada.
 
 ## Status
 
-14 pacotes, 2.564 testes, 95% de cobertura, tudo verde. Construindo em público.
+Versão 2.1.2. 15 pacotes de espaço de trabalho, 2.594 testes em CI, mais 3 testes de fumaça de pacote, 94,9–100% de cobertura de declarações por pacote, tudo verde. Construindo em público.
 
 | Pacote | Testes | Propósito |
 |---------|-------|---------|
@@ -146,18 +146,27 @@ Nenhuma etapa é opcional. Nenhuma etapa é automatizada.
 | `@attestia/reconciler` | 98 | Correspondência 3D entre sistemas + atestação do Registrum |
 | `@attestia/witness` | 295 | Atestação na cadeia XRPL, governança multi-assinatura, repetição |
 | `@attestia/verify` | 273 | Verificação de reprodução, evidência de conformidade, aplicação de SLA |
-| `@attestia/event-store` | 253 | Persistência de eventos apenas de adição, JSONL, cadeia de hash, 34 tipos de eventos |
+| `@attestia/event-store` | 263 | Persistência de eventos apenas de adição, JSONL, cadeia de hash, 34 tipos de eventos |
 | `@attestia/proof` | 94 | Árvores de Merkle (RFC 6962), provas de inclusão, empacotamento de provas de atestação |
 | `@attestia/sdk` | 115 | SDK de cliente HTTP tipado para consumidores externos |
-| `@attestia/node` | 342 | API REST Hono — persistência duradoura, autenticação, multi-tenância, tesouraria/cofre/governança, OpenAPI |
-| `@attestia/demo` | — | Demonstração interativa da CLI — demonstração completa do pipeline Attestia (privado, sem testes) |
+| `@attestia/node` | 362 | API REST Hono — persistência durável, autenticação, multi-tenância, tesouraria/cofre/governança, OpenAPI |
+| `@mcptoolshop/attestia` | 3 | O pacote npm publicado: todas as bibliotecas acima em um único pacote, com exportações de subcaminho (testes de fumaça, executados por `pnpm test`; a execução de cobertura do CI não os inclui) |
+| `@attestia/demo` | — | Demonstração interativa da CLI — percorra todo o pipeline Attestia (privado, sem testes) |
+
+### O que há de novo na versão 2.1
+
+- **2.1.2: recuperação de falhas para o registro de eventos.** Se um escritor for interrompido no meio de uma linha, `JsonlEventStore` ignora a última linha incompleta ao reabrir, e sua primeira gravação anexa uma nova linha para que os novos eventos comecem em uma linha nova. O fragmento incompleto permanece no arquivo e é ignorado em cada carregamento. Os eventos cujo `append()` foi retornado estão no disco. Um evento danificado no meio do registro ainda faz com que o armazenamento se recuse a abrir (`INTEGRITY_VIOLATION`, com o `verifyOnLoad: true` padrão). O arquivo README do armazenamento de eventos diz [o que permanece após uma retomada](packages/event-store/README.md).
+- **2.1.1: Zod 4.** A validação agora é executada no Zod 4.6.7. A redação das mensagens de validação integradas em `details.issues[].message` e em `ConfigError` foi alterada (por exemplo, `"Required"` agora é `"Invalid input: expected <type>, received undefined"`). Os códigos de erro, os caminhos de problemas, o envelope de erro HTTP e as próprias mensagens de refinamento do Attestia permanecem inalterados, portanto, corresponda aos códigos e caminhos, não ao texto da mensagem.
+- **2.1.0: um registro de eventos durável para o serviço.** `ATTESTIA_EVENTS_FILE` abre esse arquivo como o registro de eventos do proprietário configurado. Se não estiver definido, o serviço permanece na memória. Uma entrada `API_KEYS` malformada não coloca mais a chave no erro de inicialização.
+
+Veja [CHANGELOG.md](CHANGELOG.md) para a lista completa.
 
 ### Desenvolvimento
 
 ```bash
 pnpm install          # Install all dependencies
 pnpm build            # Build all packages
-pnpm test             # Run all tests (2,564)
+pnpm test             # Run all tests (2,597)
 pnpm test:coverage    # Run with coverage reporting
 pnpm typecheck        # Type-check all packages
 pnpm bench            # Run benchmarks
@@ -165,7 +174,7 @@ pnpm bench            # Run benchmarks
 
 ### Testes de integração XRPL
 
-Um nó `rippled` independente é executado no Docker para testes de integração determinísticos na cadeia — sem dependência de testnet, sem faucet, tempo de fechamento do livro-razão inferior a um segundo.
+Um nó `rippled` independente é executado no Docker para testes de integração determinísticos na cadeia — sem dependência de testnet, sem torneira, fechamento do livro-razão em menos de um segundo.
 
 ```bash
 docker compose up -d              # Start standalone rippled
@@ -178,12 +187,12 @@ docker compose down               # Stop rippled
 | Documento | Propósito |
 |----------|---------|
 | [HANDBOOK.md](HANDBOOK.md) | Visão geral executiva e referência completa do pacote |
-| [ROADMAP.md](ROADMAP.md) | Roteiro do projeto por fases |
+| [ROADMAP.md](ROADMAP.md) | Roteiro do projeto fase a fase |
 | [DESIGN.md](DESIGN.md) | Decisões de arquitetura |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Gráfico do pacote, fluxos de dados, modelo de segurança |
 | [REFERENCE_ARCHITECTURE.md](REFERENCE_ARCHITECTURE.md) | Pilhas de 5 camadas, padrões de implantação, limites de confiança |
 | [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | Integração de API com exemplos de curl + uso do SDK |
-| [VERIFICATION_GUIDE.md](VERIFICATION_GUIDE.md) | Guia passo a passo para auditoria |
+| [VERIFICATION_GUIDE.md](VERIFICATION_GUIDE.md) | Guia de reprodução passo a passo para auditores |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | Análise STRIDE por componente |
 | [CONTROL_MATRIX.md](CONTROL_MATRIX.md) | Mapeamentos de ameaça → controle → arquivo → teste |
 | [SECURITY.md](SECURITY.md) | Política de divulgação responsável |
@@ -194,18 +203,19 @@ docker compose down               # Stop rippled
 
 ## Segurança e escopo de dados
 
-- **Dados acessados:** Lê e grava entradas do livro-razão financeiro, registros de atestado e provas criptográficas. Conecta-se a nós de blockchain (XRPL) quando o módulo de testemunha está ativo.
+- **Dados acessados:** Lê e grava entradas do livro-razão financeiro, registros de atestado e provas criptográficas. O serviço grava seu registro de eventos no arquivo nomeado por `ATTESTIA_EVENTS_FILE` quando ele é definido. Conecta-se a nós de blockchain (XRPL) quando o módulo de testemunha está ativo.
 - **Dados NÃO acessados:** Sem telemetria. Sem armazenamento de credenciais de usuário. Sem análise de terceiros.
-- **Permissões necessárias:** Acesso de leitura/gravação a diretórios de dados locais. Acesso à rede apenas para atestado de blockchain. Consulte [THREAT_MODEL.md](THREAT_MODEL.md) para a análise completa do STRIDE.
+- **Integridade no disco:** o registro de eventos é apenas de anexação e encadeado por hash. Uma última linha incompleta de uma falha é ignorada e o registro é retomado; qualquer dano que quebre a cadeia faz com que o armazenamento se recuse a abrir por padrão.
+- **Permissões necessárias:** Acesso de leitura/gravação aos diretórios de dados locais. Acesso à rede apenas para atestado de blockchain. Veja [THREAT_MODEL.md](THREAT_MODEL.md) para a análise STRIDE completa.
 
-## Quadro de avaliação
+## Placar
 
 | Portão | Status |
 |------|--------|
 | A. Linha de base de segurança | APROVADO |
 | B. Tratamento de erros | APROVADO |
-| C. Documentação para operadores | APROVADO |
-| D. Boas práticas de lançamento | APROVADO |
+| C. Documentação do operador | APROVADO |
+| D. Higiene de envio | APROVADO |
 | E. Identidade | APROVADO |
 
 ## Licença
