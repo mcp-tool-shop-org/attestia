@@ -21,11 +21,11 @@
           "path": ".github/pull_request_template.md"
         },
         {
-          "hash": "e194ac55436af6199cd147811da748e7b73ff033858942a98e5c5055b14a359f",
+          "hash": "9fc197a32bcc73463aec5be637d2dd04309279897eef7b2960d7a020648404a7",
           "path": ".github/workflows/ci.yml"
         },
         {
-          "hash": "4176280e2e2c0f9ee42a99c68a01068e2e595a52a6ed0500e8be65fa0840b185",
+          "hash": "5869aa186d63091e732027411ddc466c2808b6d8fa25f678c292148a4a288a05",
           "path": ".github/workflows/docker.yml"
         },
         {
@@ -33,7 +33,7 @@
           "path": ".github/workflows/pages.yml"
         },
         {
-          "hash": "c818095d6d4e70f5bcf1999db5e7121cda28a10d4adfc330ced198acfab5b16a",
+          "hash": "e4f90b236df84632baee8e93caad5b14c6cea03e56a49552c031be31d9c1202e",
           "path": ".github/workflows/release.yml"
         }
       ],
@@ -79,7 +79,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "9d97b069c3e551eda871bca3c247bd54c87f7fb12e5a29219bfbf33e9a1dc1f6",
+          "hash": "367e5141e4f5884e5791c4021f33a9faa958840a5decf44e1b273a87aad1c459",
           "path": "packages/attestia/LICENSE"
         },
         {
@@ -129,7 +129,7 @@
           "sequences": []
         },
         {
-          "hash": "87eb8581cfa8c079f89d905eadfac88dee5dd3f19928323e86da974ee9cd216f",
+          "hash": "e7f57bd5ec248ce42513d237c32e9bded589a3f59a5c0bb38b7e3aab0c524894",
           "path": "packages/attestia/package.json"
         },
         {
@@ -373,7 +373,7 @@
           "path": "packages/chain-observer/README.md"
         },
         {
-          "hash": "676fb3fe125fc032fd2aa62e291923c7ec4d87b38f3e0ac7c017bed279093066",
+          "hash": "f6934849b87057c787e1173afe15271c5b19e335d9cdbf437657c84f0e6827ca",
           "path": "packages/chain-observer/package.json"
         },
         {
@@ -659,47 +659,52 @@
         {
           "failurePaths": [
             {
+              "in": "toSafeNumber",
+              "kind": "throw",
+              "line": 70
+            },
+            {
               "in": "constructor",
               "kind": "throw",
-              "line": 69
+              "line": 91
             },
             {
               "in": "getStatus",
               "kind": "catch",
-              "line": 125
+              "line": 148
             },
             {
               "in": "getStatus",
               "kind": "catch",
-              "line": 154
+              "line": 177
             },
             {
               "in": "requireConnection",
               "kind": "throw",
-              "line": 298
+              "line": 321
             },
             {
               "in": "emitRpcFailure",
               "kind": "catch",
-              "line": 316
-            },
-            {
-              "in": "emitRpcRetry",
-              "kind": "catch",
               "line": 339
             },
             {
-              "in": "runRpc",
+              "in": "emitRpcRetry",
               "kind": "catch",
               "line": 362
             },
             {
               "in": "runRpc",
+              "kind": "catch",
+              "line": 385
+            },
+            {
+              "in": "runRpc",
               "kind": "throw",
-              "line": 365
+              "line": 388
             }
           ],
-          "hash": "106c88ace1e48272970b5b54bc2b1ddc0928b31c5b1fc22d46ea8d05b934a55f",
+          "hash": "733ff8c06c9345d3118310e91849ba4e8892f34dadda59a605f058dc1ab3cdb6",
           "importOrder": [
             "packages/types/src/index.ts",
             "packages/chain-observer/src/observer.ts",
@@ -847,7 +852,7 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "13c696d4c192a3b0a564d082d24cd430074ba89385d9dea9d4544b2f801da2ec",
+          "hash": "e1425748518fb1b2e3b474d24b3e3171a508038c4105ae3565d052ce964b22e7",
           "importOrder": [
             "packages/chain-observer/src/evm/evm-observer.ts",
             "packages/chain-observer/src/xrpl/xrpl-observer.ts",
@@ -1001,7 +1006,24 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "3aa79131e77ba8f65028b0764d600d2bb7dd8fa84494e1784079435771c8a7c5",
+          "hash": "7ef25fed7bdd68f530158a9d196bed6769a528b42759e699defa0a21769a7c8e",
+          "importOrder": [
+            "packages/chain-observer/src/solana/solana-observer.ts",
+            "packages/chain-observer/src/errors.ts",
+            "packages/chain-observer/src/chains.ts",
+            "packages/chain-observer/src/profiles.ts"
+          ],
+          "importsFiles": [
+            "packages/chain-observer/src/chains.ts",
+            "packages/chain-observer/src/errors.ts",
+            "packages/chain-observer/src/profiles.ts",
+            "packages/chain-observer/src/solana/solana-observer.ts"
+          ],
+          "path": "packages/chain-observer/tests/solana/range-guard.test.ts",
+          "testFramework": "vitest"
+        },
+        {
+          "hash": "9e55944bb1112d3271e4ed1aa401709520d7dfbc582d8bdea74823410c98ba39",
           "importOrder": [
             "packages/chain-observer/src/solana/solana-observer.ts",
             "packages/chain-observer/src/chains.ts",
@@ -1018,7 +1040,7 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "af7864eb97416030faadc27c9694a3fd477b142ba756b1bf0ec3f97f47c49d7f",
+          "hash": "03e6aba9ea5b9c95a3cbbe06bd0391731045e708deb9ad8bb92a9836d4b40514",
           "importOrder": [
             "packages/chain-observer/src/solana/solana-observer.ts",
             "packages/chain-observer/src/chains.ts",
@@ -1033,7 +1055,20 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "ace6976a0a8d33f1c26483a7c114a0f5e4b37335632cf2cfaff6e49120e4ac32",
+          "hash": "9c8240f784f1d476e2e76618baaf605f35907c35d7b7710ebfd5e790c3a69cb8",
+          "importOrder": [
+            "packages/chain-observer/src/solana/solana-observer.ts",
+            "packages/chain-observer/src/chains.ts"
+          ],
+          "importsFiles": [
+            "packages/chain-observer/src/chains.ts",
+            "packages/chain-observer/src/solana/solana-observer.ts"
+          ],
+          "path": "packages/chain-observer/tests/solana/rpc-wire.test.ts",
+          "testFramework": "vitest"
+        },
+        {
+          "hash": "4bfc6afbd841805a6a3001e980be132a5a7a89b7ba992fbc7a0063fed70ebdf5",
           "importOrder": [
             "packages/chain-observer/src/solana/solana-observer.ts",
             "packages/chain-observer/src/chains.ts",
@@ -1135,7 +1170,7 @@
       "testRunners": [
         "vitest"
       ],
-      "testedBy": 30,
+      "testedBy": 32,
       "unresolvedSites": 0
     },
     {
@@ -1255,11 +1290,11 @@
       "externals": 0,
       "files": [
         {
-          "hash": "3f9de5af7f72bce7126f39d55955e397ad2726efd43eed6a7bdb131713274970",
+          "hash": "3dd582abe395c73fccd8a1a0c194dcc903068961377169fd5702f9d0a84f776d",
           "path": "packages/event-store/README.md"
         },
         {
-          "hash": "220564331c7de2309e75a45d409b6014bed57478ed820f1ccb589d731d34357e",
+          "hash": "0d4b5cf06c7ab2993b0ef805a72d0f378e6021ab07c5fa4248b075e41ec1411d",
           "path": "packages/event-store/package.json"
         },
         {
@@ -1402,120 +1437,120 @@
             {
               "in": "constructor",
               "kind": "throw",
-              "line": 306
+              "line": 317
             },
             {
               "in": "append",
               "kind": "throw",
-              "line": 322
+              "line": 333
             },
             {
               "in": "append",
               "kind": "throw",
-              "line": 338
+              "line": 349
             },
             {
               "in": "append",
               "kind": "throw",
-              "line": 346
+              "line": 357
             },
             {
               "in": "read",
               "kind": "throw",
-              "line": 476
+              "line": 509
             },
             {
               "in": "_emit",
               "kind": "catch",
-              "line": 613
+              "line": 646
             },
             {
               "in": "_validateStreamId",
               "kind": "throw",
-              "line": 620
+              "line": 653
             },
             {
               "in": "_loadFromFile",
               "kind": "catch",
-              "line": 665
+              "line": 699
             },
             {
               "in": "_loadFromFile",
               "kind": "throw",
-              "line": 680
+              "line": 714
             },
             {
               "in": "_loadFromFile",
               "kind": "catch",
-              "line": 707
+              "line": 745
             },
             {
               "in": "_acquireLock",
               "kind": "catch",
-              "line": 840
-            },
-            {
-              "in": "_acquireLock",
-              "kind": "throw",
-              "line": 842
-            },
-            {
-              "in": "_acquireLock",
-              "kind": "throw",
               "line": 878
+            },
+            {
+              "in": "_acquireLock",
+              "kind": "throw",
+              "line": 880
+            },
+            {
+              "in": "_acquireLock",
+              "kind": "throw",
+              "line": 916
             },
             {
               "in": "_readLockPid",
               "kind": "catch",
-              "line": 902
+              "line": 940
             },
             {
               "in": "_tryBreakStaleLock",
               "kind": "catch",
-              "line": 947
+              "line": 985
             },
             {
               "in": "_tryBreakStaleLock",
               "kind": "catch",
-              "line": 967
+              "line": 1005
             },
             {
               "in": "_releaseLock",
               "kind": "catch",
-              "line": 986
+              "line": 1024
             },
             {
               "in": "_detectExternalAdvanceUnderLock",
               "kind": "catch",
-              "line": 1017
+              "line": 1055
             },
             {
               "in": "_detectExternalAdvanceUnderLock",
               "kind": "throw",
-              "line": 1023
+              "line": 1061
             },
             {
               "in": "_detectExternalAdvanceUnderLock",
               "kind": "throw",
-              "line": 1030
+              "line": 1068
             },
             {
               "in": "_detectExternalAdvanceUnderLock",
               "kind": "throw",
-              "line": 1042
+              "line": 1080
             },
             {
               "in": "_dispatch",
               "kind": "catch",
-              "line": 1074
+              "line": 1112
             },
             {
               "in": "_dispatch",
               "kind": "catch",
-              "line": 1085
+              "line": 1123
             }
           ],
-          "hash": "9f12d5ab5971aa6e4371b38fc7b19b18e6c81f040a2db6f3f8b21f073a2eba3b",
+          "hash": "f21012112f7b70dc9602f4d72d48499c4dd5b056e5d87193185c2890459655b7",
           "importOrder": [
             "packages/types/src/index.ts",
             "packages/event-store/src/types.ts",
@@ -1759,6 +1794,21 @@
           "testFramework": "vitest"
         },
         {
+          "hash": "7d5732e0b9d7c8fdb368bbf1f052d61fcdbbf92241b625ddb39d94287ccce483",
+          "importOrder": [
+            "packages/types/src/index.ts",
+            "packages/event-store/src/jsonl-store.ts",
+            "packages/event-store/src/types.ts"
+          ],
+          "importsFiles": [
+            "packages/event-store/src/jsonl-store.ts",
+            "packages/event-store/src/types.ts",
+            "packages/types/src/index.ts"
+          ],
+          "path": "packages/event-store/tests/torn-tail-resume.test.ts",
+          "testFramework": "vitest"
+        },
+        {
           "hash": "62bab5b7545b2cf6c59cb9b23735d2709d11dea1f753aa35b113f9e61c84d0dc",
           "path": "packages/event-store/tsconfig.json"
         },
@@ -1788,7 +1838,7 @@
       "testRunners": [
         "vitest"
       ],
-      "testedBy": 16,
+      "testedBy": 17,
       "unresolvedSites": 0
     },
     {
@@ -1806,7 +1856,7 @@
           "path": "packages/ledger/README.md"
         },
         {
-          "hash": "200f61e357b7ba3de75a268312bf77ba2a17065fd445ceba55a12adb79ee3a39",
+          "hash": "cb24d889bcbcd33abbe5a890ed63f2e12db7f1e67e0202a60b2a1e82a389cb36",
           "path": "packages/ledger/package.json"
         },
         {
@@ -2184,7 +2234,7 @@
           "path": "packages/node/docs/curl-examples.md"
         },
         {
-          "hash": "a00fe0f1e0a67e9991c7925343d7d7bbf4cb61aa19d856b3abbb4a33bb639059",
+          "hash": "0c3d6613451ad2b8665c9745e994dbdb2db873bfb20b70f9b95f89936c0664bb",
           "path": "packages/node/package.json"
         },
         {
@@ -2441,7 +2491,7 @@
               "line": 187
             }
           ],
-          "hash": "5abf1334b12fa7ab5a868bb2e275ada6439475128b6c6cf68c51776507670885",
+          "hash": "525b9c1254fcd11b91ef66d2a0779b847d91b2716101fd851d6b27b0c6dcc1bc",
           "importsFiles": [
             "packages/node/src/services/attestia-service.ts"
           ],
@@ -3077,7 +3127,7 @@
             "createProofRoutes",
             "createPublicProofRoutes"
           ],
-          "hash": "b69607cc292730a260ecf082d4e658e5734930da7defe51dce482b1e1a27169b",
+          "hash": "eca025a807b3f59bf31e84607e8dd47927401f5f65be454b2ec7278800663902",
           "importOrder": [
             "packages/node/src/types/api-contract.ts",
             "packages/node/src/types/error.ts",
@@ -3370,7 +3420,7 @@
               "line": 46
             }
           ],
-          "hash": "dc4e4f5d9a4189bf89cc53d995dcdb2dd843d0cb315d0480759a85954bdbac96",
+          "hash": "eb6506730b8b52bfacbbc6cb7a13e710cf46850fd253ccd550bcb6b01ff91f54",
           "path": "packages/node/src/types/dto.ts"
         },
         {
@@ -3777,7 +3827,7 @@
           "testFramework": "vitest"
         },
         {
-          "hash": "17e15dc7b9f7f36d9f8da36e59df6df6728bf23422eee6fb592ef033a59a92eb",
+          "hash": "d908352abbbd10bd2d8c7bfa02da5cd1b125b0a17870ea7476317a11f73f0922",
           "importsFiles": [
             "packages/node/src/app.ts"
           ],
@@ -3870,6 +3920,27 @@
           "testFramework": "vitest"
         },
         {
+          "hash": "e41c761e6927969fbd6689a94c6eddbe6732ec5a9631dd91bb13c0683208f2c8",
+          "importOrder": [
+            "packages/node/src/config.ts",
+            "packages/node/src/types/dto.ts",
+            "packages/node/src/types/dto-governance.ts",
+            "packages/node/src/types/dto-treasury.ts",
+            "packages/node/src/types/dto-vault.ts",
+            "packages/node/tests/setup.ts"
+          ],
+          "importsFiles": [
+            "packages/node/src/config.ts",
+            "packages/node/src/types/dto-governance.ts",
+            "packages/node/src/types/dto-treasury.ts",
+            "packages/node/src/types/dto-vault.ts",
+            "packages/node/src/types/dto.ts",
+            "packages/node/tests/setup.ts"
+          ],
+          "path": "packages/node/tests/zod-schemas.test.ts",
+          "testFramework": "vitest"
+        },
+        {
           "hash": "62bab5b7545b2cf6c59cb9b23735d2709d11dea1f753aa35b113f9e61c84d0dc",
           "path": "packages/node/tsconfig.json"
         },
@@ -3898,7 +3969,7 @@
       "testRunners": [
         "vitest"
       ],
-      "testedBy": 45,
+      "testedBy": 46,
       "unresolvedSites": 0
     },
     {
@@ -3916,7 +3987,7 @@
           "path": "packages/proof/README.md"
         },
         {
-          "hash": "83d480891077027b14c128a5b429109d44299aca35ae74e8e4f3c84a607d4b1f",
+          "hash": "cc773d0f0b2918d933a8f8f9a7258816ca7c433737422a0eab67bacc08901366",
           "path": "packages/proof/package.json"
         },
         {
@@ -4634,7 +4705,7 @@
           "path": "packages/registrum/invariants/registry.json"
         },
         {
-          "hash": "5f7a4f2de0d3b5d527c025785f0f3a5e14ea7aa351d81c9bb735ef8f01df5b61",
+          "hash": "6b3dc54c23e9e9a7f54ef1560eb69bd0650023f5953f6195d678984184c27e21",
           "path": "packages/registrum/package.json"
         },
         {
@@ -6084,7 +6155,7 @@
           "path": "ARCHITECTURE.md"
         },
         {
-          "hash": "5b2eede272ca20744ff7f368851fa76a682cba05b9ea2c6be8377707031ea902",
+          "hash": "9224736e3b0dfeac90a19b90ad1fb0cf692bfdaf0df41d1da93af97f15de1839",
           "path": "CHANGELOG.md"
         },
         {
@@ -6096,7 +6167,7 @@
           "path": "DESIGN.md"
         },
         {
-          "hash": "02c6f7d76e8e3488f00f702440171d0a61398ddd43c05df9ed98955f8766e5c9",
+          "hash": "f0baad9bcf30479fbb2b2dafa7b6f8d7d60096a87da1803a5ef09491630a1b0a",
           "path": "HANDBOOK.md"
         },
         {
@@ -6112,7 +6183,7 @@
           "path": "INTEGRATION_GUIDE.md"
         },
         {
-          "hash": "9d97b069c3e551eda871bca3c247bd54c87f7fb12e5a29219bfbf33e9a1dc1f6",
+          "hash": "367e5141e4f5884e5791c4021f33a9faa958840a5decf44e1b273a87aad1c459",
           "path": "LICENSE"
         },
         {
@@ -6124,35 +6195,35 @@
           "path": "PILOT_SCOPE.md"
         },
         {
-          "hash": "9e86fe8e07d5607b63647adce9a01b8d85eff331c4a3460d437b715bd013e023",
+          "hash": "8e3e5c4326726a98de75c70556c63946d91b4f283667dab2bfaf0c07535c36e3",
           "path": "README.es.md"
         },
         {
-          "hash": "80c27658d32265138ee05eb815abffeafac065e72cab9ae98ebb9a985ae23a02",
+          "hash": "8f85261260e869e8260a0f53495498412034687e170518000f28a01ab33d6a12",
           "path": "README.fr.md"
         },
         {
-          "hash": "df478e4fe1cdaeefe9edd87f9d77e2b511cbadddc432dc4908555385f3604b2e",
+          "hash": "7d49440bbb7d3c6970fae115327067e6082df5af405e27c887a7a445837b9854",
           "path": "README.hi.md"
         },
         {
-          "hash": "f1733b15b1039c546e37e6f33c0bcbcc18107ea7a67d9a7ae47e306ff5754e60",
+          "hash": "d29b8a1fc3ab5a81e2ba41ee3e7650775c1d3f39a2ece1123ec556d09e8fbb1e",
           "path": "README.it.md"
         },
         {
-          "hash": "1fd18ccd893c47ca1745aa4b9fce57b8fdf37296d1830971716552aae31260de",
+          "hash": "25cdbfbd6786dea283051d52c234114e5b5f38b9ba8a7edba17f89afb535d71d",
           "path": "README.ja.md"
         },
         {
-          "hash": "1b5c1e397047503d29a17815f67f298bf06ea7ac30c83dbd276f2fe292ee5e97",
+          "hash": "919f1227e5814c5e5d53250fe82840ce4ed926df18b25d6a3fc6c27825a44a61",
           "path": "README.md"
         },
         {
-          "hash": "96ae126b9fbdf5de17b8d3b4877ef0153a0e0ba4390dd766ebbf8e4dd6777243",
+          "hash": "4e89e0964bffa426fcf26da19a8603cd79e82eae3a8fa27559fd5e6223a7b9ee",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "de2bbc1f3d40ab95760bc4e6769d0cb553a8561c9f365e053b9a341011977a47",
+          "hash": "f821f27c0aadfbd7aab400aca2e50f2cacc14463459c7fd2d0d4a46749807d53",
           "path": "README.zh.md"
         },
         {
@@ -6200,11 +6271,11 @@
           "path": "docker-compose.yml"
         },
         {
-          "hash": "d489879ed62fb05c4b4f3af27f180ffe4ccc785aa18eb85ff15ff662f8ac41ac",
+          "hash": "e5939bbb664512d4a3cff1eeb6dafef02ba97d16d1100c913f6e5be510e6c443",
           "path": "package.json"
         },
         {
-          "hash": "5bbc1cf478c9fb4a8d33c683b592ab1ed469aafc0a74ce00048e87bd7034b831",
+          "hash": "293b81c01993700d8e2a7f11f071deaa7cd3f2ceeaf27d36932c0af31c570649",
           "path": "pnpm-lock.yaml"
         },
         {
@@ -6296,7 +6367,7 @@
           "path": "packages/sdk/README.md"
         },
         {
-          "hash": "58ea86ce2954515d1afce5e75bdee7441b4bc50b813d8ac3a15a5d3deb02248a",
+          "hash": "0f504a216b0edddf86e268860a36a90566dd585e069621faee07fb8a973781ed",
           "path": "packages/sdk/package.json"
         },
         {
@@ -6484,7 +6555,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "e64d3df2ce7e8af8a0ff9cc127df37a9b90e25e7d64d7e787fceae905bdf7b08",
+          "hash": "99cce7e57617abbfd51a7fa929490f4ccb755802367a6ac0d26bd82fad89b47b",
           "path": "site/astro.config.mjs"
         },
         {
@@ -6509,28 +6580,32 @@
           "path": "site/src/content.config.ts"
         },
         {
-          "hash": "c40c4d72b34b988042dbff0403eaf0602a291639ece267c7597ae3a315936597",
+          "hash": "edc7579937f331c3bc9db93d7fae78409f5244bb8da27123f18e28056f0505af",
           "path": "site/src/content/docs/handbook/architecture.md"
         },
         {
-          "hash": "b85fef383094c320316719dea5110c39424c33b76e00d86c9a38ad3bd5b32e5e",
+          "hash": "0580fa1c30b95ffdcc60658790f0a567d9b3dc5cb2f32df98a9b82dbc8542009",
           "path": "site/src/content/docs/handbook/beginners.md"
         },
         {
-          "hash": "41cfa6392c1fb4cb0e7df902ab2df606e982cc536dada59dd74b669c3d288a41",
+          "hash": "bd9f071d5a88c4c7bcd8488fc0ca8f701fbc0aa7cb805c0d64e77d53d3c606b9",
           "path": "site/src/content/docs/handbook/getting-started.md"
         },
         {
-          "hash": "df372cf1c2bebe4b28e10e382dfac34205f0d75c38120f956511f0398130aafd",
+          "hash": "0c341d435dfd9bb144854e059c85a28e40e2231e8eec93ee9777dc61b06e7a55",
           "path": "site/src/content/docs/handbook/index.md"
         },
         {
-          "hash": "cb6a74dadd57e8455dd07a6611597fb10d7b9847d58ea77ba1b5a160b0feeb9d",
+          "hash": "be56ec44ea16c127cf91b2d8940d8fa53d4abfdcbfaa32594ee9fd88822b0188",
           "path": "site/src/content/docs/handbook/principles.md"
         },
         {
-          "hash": "059498e601420a0768891c89842e8d78d0d1455704daef18ebaca75f42e95b69",
+          "hash": "7c67d2457e7c75f9519d8d25ac712a23105644351faee305e46517e1e5db2ed2",
           "path": "site/src/content/docs/handbook/reference.md"
+        },
+        {
+          "hash": "762f69163a65689f4a6a48cd235a024502c6346d37752a183111356ddf6ef44c",
+          "path": "site/src/content/docs/handbook/whats-new.md"
         },
         {
           "hash": "1c4f96168c1faf343c85365196072da7cfef690a5242c4142ba0c3f9a29086ad",
@@ -6546,7 +6621,7 @@
         },
         {
           "constantOnly": true,
-          "hash": "e6793329874221d7ef5a6cf7aef5063914cac2adfcd6f3eb225bab3ffe1d3a09",
+          "hash": "ebee302257e8d9393c44929935a442436b3a361af87e6ccc597020f6f3019686",
           "path": "site/src/site-config.ts"
         },
         {
@@ -7133,7 +7208,7 @@
           "path": "packages/types/README.md"
         },
         {
-          "hash": "20988a75c1719ce36bfbc7b61d4d7065633b21568463ea03e3787a2bf6c023b8",
+          "hash": "60f4d826cbb5d8c42e5b18c95bde7d7cc742e0cd5ab195e595d9306ff9284d7c",
           "path": "packages/types/package.json"
         },
         {
@@ -7254,7 +7329,7 @@
       "testRunners": [
         "vitest"
       ],
-      "testedBy": 120,
+      "testedBy": 123,
       "unresolvedSites": 0
     },
     {
@@ -9486,12 +9561,12 @@
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 14
+          "files": 15
         },
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 41
+          "files": 43
         },
         {
           "boundary": "demo",
@@ -9501,7 +9576,7 @@
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 20
+          "files": 21
         },
         {
           "boundary": "ledger",
@@ -9511,7 +9586,7 @@
         {
           "boundary": "node",
           "depth": 0,
-          "files": 89
+          "files": 90
         },
         {
           "boundary": "proof",
@@ -9643,6 +9718,14 @@
           "job": "build-and-test",
           "path": "packages/attestia/src/witness.ts",
           "runKind": "executes"
+        },
+        {
+          "directory": true,
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/attestia/tests/",
+          "runKind": "executes",
+          "via": "vitest packages/attestia/vitest.config.ts"
         },
         {
           "built": true,
@@ -9830,6 +9913,13 @@
           "via": "vitest packages/event-store/vitest.config.ts"
         },
         {
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/event-store/tests/torn-tail-resume.test.ts",
+          "runKind": "executes",
+          "via": "vitest packages/event-store/vitest.config.ts"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "build-and-test",
@@ -10004,6 +10094,13 @@
           "job": "build-and-test",
           "matched": true,
           "path": "packages/node/tests/verify.test.ts",
+          "runKind": "executes",
+          "via": "vitest packages/node/vitest.config.ts"
+        },
+        {
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/node/tests/zod-schemas.test.ts",
           "runKind": "executes",
           "via": "vitest packages/node/vitest.config.ts"
         },
@@ -10464,7 +10561,7 @@
           "via": "vitest packages/witness/vitest.config.ts"
         }
       ],
-      "runsCount": 124,
+      "runsCount": 127,
       "secrets": [],
       "sends": {
         "deploysPages": false,
@@ -10479,10 +10576,22 @@
       "stages": [],
       "tests": [
         {
+          "config": "packages/attestia/vitest.config.ts",
+          "dir": "packages/attestia",
+          "files": 1,
+          "job": "build-and-test",
+          "runner": "vitest",
+          "step": "Test with coverage",
+          "through": [
+            "pnpm run test:coverage",
+            "pnpm run test:coverage (packages/attestia)"
+          ]
+        },
+        {
           "config": "packages/chain-observer/vitest.config.ts",
           "coverage": true,
           "dir": "packages/chain-observer",
-          "files": 20,
+          "files": 22,
           "job": "build-and-test",
           "runner": "vitest",
           "step": "Test with coverage",
@@ -10495,7 +10604,7 @@
           "config": "packages/event-store/vitest.config.ts",
           "coverage": true,
           "dir": "packages/event-store",
-          "files": 12,
+          "files": 13,
           "job": "build-and-test",
           "runner": "vitest",
           "step": "Test with coverage",
@@ -10521,7 +10630,7 @@
           "config": "packages/node/vitest.config.ts",
           "coverage": true,
           "dir": "packages/node",
-          "files": 41,
+          "files": 42,
           "job": "build-and-test",
           "runner": "vitest",
           "step": "Test with coverage",
@@ -10698,6 +10807,22 @@
       "commands": [],
       "elsewhere": [],
       "file": ".github/workflows/docker.yml",
+      "gated": [
+        {
+          "jobs": [
+            "build-and-push"
+          ],
+          "pushes": false,
+          "sends": [
+            "publishesTo:container image"
+          ],
+          "stages": [],
+          "when": {
+            "event": "push",
+            "tags": true
+          }
+        }
+      ],
       "jobs": [
         {
           "basis": "declared",
@@ -10733,7 +10858,7 @@
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 44
+          "files": 46
         },
         {
           "boundary": "demo",
@@ -10743,7 +10868,7 @@
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 23
+          "files": 24
         },
         {
           "boundary": "ledger",
@@ -10753,7 +10878,7 @@
         {
           "boundary": "node",
           "depth": 0,
-          "files": 92
+          "files": 93
         },
         {
           "boundary": "proof",
@@ -11189,10 +11314,8 @@
         "opensIssues": false,
         "opensIssuesOnFailure": false,
         "opensPullRequests": false,
-        "publishes": true,
-        "publishesTo": [
-          "container image"
-        ],
+        "publishes": false,
+        "publishesTo": [],
         "releases": false
       },
       "stages": [],
@@ -11202,6 +11325,9 @@
           "types": [
             "published"
           ]
+        },
+        {
+          "event": "workflow_call"
         },
         {
           "event": "workflow_dispatch"
@@ -11361,7 +11487,7 @@
       "usesWorkflowToken": false
     },
     {
-      "checksCount": 0,
+      "checksCount": 20,
       "commands": [
         {
           "dir": "",
@@ -11482,6 +11608,22 @@
               "version": "22"
             }
           ]
+        },
+        {
+          "basis": "declared",
+          "name": "image/build-and-push",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
         }
       ],
       "landings": [],
@@ -11497,93 +11639,135 @@
       ],
       "name": "Release",
       "permissions": [
+        "contents:read",
         "contents:write",
-        "id-token:write"
+        "id-token:write",
+        "packages:write"
       ],
       "pushes": false,
       "reach": [
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 15
+          "files": 18
         },
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 41
+          "files": 46
         },
         {
           "boundary": "demo",
           "depth": 0,
-          "files": 2
+          "files": 3
         },
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 20
+          "files": 24
         },
         {
           "boundary": "ledger",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "node",
           "depth": 0,
-          "files": 89
+          "files": 93
         },
         {
           "boundary": "proof",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "reconciler",
           "depth": 0,
-          "files": 18
+          "files": 20
         },
         {
           "boundary": "registrum",
           "depth": 0,
-          "files": 48
+          "files": 51
+        },
+        {
+          "boundary": "root",
+          "depth": 0,
+          "files": 4
         },
         {
           "boundary": "sdk",
           "depth": 0,
-          "files": 8
+          "files": 10
         },
         {
           "boundary": "treasury",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "types",
           "depth": 0,
-          "files": 10
+          "files": 12
         },
         {
           "boundary": "vault",
           "depth": 0,
-          "files": 14
+          "files": 16
         },
         {
           "boundary": "verify",
           "depth": 0,
-          "files": 40
+          "files": 44
         },
         {
           "boundary": "witness",
           "depth": 0,
-          "files": 42
+          "files": 46
         }
       ],
       "readers": [],
       "runs": [
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "directory": true,
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "job": "image/build-and-push",
+          "path": "packages/attestia/bundle-dts.mjs",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
           "job": "release",
           "path": "packages/attestia/bundle-dts.mjs",
           "runKind": "executes"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/attestia/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/chain-observer.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11593,9 +11777,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/event-store.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/event-store.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/index.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11605,9 +11803,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/ledger.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/ledger.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/proof.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11617,9 +11829,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/reconciler.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/reconciler.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/registrum.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11629,9 +11855,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/sdk.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/sdk.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/treasury.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11641,9 +11881,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/types.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/types.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/vault.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11653,9 +11907,23 @@
         },
         {
           "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/verify.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
           "job": "release",
           "path": "packages/attestia/src/verify.ts",
           "runKind": "executes"
+        },
+        {
+          "built": true,
+          "job": "image/build-and-push",
+          "path": "packages/attestia/src/witness.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "built": true,
@@ -11670,6 +11938,22 @@
           "path": "packages/attestia/tests/",
           "runKind": "executes",
           "via": "vitest packages/attestia/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/chain-observer/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/chain-observer/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/chain-observer/tsconfig.json"
         },
         {
           "built": true,
@@ -11755,6 +12039,22 @@
           "via": "vitest packages/chain-observer/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/demo/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/demo/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/demo/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -11762,6 +12062,22 @@
           "path": "packages/demo/src/",
           "runKind": "executes",
           "via": "tsc packages/demo/tsconfig.json"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/event-store/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/event-store/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/event-store/tsconfig.json"
         },
         {
           "built": true,
@@ -11857,6 +12173,29 @@
           "via": "vitest packages/event-store/vitest.config.ts"
         },
         {
+          "job": "release",
+          "matched": true,
+          "path": "packages/event-store/tests/torn-tail-resume.test.ts",
+          "runKind": "executes",
+          "via": "vitest packages/event-store/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/ledger/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/ledger/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/ledger/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -11874,6 +12213,22 @@
           "via": "vitest packages/ledger/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/node/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/node/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/node/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -11881,6 +12236,12 @@
           "path": "packages/node/src/",
           "runKind": "executes",
           "via": "tsc packages/node/tsconfig.json"
+        },
+        {
+          "job": "image/build-and-push",
+          "path": "packages/node/src/main.ts",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile"
         },
         {
           "job": "release",
@@ -12035,6 +12396,29 @@
           "via": "vitest packages/node/vitest.config.ts"
         },
         {
+          "job": "release",
+          "matched": true,
+          "path": "packages/node/tests/zod-schemas.test.ts",
+          "runKind": "executes",
+          "via": "vitest packages/node/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/proof/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/proof/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/proof/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -12052,6 +12436,22 @@
           "via": "vitest packages/proof/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/reconciler/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/reconciler/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/reconciler/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -12067,6 +12467,22 @@
           "path": "packages/reconciler/tests/",
           "runKind": "executes",
           "via": "vitest packages/reconciler/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/registrum/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/registrum/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/registrum/tsconfig.json"
         },
         {
           "built": true,
@@ -12185,6 +12601,22 @@
           "via": "vitest packages/registrum/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/sdk/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/sdk/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/sdk/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -12200,6 +12632,22 @@
           "path": "packages/sdk/tests/",
           "runKind": "executes",
           "via": "vitest packages/sdk/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/treasury/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/treasury/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/treasury/tsconfig.json"
         },
         {
           "built": true,
@@ -12219,6 +12667,22 @@
           "via": "vitest packages/treasury/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/types/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/types/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/types/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -12236,6 +12700,22 @@
           "via": "vitest packages/types/vitest.config.ts"
         },
         {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/vault/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/vault/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/vault/tsconfig.json"
+        },
+        {
           "built": true,
           "directory": true,
           "job": "release",
@@ -12251,6 +12731,22 @@
           "path": "packages/vault/tests/",
           "runKind": "executes",
           "via": "vitest packages/vault/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/verify/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/verify/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/verify/tsconfig.json"
         },
         {
           "built": true,
@@ -12367,6 +12863,22 @@
           "path": "packages/verify/tests/verifier-telemetry.test.ts",
           "runKind": "executes",
           "via": "vitest packages/verify/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "packages/witness/package.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "built": true,
+          "directory": true,
+          "job": "image/build-and-push",
+          "matched": true,
+          "path": "packages/witness/src/",
+          "runKind": "executes",
+          "via": "docker build packages/node/Dockerfile → tsc packages/witness/tsconfig.json"
         },
         {
           "built": true,
@@ -12489,9 +13001,30 @@
           "path": "packages/witness/tests/witness.test.ts",
           "runKind": "executes",
           "via": "vitest packages/witness/vitest.config.ts"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "pnpm-lock.yaml",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "pnpm-workspace.yaml",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
+        },
+        {
+          "job": "image/build-and-push",
+          "packed": true,
+          "path": "tsconfig.json",
+          "runKind": "checks",
+          "via": "docker build packages/node/Dockerfile"
         }
       ],
-      "runsCount": 125,
+      "runsCount": 148,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -12510,6 +13043,7 @@
         ],
         "publishes": true,
         "publishesTo": [
+          "container image",
           "npm"
         ],
         "releases": true
@@ -12531,7 +13065,7 @@
         {
           "config": "packages/chain-observer/vitest.config.ts",
           "dir": "packages/chain-observer",
-          "files": 20,
+          "files": 22,
           "job": "release",
           "runner": "vitest",
           "step": "Run tests",
@@ -12543,7 +13077,7 @@
         {
           "config": "packages/event-store/vitest.config.ts",
           "dir": "packages/event-store",
-          "files": 12,
+          "files": 13,
           "job": "release",
           "runner": "vitest",
           "step": "Run tests",
@@ -12567,7 +13101,7 @@
         {
           "config": "packages/node/vitest.config.ts",
           "dir": "packages/node",
-          "files": 41,
+          "files": 42,
           "job": "release",
           "runner": "vitest",
           "step": "Run tests",
@@ -12698,7 +13232,10 @@
       ],
       "uses": [
         "actions/checkout",
-        "actions/setup-node"
+        "actions/setup-node",
+        "docker/build-push-action",
+        "docker/login-action",
+        "docker/metadata-action"
       ],
       "usesWorkflowToken": true
     },
@@ -12999,10 +13536,10 @@
       "to": "types"
     }
   ],
-  "engine": "1.24.0",
+  "engine": "1.26.0",
   "generatedFrom": {
-    "commit": "4ce59c244b3f7453e4740c2fd1e49361aeec6c7d",
-    "tracked": 593
+    "commit": "57d57458dd8b12988fc8ebd268365dc49766483e",
+    "tracked": 598
   },
   "landings": [
     {
@@ -13137,7 +13674,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 192,
+  "testFiles": 196,
   "testsLeftOut": [
     {
       "config": "packages/witness/vitest.config.ts",

@@ -126,61 +126,54 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 67,
+      "added": 5,
+      "changed": 45,
       "moved": 0,
-      "parts": 19,
+      "parts": 12,
       "removed": 0
     },
     "items": [
       {
         "kind": "door",
-        "sentence": "CI now also runs packages/attestia/bundle-dts.mjs.",
+        "sentence": "CI now also runs packages/attestia/tests/, packages/event-store/tests/torn-tail-resume.test.ts and packages/node/tests/zod-schemas.test.ts.",
         "subjects": [
           ".github/workflows/ci.yml",
-          "packages/attestia/bundle-dts.mjs"
+          "packages/attestia/tests/",
+          "packages/event-store/tests/torn-tail-resume.test.ts",
+          "packages/node/tests/zod-schemas.test.ts"
         ]
       },
       {
         "kind": "door",
-        "sentence": "Publish to GHCR now also runs packages/attestia/bundle-dts.mjs.",
+        "sentence": "Publish to GHCR now also starts on a `workflow_call` event.",
         "subjects": [
-          ".github/workflows/docker.yml",
-          "packages/attestia/bundle-dts.mjs"
+          ".github/workflows/docker.yml"
         ]
       },
       {
         "kind": "door",
-        "sentence": "Release now also runs packages/attestia/bundle-dts.mjs.",
+        "sentence": "Release now also runs packages/event-store/tests/torn-tail-resume.test.ts, packages/node/src/main.ts and packages/node/tests/zod-schemas.test.ts.",
         "subjects": [
           ".github/workflows/release.yml",
-          "packages/attestia/bundle-dts.mjs"
+          "packages/event-store/tests/torn-tail-resume.test.ts",
+          "packages/node/src/main.ts",
+          "packages/node/tests/zod-schemas.test.ts"
         ]
       },
       {
-        "kind": "landing",
-        "sentence": "packages/attestia/dist is now written by packages/attestia/bundle-dts.mjs.",
-        "subjects": [
-          "packages/attestia/dist",
-          "packages/attestia/bundle-dts.mjs"
-        ]
-      },
-      {
-        "kind": "sequence",
-        "sentence": "In packages/node/src/main.ts, `main` gained a step, `persistenceFromConfig`, before `createApp`.",
-        "subjects": [
-          "packages/node/src/main.ts"
-        ]
+        "kind": "door",
+        "sentence": "And 1 more change to a door.",
+        "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 67 changed content, across 19 parts.",
+        "sentence": "5 files added and 45 changed content, across 12 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "92c144c11a80d3a09ddfcf8dde80f83bbdfc6896",
-      "generatedAt": "2026-10-01T02:14:21.600Z"
+      "commit": "4ce59c244b3f7453e4740c2fd1e49361aeec6c7d",
+      "generatedAt": "2026-10-15T01:17:25.260Z"
     },
     "unchanged": false
   },
@@ -189,9 +182,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "4ce59c244b3f7453e4740c2fd1e49361aeec6c7d",
+  "commit": "57d57458dd8b12988fc8ebd268365dc49766483e",
   "defaultBranch": "main",
-  "derived": "23 parts, mostly TypeScript (407 files), JavaScript (3), CSS (2) and Astro (1). Work enters through 5 doors; the busiest is Publish to GHCR, which reaches 16 parts. It publishes @mcptoolshop/attestia to npm and a container image. It deploys a site to GitHub Pages. People import @mcptoolshop/attestia.",
+  "derived": "23 parts, mostly TypeScript (411 files), JavaScript (3), CSS (2) and Astro (1). Work enters through 5 doors; Publish to GHCR and Release each reach 16 parts, and Publish to GHCR is followed because it comes first by name. It publishes @mcptoolshop/attestia to npm and a container image. It deploys a site to GitHub Pages. People import @mcptoolshop/attestia.",
   "doors": [
     {
       "builds": [
@@ -262,7 +255,7 @@
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 44
+          "files": 46
         },
         {
           "boundary": "demo",
@@ -272,7 +265,7 @@
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 23
+          "files": 24
         },
         {
           "boundary": "ledger",
@@ -282,7 +275,7 @@
         {
           "boundary": "node",
           "depth": 0,
-          "files": 92
+          "files": 93
         },
         {
           "boundary": "proof",
@@ -342,11 +335,12 @@
       "runsCount": 2,
       "runsMore": 0,
       "sends": [
-        "publishes a container image"
+        "publishes a container image on a tag push"
       ],
       "stages": [],
       "triggers": [
         "when a release is published",
+        "on a `workflow_call` event",
         "or by hand"
       ],
       "untracked": "packages/attestia/dist/, which is not tracked"
@@ -384,90 +378,119 @@
       "checks": [],
       "checksCount": 0,
       "checksMore": 0,
-      "file": ".github/workflows/ci.yml",
-      "id": ".github/workflows/ci.yml",
+      "file": ".github/workflows/release.yml",
+      "id": ".github/workflows/release.yml",
       "landings": [],
-      "name": "CI",
+      "name": "Release",
+      "packs": [
+        "package.json",
+        "packages/",
+        "packages/attestia/package.json",
+        "packages/chain-observer/package.json",
+        "packages/demo/package.json",
+        "packages/event-store/package.json",
+        "packages/ledger/package.json",
+        "packages/node/package.json",
+        "packages/proof/package.json",
+        "packages/reconciler/package.json",
+        "packages/registrum/package.json",
+        "packages/sdk/package.json",
+        "packages/treasury/package.json",
+        "packages/types/package.json",
+        "packages/vault/package.json",
+        "packages/verify/package.json",
+        "packages/witness/package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "tsconfig.json"
+      ],
       "pushes": false,
       "reach": [
         {
           "boundary": "attestia",
           "depth": 0,
-          "files": 14
+          "files": 18
         },
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 41
+          "files": 46
         },
         {
           "boundary": "demo",
           "depth": 0,
-          "files": 2
+          "files": 3
         },
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 20
+          "files": 24
         },
         {
           "boundary": "ledger",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "node",
           "depth": 0,
-          "files": 89
+          "files": 93
         },
         {
           "boundary": "proof",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "reconciler",
           "depth": 0,
-          "files": 18
+          "files": 20
         },
         {
           "boundary": "registrum",
           "depth": 0,
-          "files": 48
+          "files": 51
+        },
+        {
+          "boundary": "root",
+          "depth": 0,
+          "files": 4
         },
         {
           "boundary": "sdk",
           "depth": 0,
-          "files": 8
+          "files": 10
         },
         {
           "boundary": "treasury",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "types",
           "depth": 0,
-          "files": 10
+          "files": 12
         },
         {
           "boundary": "vault",
           "depth": 0,
-          "files": 14
+          "files": 16
         },
         {
           "boundary": "verify",
           "depth": 0,
-          "files": 40
+          "files": 44
         },
         {
           "boundary": "witness",
           "depth": 0,
-          "files": 42
+          "files": 46
         }
       ],
       "runs": [
         "packages/attestia/bundle-dts.mjs",
+        "packages/node/src/main.ts",
+        "packages/attestia/tests/",
         "packages/chain-observer/tests/chains.test.ts",
         "packages/chain-observer/tests/error-ux.test.ts",
         "packages/chain-observer/tests/evm/",
@@ -490,6 +513,7 @@
         "packages/event-store/tests/snapshot-store-hardening.test.ts",
         "packages/event-store/tests/snapshot-store.test.ts",
         "packages/event-store/tests/telemetry.test.ts",
+        "packages/event-store/tests/torn-tail-resume.test.ts",
         "packages/ledger/tests/",
         "packages/node/tests/app-lifecycle.test.ts",
         "packages/node/tests/attestation.test.ts",
@@ -512,6 +536,7 @@
         "packages/node/tests/routes/",
         "packages/node/tests/tenant-registry.test.ts",
         "packages/node/tests/verify.test.ts",
+        "packages/node/tests/zod-schemas.test.ts",
         "packages/proof/tests/",
         "packages/reconciler/tests/",
         "packages/registrum/tests/attestation/",
@@ -565,16 +590,15 @@
         "packages/witness/tests/witness-mocked.test.ts",
         "packages/witness/tests/witness.test.ts"
       ],
-      "runsCount": 97,
-      "runsMore": 181,
+      "runsCount": 101,
+      "runsMore": 187,
       "sends": [
-        "uploads coverage to Codecov"
+        "publishes @mcptoolshop/attestia to npm and a container image",
+        "creates a GitHub release"
       ],
       "stages": [],
       "triggers": [
-        "on a pull request to main",
-        "on a push to main touching 13 paths",
-        "or by hand"
+        "when a tag matching `v*` is pushed"
       ],
       "untracked": "packages/attestia/dist/, which is not tracked"
     },
@@ -611,10 +635,10 @@
       "checks": [],
       "checksCount": 0,
       "checksMore": 0,
-      "file": ".github/workflows/release.yml",
-      "id": ".github/workflows/release.yml",
+      "file": ".github/workflows/ci.yml",
+      "id": ".github/workflows/ci.yml",
       "landings": [],
-      "name": "Release",
+      "name": "CI",
       "pushes": false,
       "reach": [
         {
@@ -625,7 +649,7 @@
         {
           "boundary": "chain-observer",
           "depth": 0,
-          "files": 41
+          "files": 43
         },
         {
           "boundary": "demo",
@@ -635,7 +659,7 @@
         {
           "boundary": "event-store",
           "depth": 0,
-          "files": 20
+          "files": 21
         },
         {
           "boundary": "ledger",
@@ -645,7 +669,7 @@
         {
           "boundary": "node",
           "depth": 0,
-          "files": 89
+          "files": 90
         },
         {
           "boundary": "proof",
@@ -718,6 +742,7 @@
         "packages/event-store/tests/snapshot-store-hardening.test.ts",
         "packages/event-store/tests/snapshot-store.test.ts",
         "packages/event-store/tests/telemetry.test.ts",
+        "packages/event-store/tests/torn-tail-resume.test.ts",
         "packages/ledger/tests/",
         "packages/node/tests/app-lifecycle.test.ts",
         "packages/node/tests/attestation.test.ts",
@@ -740,6 +765,7 @@
         "packages/node/tests/routes/",
         "packages/node/tests/tenant-registry.test.ts",
         "packages/node/tests/verify.test.ts",
+        "packages/node/tests/zod-schemas.test.ts",
         "packages/proof/tests/",
         "packages/reconciler/tests/",
         "packages/registrum/tests/attestation/",
@@ -793,15 +819,16 @@
         "packages/witness/tests/witness-mocked.test.ts",
         "packages/witness/tests/witness.test.ts"
       ],
-      "runsCount": 98,
-      "runsMore": 182,
+      "runsCount": 100,
+      "runsMore": 186,
       "sends": [
-        "publishes @mcptoolshop/attestia to npm",
-        "creates a GitHub release"
+        "uploads coverage to Codecov"
       ],
       "stages": [],
       "triggers": [
-        "when a tag matching `v*` is pushed"
+        "on a pull request to main",
+        "on a push to main touching 13 paths",
+        "or by hand"
       ],
       "untracked": "packages/attestia/dist/, which is not tracked"
     },
@@ -932,9 +959,9 @@
       "to": "types"
     }
   ],
-  "engine": "1.24.0",
+  "engine": "1.26.0",
   "generated": [],
-  "generatedAt": "2026-10-15T01:17:25.260Z",
+  "generatedAt": "2026-11-11T22:08:17.268Z",
   "limits": [
     "5 writes and 7 reads use paths built at run time and are not named here.",
     "1 write goes to places this repository does not track, so it is not listed as generated.",
@@ -1080,25 +1107,26 @@
   ],
   "summary": null,
   "summaryFrom": null,
-  "testFiles": 192,
+  "testFiles": 196,
   "testedBy": {
     "attestia": 9,
-    "chain-observer": 30,
+    "chain-observer": 32,
     "demo": 0,
-    "event-store": 16,
+    "event-store": 17,
     "ledger": 40,
-    "node": 45,
+    "node": 46,
     "proof": 10,
     "reconciler": 25,
     "registrum": 43,
     "scripts": 0,
     "sdk": 6,
     "treasury": 10,
-    "types": 120,
+    "types": 123,
     "vault": 11,
     "verify": 30,
     "witness": 34
   },
+  "testedCodeParts": 16,
   "unnamedWrites": 5,
   "unread": [],
   "unreadFiles": 0,
